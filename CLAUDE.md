@@ -23,7 +23,9 @@
 
 | Purpose | Command | Verified on |
 |---|---|---|
-| (아직 없음) | | |
+| 설치 | `npm install` | 2026-08-12 |
+| 빌드 | `npm run build` | 2026-08-12 |
+| 빌드 결과 확인 | `npx vite preview --port 4173 --strictPort` | 2026-08-12 |
 
 ## Report Template
 ```
