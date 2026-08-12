@@ -16,7 +16,7 @@
 
 | ID | Task | 담당 | Depends | Spec | Status |
 |---|---|---|---|---|---|
-| S01 | **리포 스캐폴드** — Vite5+React18(JS)+@crxjs/vite-plugin, MV3 manifest(sidePanel·storage 권한), dist 언팩 로드 실브라우저 스모크(Lessons #1: jsdom 신뢰 금지, `process` define 처리) | BE-B | — | §6, §9 | todo |
+| S01 | **리포 스캐폴드** — Vite5+React18(JS)+@crxjs/vite-plugin, MV3 manifest(sidePanel·storage 권한), dist 언팩 로드 실브라우저 스모크(Lessons #1: jsdom 신뢰 금지, `process` define 처리) | BE-B | — | §6, §9 | review |
 | S02 | **Firebase 세팅** — 프로젝트 생성(콘솔은 사용자/팀), Auth(구글 로그인), Firestore, Functions 배포 파이프라인, `.env.example` 갱신 | BE-B | S01 | §6-2 | todo |
 | S03 | **`POST /v1/refine` 단일 통합 호출** — OpenAI 1회 호출로 `refined`/`backTranslation`/`detectedIntent`/`ticket`/`appliedGlossary`/`urgency` 6필드 JSON 반환. 프롬프트는 `reference/c1·c2·c4·c6.ts` 통합. 실패 시 urgency=Normal+실패 알림 필드(필수 1), 크레딧 소진 폴백 응답+폴백 표시 필드(Lessons #5), 동일 입력 캐시+바이패스(Lessons #6). 통합 테스트는 `reference/TestCases-legacy.md`에서 20건 선별 | BE-A | S01 | §6-3, 필수 1·3·4 | todo |
 | S04 | **[DS] Figma 시안** — In-page 팝업(작성/수신 모드)·사이드패널·대시보드, 주황/초록 토큰(`--primary-orange:#ff6b00`, `--primary-green:#10b981`), 아이콘 SVG | DS | — | §1, §7 | todo |
@@ -33,6 +33,8 @@
 | S15 | **민감정보 가드** — LLM 전송 **전** 클라이언트 로컬 Regex(`sk-`, `ghp_`, 카드번호, 주민번호, 비밀번호 패턴) 감지 → 전송 차단 + `[REDACTED]` 마스킹 + 안내 | FE | S05 | 필수 11 | todo |
 | S16 | **밈 수집 + Work-Safe Filter** — RSS 오픈 피드 기반 수집 Cloud Function(cron), 비속어/혐오 필터, 캐주얼 톤 옵션에 반영. 봇 차단 리스크 있으므로 **시드 데이터 동봉 후 크론은 보강** 순서로 | BE-A | S02, S03 | 필수 8, audit 4 | todo |
 | S17 | **수신자 소통 가이드** — 서술형 태그("오전 응답 빠름" 등)만, 숫자 점수 전면 금지, 본인 열람·수정·비공개 권리. 수신자 수동 선택 드롭다운(audit 2 — Lessons #4에 따라 주 경로) 포함 | BE-B+FE | S11, S13 | 필수 9, audit 2 | todo |
+
+> **S01 검증 기록 (2026-08-12)**: `npm run build` 성공(36 모듈, dist/manifest.json 자동 생성) · 번들 `process.env` 잔존 0건 · 사이드패널 React 렌더를 `vite preview`로 실브라우저 확인(탭 6개 표시). **남은 것 1건**: chrome://extensions 언팩 로드는 자동화 불가(OS 파일 선택창) — 사용자가 dist 폴더 로드 후 ① 아이콘 클릭 시 사이드패널 열림 ② 아무 페이지 콘솔에 `[사이] content script 로드됨` 출력 2가지 확인되면 done.
 
 ## P1 — 데모 완성도 (P0 완료 후)
 
