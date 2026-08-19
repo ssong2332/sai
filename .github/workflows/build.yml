@@ -1,0 +1,66 @@
+# S·AI 확장 빌드 — 테스터가 받아 갈 zip을 만든다.
+#
+# 🔴 **비밀값을 쓰지 않는다.** 확장 번들에 들어가는 값(Firebase 웹 키·OAuth client_id)은
+#    전부 소스에 있는 공개 식별자이고, 진짜 비밀(OpenAI·Gemini 키)은 서버(Secret Manager)에만
+#    있다. 그래서 이 워크플로에는 `secrets.*`가 하나도 없고, 포크에서도 그대로 돈다.
+#
+# 🔴 **테스트를 통과해야 zip을 만든다.** 설치해 보고서야 깨진 걸 아는 상황을 막는다 —
+#    `npm test`에는 ESLint `no-undef` 게이트가 들어 있어(빌드는 통과하지만 렌더 시 죽는
+#    결함을 실제로 두 번 잡았다) 이 순서가 중요하다.
+#
+# 받는 곳
+#   - 브랜치 푸시·수동 실행 → Actions 실행 페이지 하단 **Artifacts** (로그인 필요 · 90일 보관)
+#   - 태그 푸시(v로 시작)   → **Releases**에 zip 첨부 (로그인 없이 누구나 다운로드)
+
+name: build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch: # Actions 탭에서 손으로 돌릴 수 있게
+
+permissions:
+  contents: write # 릴리스 생성에 필요. 그 외 권한은 주지 않는다.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 🔴 functions/가 Node 22를 쓴다 — 같은 버전으로 맞춰 "로컬에선 되는데" 를 줄인다.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # 🔴 `npm ci`다(`install` 아님) — package-lock.json 그대로 설치해야 재현된다.
+      - run: npm ci
+
+      - name: 테스트 (ESLint 게이트 포함)
+        run: npm test
+
+      - name: 빌드
+        run: npm run build
+
+      # 🔴 zip 안에 폴더를 한 겹 두지 않는다 — 크롬의 「압축해제된 확장 프로그램 로드」는
+      #    manifest.json이 **선택한 폴더 바로 아래** 있어야 한다.
+      - name: zip 만들기
+        run: cd dist && zip -r ../sai-extension.zip . && cd .. && unzip -l sai-extension.zip | head -20
+
+      - name: 아티팩트 올리기
+        uses: actions/upload-artifact@v4
+        with:
+          name: sai-extension
+          path: sai-extension.zip
+          retention-days: 90
+
+      # 태그를 밀었을 때만 릴리스를 만든다 — 평소 푸시마다 릴리스가 쌓이면 어느 게 최신인지 흐려진다.
+      - name: 릴리스에 첨부 (태그 푸시일 때만)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sai-extension.zip
+          generate_release_notes: true
