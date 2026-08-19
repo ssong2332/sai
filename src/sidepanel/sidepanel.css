@@ -1,70 +1,1585 @@
+/**
+ * 🔴 **글자 크기 눈금을 한 단계 올렸다** (2026-08-18 사용자 지적 — "글씨가 잘 안 보인다").
+ *
+ * 그전에는 가장 흔한 크기가 **11px**(사이드패널)·**11.5px**(팝업)이었고, 11px 이하가
+ * 사이드패널 15곳·팝업 36곳이었다. 본문 최소 권장(14px)에 한참 못 미친다.
+ *
+ * 🔴 **대비는 원인이 아니었다** — `--sub` 7.11:1, `--mut` 6.45:1로 넉넉하다. 순전히 크기다.
+ *    그래서 색은 건드리지 않고 크기만 올렸다.
+ *
+ * 🔴 **눈금을 «통째로» 올렸다.** 개별 값을 골라 올리면 위계(제목 > 본문 > 캡션)가 무너진다.
+ *    10→11.5 · 10.5→12 · 11→12.5 · 11.5→13 · 12→13.5 · 12.5→13.5 · 13→14 · 13.5→14.5 ·
+ *    14→15 · 15→16. **제목급(19·22)은 그대로 뒀다** — 이미 충분히 크고, 좁은 패널에서
+ *    올리면 줄바꿈만 늘어난다.
+ */
+/* 사이드 패널 스타일 — [DS] 프로토타입 `Sai Prototype.dc.html`의 사이드 패널 인라인 스타일을
+   클래스로 정리한 것. 수치(폰트 크기·radius·padding)는 프로토타입 값을 그대로 옮겼다. */
+
+* {
+  box-sizing: border-box;
+}
+
+/* 🔴 문서 자체는 절대 스크롤하지 않는다 — 스크롤은 `.panel-body` 하나만 맡는다.
+   이게 없으면 `.panel`의 높이를 고정해도 1px 오차로 문서 스크롤바가 되살아난다. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
-  color: var(--text);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+/**
+ * 🔴 **`min-height` → `height`** (2026-08-19). 이 한 글자가 스크롤바 문제의 **진짜 원인**이었다.
+ *
+ *    `min-height: 100vh`는 「최소 화면 높이」일 뿐 **위쪽 한계가 없다.** 그래서 내용이 길어지면
+ *    `.panel`이 화면 밖으로 자라고, 자식인 `.panel-body`는 `overflow-y: auto`를 갖고도
+ *    **넘칠 일이 없어 스크롤하지 않는다** — 대신 **문서(body)가 통째로 스크롤**했다.
+ *    증거: 스크롤바가 **헤더·탭 위까지 관통**한다(2026-08-19 스크린샷). 패널 안이 스크롤되는
+ *    거라면 바는 본문 영역에서 시작해야 한다.
+ *
+ * 🔴 그래서 앞서 `.panel-body`에 건 규칙(`scrollbar-gutter` → `scrollbar-width: none`)이
+ *    **둘 다 아무 효과가 없었다.** 스크롤하지 않는 요소의 스크롤바를 손보고 있었던 것이다.
+ *    높이를 `100vh`로 고정하면 `.panel-body`가 실제 스크롤 주체가 되고, 헤더·탭은 고정된다.
+ */
+.panel {
+  position: relative; /* 설정 시트(.settings-sheet)의 배치 기준 */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   background: var(--bg);
 }
 
-.panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
+/* ── 헤더 ── */
 
 .panel-header {
-  padding: 16px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border);
+  flex: none;
 }
 
-.panel-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--primary-orange);
+.brand-mark {
+  flex: none;
 }
 
-.panel-subtitle {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--text-subtle);
+/* 🔴 `flex: 1`은 원래 `.brand-sub`("Side Panel")에 있었는데 그 요소를 지우면서 사라져,
+   톱니 버튼이 제목 바로 옆에 붙었다(2026-08-13). 브랜드명이 남는 공간을 먹어 이후 버튼을
+   오른쪽 끝으로 민다. */
+/**
+ * 워드마크 + 서브타이틀 (2026-08-19).
+ * 🔴 `flex: 1`은 이제 **묶음**이 갖는다 — 예전에는 `.brand-name`에 있었고(그 앞에는 지워진
+ *    `.brand-sub`에 있었다), 두 줄이 되면서 자리를 옮겼다. 이게 없으면 톱니 버튼이 제목 옆에
+ *    달라붙는다(2026-08-13에 같은 증상으로 한 번 고친 자리다).
+ */
+.brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
 }
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 800;
+  /* 가운뎃점이 글자에 묻히지 않게 아주 살짝 벌린다 — 「사이」로 읽히는 것이 이름의 요점이다. */
+  letter-spacing: 0.02em;
+}
+
+/**
+ * 🔴 **제목보다 확실히 약해야 한다.** 같은 무게로 두 줄이 서면 헤더가 무거워지고, 이 줄은
+ *    한 번 읽으면 되는 문장이다. 좁은 패널에서 줄바꿈되지 않도록 크기를 낮게 잡았다.
+ */
+.brand-tagline {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--mut);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-sub {
+  font-size: 12.5px;
+  color: var(--mut);
+  flex: 1;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--mut);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  flex: none;
+}
+
+.icon-button:hover {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+/**
+ * 🔴 **삭제 버튼은 hover에서만 붉어진다** (2026-08-19, 이모지 🗑 → SVG로 바꾸면서).
+ *    평소에도 붉으면 목록에 빨간 점이 사람 수만큼 깔려 「경고가 널린 화면」이 된다.
+ *    누르려고 다가갔을 때 되돌릴 수 없는 동작임을 알리면 충분하다.
+ */
+.icon-button-danger:hover {
+  background: var(--r-tint);
+  color: var(--r-deep);
+}
+
+/* 🔴 이모지(⚙️)는 폰트에 따라 작고 흐리게 그려져 알아보기 어려웠다(2026-08-13 사용자 지적).
+   `currentColor`를 쓰는 SVG로 바꿔 또렷하고 테마도 따라간다. */
+.icon-button svg {
+  display: block;
+}
+
+/* ── 탭 ── */
 
 .panel-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-subtle);
+  gap: 2px;
+  padding: 10px 14px 0;
+  flex: none;
 }
 
 .tab {
-  border: 1px solid transparent;
-  background: none;
-  border-radius: var(--radius-pill);
-  padding: 4px 10px;
-  font-size: 12px;
-  color: var(--text-subtle);
+  border: 0;
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 7px 11px;
+  border-radius: 9px;
+  color: var(--mut);
   cursor: pointer;
 }
 
 .tab:hover {
-  color: var(--text);
+  color: var(--sub);
 }
 
 .tab-active {
-  background: var(--bg);
-  border-color: var(--border);
-  color: var(--primary-orange);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* ── 본문 ── */
+
+/**
+ * 🔴 **가로 스크롤을 막는 마지막 방어선** (2026-08-18). 위 `.form-input` 수정으로 원인은
+ *    없앴지만, 앞으로 긴 낱말(이메일·타임존·URL)이 들어오면 다시 생길 수 있다.
+ *    사이드패널은 폭이 고정된 화면이라 **가로로 밀리면 안 되는 것이 기본**이다.
+ */
+/**
+ * 🔴 **그리드 칸이 내용보다 작아지지 않게 한다** (2026-08-19, 실측 두 번).
+ *
+ *    `.panel-body`는 그리드이고, 그 안의 `.fold`·`.person-card`는 둥근 모서리를 자르려고
+ *    `overflow: hidden`을 갖고 있다. CSS 규격상 **`overflow`가 `visible`이 아니면 그 요소의
+ *    「자동 최소 크기」가 0**이 된다 — 그리드가 「이 칸은 0까지 줄여도 된다」고 판단한다.
+ *    `.panel`이 `min-height`였을 때는 패널이 그냥 길어져 티가 안 났는데, `height: 100vh`로
+ *    묶은 순간 **줄일 수 있는 칸을 실제로 줄여 버렸다.** 증상이 두 가지로 나타났다:
+ *
+ *    | 증상 | 실측 |
+ *    |---|---|
+ *    | 목록이 잘리고 스크롤도 안 됨 | `.fold` 468px인데 내용 1152px, `.panel-body`는 넘침 0 |
+ *    | 접이 섹션끼리 **겹쳐 보임** | 용어집 아래끝이 저장 문구 위끝보다 **125px 아래** |
+ *
+ *    겹침은 칸(row)만 줄고 **요소 상자는 그대로**라 다음 칸을 침범해서 생긴다. 그래서 용어집을
+ *    켠 채로 저장 문구를 펴면 「+ 용어 추가」가 저장 문구 카드 뒤로 비쳐 보였다.
+ *
+ * 🔴 **칸을 내용 크기로 못 박는다.** `max-content`면 어떤 경우에도 줄지 않는다.
+ *    같은 실측에서 겹침 −20px(= 정상 간격) · 잘림 없음 · 패널 스크롤 정상.
+ *    (앞서 넣었던 `.panel-body > * { min-height: min-content }`는 이 규칙이 있으면 필요 없어
+ *    지웠다 — 실측으로 확인했다. `overflow: hidden`을 걷어내는 쪽은 카드 둥근 모서리 밖으로
+ *    내용이 삐져나와서 고르지 않았다.)
+ */
+.panel-body {
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 18px 18px;
+  display: grid;
+  grid-auto-rows: max-content;
+  gap: 12px;
+  align-content: start;
+}
+
+/* ── 카드 ── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+
+.card-accent {
+  background: var(--o-tint);
+  border-color: transparent;
+}
+
+.card-dashed {
+  background: var(--g-tint);
+  border: 1.5px dashed color-mix(in oklab, var(--g) 40%, transparent);
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+}
+
+.card-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.card-label {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--mut);
+}
+
+.card-label-green {
+  color: var(--g-deep);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.card-text {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: var(--sub);
+  line-height: 1.6;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-head-bare {
+  margin-bottom: 0;
+  align-items: baseline;
+}
+
+/* ── 통계 ── */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.stat-orange {
+  color: var(--o-deep);
+}
+
+.stat-green {
+  color: var(--g-deep);
+}
+
+.stat-ink {
+  color: var(--ink);
+}
+
+.stat-label {
+  font-size: 12.5px;
+  color: var(--mut);
+}
+
+.points {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--o-deep);
+}
+
+/* ── 세그먼트 ── */
+
+.segment {
+  display: flex;
+  gap: 2px;
+  background: var(--sunken);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+
+.segment-item {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 5px 0;
+  border-radius: var(--radius-sm);
+  color: var(--mut);
+  cursor: pointer;
+}
+
+.segment-active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── 용어·스니펫·태그 ── */
+
+.term-from {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.term-to {
+  font-size: 13.5px;
+  color: var(--g-deep);
   font-weight: 600;
 }
 
-.panel-body {
-  flex: 1;
-  padding: 16px;
+.snippet-text {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--sub);
 }
 
-.placeholder {
+.learned-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--sub);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.chip {
   font-size: 13px;
-  color: var(--text-subtle);
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 7px;
+  border: 0;
+  white-space: nowrap;
+}
+
+.chip-green {
+  color: var(--g-deep);
+  background: var(--g-tint);
+}
+
+/* S13 — 1순위 프로필 선택 칩. 기본은 회색, 고르면 주황(선택 상태가 한눈에 보여야 한다). */
+.tag-row .chip {
+  cursor: pointer;
+  color: var(--sub);
+  background: var(--sunken);
+}
+
+.tag-row .chip.chip-on {
+  color: #fff;
+  background: var(--o);
+}
+
+/* 소통 태그(읽기 전용, 필수 9)는 위 규칙에 휩쓸리면 안 된다 — 초록 유지·커서 없음. */
+.tag-row .chip.chip-green {
+  cursor: default;
+  color: var(--g-deep);
+  background: var(--g-tint);
+}
+
+.chip-orange {
+  color: var(--o-deep);
+  background: var(--o-tint);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 5px 10px;
+}
+
+.chip-outline {
+  color: var(--sub);
+  background: var(--sunken);
+  border: 1px dashed var(--faint);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 7px;
+}
+
+/* ── 버튼 ── */
+
+.button {
+  border: 0;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.button-green {
+  margin-top: 8px;
+  background: var(--g);
+  color: #fff;
+}
+
+.button-dashed {
+  border: 1.5px dashed var(--faint);
+  background: transparent;
+  color: var(--mut);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 0;
+  width: 100%;
+}
+
+.button-primary {
+  background: var(--o);
+  color: #fff;
+}
+
+.button-quiet {
+  background: var(--sunken);
+  color: var(--sub);
+}
+
+/* ── 용어집 추가/수정 폼 (S12) ── */
+
+.glossary-form {
+  display: grid;
+  gap: 8px;
+}
+
+.form-label {
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--mut);
+}
+
+.form-input {
+  /**
+   * 🔴 **`width: 100%`가 없으면 가로 스크롤바가 생긴다** (2026-08-18 실측).
+   *    `<input>`은 CSS로 폭을 안 주면 **브라우저 기본 폭(약 20자)**을 쓰는데, 그 폭은
+   *    «글자 크기에 비례»한다. 글자를 한 단계 키우자 그 기본 폭이 패널보다 넓어졌고,
+   *    세로 스크롤바가 뜨면 폭이 15px 더 줄어 **가로 스크롤바까지** 생겼다.
+   * 🔴 `box-sizing: border-box`가 이미 전역이라 padding·border를 포함해 계산된다.
+   */
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--sub);
+}
+
+/* 오류는 레드 — 강조(주황)와 색으로 구분한다(content.css `.sai-error` 주석 참조). */
+.form-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--r-deep);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.form-actions .button {
+  padding: 7px 14px;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--mut);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-inline {
+  margin-top: 0;
+}
+
+/* ── 보조 텍스트 ── */
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 1.55;
+}
+
+.hint-faint {
+  color: var(--mut);
+}
+
+/**
+ * 🔴 패널에서 **설명을 나르는 주력 문구**다. 10.5px + `--mut`(회색)이었고, 2026-08-16에
+ *    사용자가 "흰 배경에 회색 글씨라 잘 안 보인다, **글씨 크기도 작으니까**"라고 지적했다.
+ *    작은 글씨와 낮은 대비는 **함께** 고쳐야 한다 — 크기를 올리고 보조 잉크(`--sub`, 7.11:1)로
+ *    바꿨다. 라벨(`--mut`)보다 한 단계 진하다.
+ */
+/**
+ * 섹션 라벨 (2026-08-18 사용자 지적 — "각 내용이 구분이 안 된다").
+ *
+ * 🔴 **원인은 색도 크기도 아니라 «구분이 없었다»는 것이다.** 「이 사람이 있는 지역」 같은
+ *    **라벨**과 그 아래 **설명문**이 둘 다 `.meta`(작고 흐린 회색)여서, 화면이 같은 굵기의
+ *    회색 문장 여러 줄로 보였다. 무엇이 제목이고 무엇이 설명인지 눈이 구분할 단서가 없었다.
+ * 🔴 색을 진하게(`--ink`) + 굵게 + **위 여백을 크게** 준다. 여백이 실제로 «묶음»을 만든다 —
+ *    선을 긋는 것보다 조용하고, 좁은 패널에서 선이 늘면 답답해진다.
+ */
+.field-label {
+  margin: 18px 0 7px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+/* 🔴 카드 안 첫 라벨은 위 여백을 줄인다 — 카드 padding과 겹쳐 뜬 것처럼 보인다. */
+.card > .field-label:first-child,
+.form-block > .field-label:first-child {
+  margin-top: 0;
+}
+
+.meta {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--sub);
+  margin: 8px 0 0;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--sub);
+  line-height: 1.6;
+  padding: 12px 2px;
+}
+
+/* ── 토스트 ── */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 14px;
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  animation: sai-toast-up 0.3s ease;
+  max-width: calc(100% - 36px);
+}
+
+/* 예약 기록 한 건 — 카드 안의 작은 블록. */
+.card-inset {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--sunken);
+  border-radius: 10px;
+}
+
+/* ── 설정 시트 (2026-08-13) ── */
+
+/* 탭을 늘리지 않고 자리를 확보한다 — 자주 쓰지 않는 설정을 상시 탭으로 두는 건 낭비다. */
+.settings-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  padding: 14px 18px 18px;
+  background: var(--bg);
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+/* ── 스위치 — 팝업(`content.css`)과 같은 모양 ──
+   두 화면에서 같은 조작이 달라 보이면 사용자가 다시 배워야 한다.
+   🔴 노브는 `transform`으로만 움직인다(레이아웃 재계산 없이 매끄럽게).
+   🔴 꺼짐 트랙을 충분히 진하게 + 노브에 그림자 — 옅은 회색 트랙에 흰 노브면
+      켜짐/꺼짐이 구분되지 않는다(2026-08-13 사용자 지적). */
+.sai-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: 10px;
+  padding: 2px;
+  background: var(--mut);
+  cursor: pointer;
+  flex: none;
+  transition: background 160ms ease;
+}
+
+.sai-switch-on {
+  background: var(--o);
+}
+
+.sai-switch-knob {
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transform: translateX(0);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sai-switch-on .sai-switch-knob {
+  transform: translateX(12px);
+}
+
+/* ── 회의 시간 추천 (S23 / Spec 권장 12) ── */
+
+.slot-select {
+  width: 100%;
+  margin: 8px 0 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+
+.slot-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 슬롯 하나가 곧 버튼이다 — 누르면 그 시간으로 정해진다. */
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.slot:hover {
+  background: var(--sunken);
+}
+
+.slot-times {
+  display: grid;
+  gap: 1px;
+  font-size: 13.5px;
+  min-width: 0;
+}
+
+/* 상대 시각은 보조 정보 — 내 시각보다 작고 흐리게. */
+.slot-sub {
+  font-size: 12.5px;
+  color: var(--mut);
+}
+
+.slot-note {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: none;
+}
+
+.slot-note-green {
+  color: var(--g-deep);
+}
+
+.slot-note-orange {
+  color: var(--o-deep);
+}
+
+.slot-note-mut {
+  color: var(--mut);
+}
+
+/* ── 단축키 표시 (S26 / Spec 부가 9) ── */
+
+.shortcut-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 6px;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.shortcut-desc {
+  color: var(--sub);
+  min-width: 0;
+}
+
+.shortcut-key {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex: none;
+}
+
+/* 미할당은 회색으로 — 키처럼 보이면 눌러도 된다고 오해한다. */
+.shortcut-none {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--mut);
+  white-space: nowrap;
+  flex: none;
+}
+
+/* ── S22 GitHub 태그 제안 ────────────────────────────────────────────── */
+
+/* Device Flow 사용자 코드 — 8자를 옮겨 적어야 하므로 크고 또렷하게, 자간을 벌린다. */
+.github-code {
+  margin: 6px 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--o-deep);
+}
+
+.github-suggest {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.github-suggest-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.github-suggest-form .form-input {
+  flex: 1;
+  /* 🔴 `flex:1`만으로는 부족하다 — 기본 `min-width:auto` 때문에 입력창이 자기 최소 폭을 지키려고
+     옆 버튼을 밀어붙인다. 0으로 낮춰야 좁은 패널에서 버튼이 아니라 입력창이 줄어든다. */
+  min-width: 0;
+  margin: 0;
+}
+
+/**
+ * 🔴 좁은 패널(352px)에서 **버튼 글자가 한 글자씩 세로로 쪼개졌다** (2026-08-15 실확장 스크린샷:
+ *    「참가」→"참/가", 「팀 만들기」→"팀/만/들/기"). flex 아이템은 기본적으로 줄어들 수 있고
+ *    한글은 글자 단위로 줄바꿈되기 때문이다. 라벨을 짧게 바꾸는 것으로 때우면 다음 버튼에서
+ *    또 터진다 — 규칙으로 막는다.
+ */
+.github-suggest-form .button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/**
+ * 제안 한 건 — 태그 이름 + 근거 문장이 **한 버튼 안에** 들어간다.
+ *
+ * 🔴 **`.chip`의 `white-space: nowrap`을 반드시 푼다** (2026-08-19 사용자 지적 — "비율이 왕창
+ *    깨진다"). 이 요소는 `.chip`을 함께 쓰는데, 칩은 「짧은 낱말 하나」를 전제로 줄바꿈을
+ *    금지한다. 그런데 여기 들어가는 근거는 **문장**이다(예: "중앙값 220자 — 배경을 함께 쓰는
+ *    편이에요"). 줄바꿈이 막히면 버튼이 패널 폭을 넘어서 그대로 늘어나고, 옆 요소까지 밀려
+ *    화면 전체 비율이 무너진다.
+ * 🔴 그래서 **폭을 100%로 못 박고 한 줄에 하나씩** 놓는다. 근거가 길든 짧든 폭이 같아
+ *    목록으로 읽힌다. `.tag-row`(가로 나열)와 달라야 하는 이유가 이것이다.
+ * 🔴 왼쪽 정렬 — 버튼 기본값(가운데)이면 문장이 가운데 정렬돼 읽기 어렵다.
+ */
+.github-suggest-item {
+  display: block;
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.5;
+  padding: 8px 10px;
+  /**
+   * 🔴 **색을 명시한다** (2026-08-19 사용자 지적 — 다크에서 하얗게 떴다).
+   *    `.chip`은 색을 정하지 않고, 색은 `.tag-row .chip`이 준다. 이 버튼은 `.tag-row` 안에
+   *    있지 않아 **어떤 배경도 못 받고 브라우저 기본값(밝은 회색)으로 그려졌다** — 다크 화면에
+   *    흰 덩어리 셋이 뜬 이유다. 토큰으로 칠하면 두 테마를 함께 따라간다.
+   */
+  background: var(--sunken);
+  color: var(--sub);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+/**
+ * 🔴 **고른 것이 보여야 한다** (2026-08-19 사용자 지적 — "눌러도 별 달라지는 게 없어").
+ *    누르면 `draft.tagIds`가 실제로 바뀌고 저장하면 반영되는데, **선택 표시가 없었다.**
+ *    선택 상태 스타일(`chip-on`)이 `.tag-row .chip.chip-on`으로만 정의돼 있어 여기엔 안 걸렸다.
+ *    「눌러도 아무 일이 없다」로 보였으니 사용자 입장에서는 고장이다.
+ */
+.github-suggest-item.chip-on {
+  /**
+   * 🔴 **다크에서 눈이 아프지 않게** (2026-08-19 사용자 지적 ②). 예전에는 라벨과 근거 문장까지
+   *    주황(`--o-deep`)으로 칠했는데, 다크의 `--o-deep`은 **원색 그대로(#ff6100)**라 어두운
+   *    바탕 위에서 문장 전체가 형광처럼 빛났다(토큰 주석: "주황은 원색 그대로가 다크에서 이미
+   *    충분히 밝다").
+   * 🔴 그래서 **주황은 「면적이 작은 것」에만 남긴다** — 1px 테두리와 ✓ 표식뿐이다.
+   *    글자는 평소 색(`--ink`/`--mut`)을 쓴다. 상태는 여전히 한눈에 보이면서 읽기가 편하다.
+   */
+  background: var(--o-tint);
+  border-color: var(--o);
+  color: var(--ink);
+}
+
+/* 🔴 근거 문장은 켜져도 «본문 색»을 유지한다 — 여기가 형광으로 보이던 자리다. */
+.github-suggest-item.chip-on .meta {
+  color: var(--mut);
+}
+
+/* 표식만 주황 — 작아서 밝아도 눈이 편하고, 색맹이어도 ✓ 모양으로 구분된다. */
+.github-suggest-item.chip-on .github-suggest-check {
+  color: var(--o-deep);
+}
+
+.github-suggest-item + .github-suggest-item {
+  margin-top: 6px;
+}
+
+/* 선택 표시 — 색만으로 상태를 알리지 않는다(색각 이상·저대비 화면). */
+.github-suggest-check {
+  font-weight: 800;
+  margin-right: 4px;
+}
+
+.github-suggest-item .meta {
+  margin: 2px 0 0;
+}
+
+/* ── 보관함 접이 섹션 (2026-08-14 탭 5→3 정리) ────────────────────────── */
+
+.fold {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* 제목 줄 전체가 버튼이다 — 작은 화살표만 누르게 하면 400px 폭에서 조준이 어렵다. */
+.fold-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fold-head:hover {
+  background: var(--sunken);
+}
+
+.fold-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 접힌 상태에서도 안에 뭐가 있는지 알 수 있게 하는 개수 배지. */
+.fold-count {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--sunken);
+  color: var(--mut);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.fold-caret {
+  color: var(--mut);
+  font-size: 12.5px;
+}
+
+/* 🔴 위쪽 테두리로 머리와 몸을 나눈다 — 안에 또 카드가 들어와도 경계가 안 무너진다. */
+.fold-body {
+  padding: 4px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── 내 문체 리포트 (S30 대안) ────────────────────────────────────────── */
+
+/* 항목 사이를 선으로 나눈다 — 제안이 여러 개일 때 어디까지가 한 항목인지 안 보인다. */
+.style-note {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.style-note:last-of-type {
+  border-bottom: 0;
+}
+
+.style-note .meta {
+  margin: 2px 0 0;
+}
+
+/* ── 지역 선택 콤보박스 (S34) ─────────────────────────────────────────── */
+
+/* 닫힌 상태 — `form-input`과 같은 모양이라 다른 입력칸들과 줄이 맞는다. */
+.region-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.region-placeholder {
+  color: var(--mut);
+}
+
+.region-picker {
+  margin-bottom: 8px;
+}
+
+/* 🔴 목록에 높이 상한과 스크롤을 준다 — 25개가 한 번에 펼쳐지면 저장 버튼이 화면 밖으로 밀린다. */
+.region-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.region-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.region-option:last-child {
+  border-bottom: 0;
+}
+
+.region-option:hover,
+.region-option:focus-visible {
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+.region-option-on {
+  font-weight: 700;
+  color: var(--o-deep);
+}
+
+.region-empty {
+  padding: 12px;
+  margin: 0;
+}
+
+/**
+ * 목록 밖 지역을 **목록 안의 한 줄로** 고르게 한다 (2026-08-16 ⑤).
+ * 🔴 목록 항목과 **다르게 보여야 한다** — 「직접 입력」은 우리가 아는 지역이 아니라 사용자가
+ *    친 값이고, 국가코드가 없어 공휴일 조회가 안 된다는 차이가 있다.
+ */
+.region-option-custom {
+  border-top: 1px dashed var(--line);
+  background: var(--o-tint);
+}
+
+/**
+ * 목록 밖 지역 직접 입력 (2026-08-16 ③).
+ * 🔴 목록과 **시각적으로 분리**한다 — 여기 값은 우리가 아는 지역이 아니라 사용자가 넣은 값이다.
+ */
+.region-manual {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+  background: var(--o-tint);
+}
+
+/** 수신자 카드의 편집·삭제 — 한 줄에 나란히. 🔴 삭제만 있던 자리라 폭을 다시 잡는다. */
+.recipient-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ── 연결된 서비스 · 팀 관리 (2026-08-15) ─────────────────────────────── */
+
+/**
+ * 로고 + 설명 + 버튼 한 줄. 🔴 설명이 길어도 버튼이 밀리지 않게 `min-width:0`을 준다 —
+ * 352px 패널에서 버튼 글자가 세로로 쪼개졌던 것과 같은 원인이다.
+ */
+.service-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.service-row:first-of-type {
+  border-top: 0;
+}
+.service-mark {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+.service-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.service-name {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.service-row .chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 팀원 한 줄 — 왼쪽은 계정·역할, 오른쪽은 권한 스위치. */
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.member-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.member-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  /* 🔴 이메일이 길어도 줄을 밀지 않는다 — 좁은 패널에서 권한 버튼이 화면 밖으로 나간다. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-role {
+  font-size: 12.5px;
+  color: var(--sub);
+}
+.member-row .chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/**
+ * 팀 선택 드롭다운 (2026-08-16).
+ * 🔴 세그먼트로 늘어놓으면 팀이 늘수록 352px 폭에서 위로 쌓여 화면 절반을 먹는다.
+ *    드롭다운은 팀 수와 무관하게 한 줄이다.
+ */
+.team-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.team-picker-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mut);
+  flex-shrink: 0;
+}
+.team-picker .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 팀원 한 명의 블록 — 정보 줄 + 관리 동작 줄 (2026-08-16). */
+.member-block {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}
+.member-block .member-row {
+  border-top: 0;
+  padding: 0;
+}
+.member-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+/* 🔴 되돌릴 수 없는 조작의 확인 상자 — 주황 배경으로 평소 줄과 구분한다. */
+.member-confirm {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--o-tint);
+  border-radius: var(--radius-sm);
+}
+.member-confirm .meta {
+  margin: 0 0 6px;
+}
+
+/* 용어집 다중 선택 (2026-08-16) — 여러 개를 한 번에 옮기기 위한 체크박스와 동작 바. */
+.glossary-check {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--o);
+  cursor: pointer;
+}
+.glossary-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--o-tint);
+  border-radius: var(--radius-sm);
+}
+.glossary-bulk .meta {
+  margin: 0;
+  font-weight: 700;
+}
+.glossary-bulk .form-input {
+  flex: 1;
+  /* 🔴 90px 고정이면 좁은 폭에서 형제 요소를 밀어낸다 — 줄바꿈에 맡긴다. */
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 13.5px;
+}
+.glossary-bulk .chip {
+  cursor: pointer;
+}
+
+/* 회의 초안 · 직접 입력 (2026-08-16 ⑤⑦⑧). */
+.slot-manual,
+.slot-chosen {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--o-tint);
+}
+
+/**
+ * 🔴 초안은 `<pre>`로 그린다 — 줄바꿈이 그대로 보여야 복사한 결과와 화면이 같다.
+ *    폭이 352px이므로 반드시 감싼다(안 그러면 가로 스크롤이 생긴다).
+ */
+.slot-draft {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/**
+ * 탭 안의 그룹 제목 (2026-08-16 ⑨⑩ — 정리).
+ * 🔴 카드가 아니라 **구분선**이다. 카드로 만들면 그릇이 한 겹 더 생겨 오히려 복잡해진다.
+ */
+/**
+ * 🔴 설정 그룹 제목도 «흐린 회색 12.5px»이라 아래 항목들과 구분되지 않았다(2026-08-18).
+ *    `.field-label`과 같은 위계로 맞춘다 — 한 제품 안에서 「제목」이 화면마다 다르면
+ *    사용자가 매번 다시 훑어야 한다.
+ */
+.group-title {
+  margin: 20px 0 2px;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-transform: none;
+}
+
+.settings-group:first-of-type .group-title {
+  margin-top: 4px;
+}
+
+/* 설정 묶음 (2026-08-16 ⑩) — 카드 사이 간격을 그룹 안에서만 좁힌다. */
+.settings-group {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/**
+ * 프로필 「나」 — 카드 하나 안의 구획들 (2026-08-16 ⑤).
+ * 🔴 제목만 붙였을 때는 정리가 안 됐다(카드 4개가 그대로 쌓여 있었다). 그릇을 하나로 합치고
+ *    안에서는 **얇은 선**으로만 나눈다 — 테두리를 겹겹이 두르면 오히려 복잡해 보인다.
+ */
+.profile-me {
+  display: grid;
+  gap: 12px;
+}
+
+/**
+ * 🔴 **첫 구획 위에는 선을 긋지 않는다** (2026-08-19 사용자 요청 ④). 이 선은 구획«사이»를
+ *    나누라고 넣은 것인데, `>` 선택자가 첫 구획까지 잡아서 「팀에서 보이는 내 이름」 **위**,
+ *    즉 카드 안쪽 맨 위에 선이 하나 떠 있었다 — 나눌 것이 없는 자리의 선이다.
+ */
+.profile-block + .profile-block,
+.profile-me > .profile-block:not(:first-child) {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.profile-me > .card-label:first-child {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* 초안 편집 상자 (2026-08-16 ③) — 보기 전용 `<pre>`와 같은 모양이어야 한다. */
+.slot-draft-edit {
+  width: 100%;
+  resize: vertical;
+}
+
+/**
+ * 🔴 라벨 + `?`를 한 덩어리로. `.card-head-bare`는 `align-items: baseline`이라 원형 버튼이
+ *    글자 기준선에 걸려 어긋난다 — 이 안에서만 `center`로 맞춘다.
+ */
+.setting-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/**
+ * 설정 설명 펼치기 (2026-08-16 ⑤).
+ * 🔴 스위치와 **다르게 보여야 한다** — 눌렀을 때 설정이 바뀔 것처럼 보이면 안 된다.
+ *    그래서 채운 알약이 아니라 얇은 테두리 원이다.
+ */
+.setting-why {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--mut);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.setting-why:hover {
+  color: var(--ink);
+  border-color: var(--mut);
+}
+
+.setting-why-open {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+/**
+ * 머리줄 전체를 누를 수 있게 (2026-08-16 ⑤).
+ * 🔴 `<button>`이지만 **버튼처럼 보이면 안 된다** — 카드 제목 줄의 모양을 그대로 유지한다.
+ *    기본 버튼 배경·테두리·정렬을 전부 되돌린다.
+ */
+.card-head-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  /* 🔴 `.card-head`의 flex를 덮는다 — 이제 버튼 안에 «제목 줄 + 설명 줄» 두 줄이 들어간다
+     (2026-08-19). 제목 줄의 좌우 배치는 아래 `.card-head-row`가 맡는다. */
+  display: block;
+}
+
+/* 제목과 「열기/접기」를 양끝으로 — 예전에 `.card-head`가 하던 일. */
+.card-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 버튼 안의 설명 줄 — `<span>`이므로 블록으로 만들어야 제 줄을 차지한다. */
+.card-head-button .card-text {
+  display: block;
+}
+
+.card-head-button:hover .card-label {
+  color: var(--ink);
+}
+
+/** 접힌 완료 카드 (2026-08-16 ④) — 카드 안의 한 줄 버튼. */
+.onboard-done {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+/**
+ * 「오늘 막은 것」 (2026-08-17).
+ * 🔴 위 숫자 세 개와 **다른 성격**이다(한 것 vs 안 일어나게 한 것) — 초록 배경으로 갈라 놓는다.
+ */
+.blocked-line {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--g-tint);
+  color: var(--g-deep);
+  font-weight: 600;
+}
+
+/**
+ * ── 용어집 목록 스크롤 상자 (2026-08-19 사용자 지적) ──────────────────
+ *
+ * 🔴 **왜 목록에 높이 상한을 두나.** 용어가 6개만 넘어도 목록이 패널을 통째로 아래로 밀어서
+ *    **「＋ 용어 추가」 버튼이 화면 밖으로 나갔다.** 패널을 스크롤해 내리면 이번에는 목록 위쪽이
+ *    사라져 **무엇을 등록해 뒀는지 보면서 새 것을 넣을 수가 없었다.** 용어를 많이 만든 사람일수록
+ *    더 못 만드는 구조였다.
+ *
+ * 🔴 **목록만 안에서 스크롤시킨다.** 그러면 「전체 선택」(위)과 「＋ 용어 추가」(아래)가 **항상
+ *    제자리에 남고**, 그 사이의 목록만 움직인다. 접이 섹션(`.fold`) 하나가 화면을 다 먹는 일도
+ *    없어져 「저장 문구」·「예약 발송」이 늘 보인다.
+ *
+ * 🔴 **높이는 `vh`로 준다** — 브라우저 창 높이가 제각각이라 고정 px이면 짧은 화면에서 되레
+ *    답답해진다. `46vh`면 800px 화면에서 카드 약 5장이다.
+ *
+ * 🔴 **스크롤바를 여기서는 «보여 준다».** 패널 전체(`.panel-body`)에서는 숨겼지만, 이 상자는
+ *    「여기가 더 있다」를 알려 줄 것이 스크롤바뿐이다 — 잘린 것처럼 보이는 게 문제였으므로
+ *    오히려 보여야 한다. `scrollbar-gutter: stable`로 자리를 미리 비워 **나타나도 카드 폭이
+ *    흔들리지 않게** 한다.
+ */
+.glossary-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.glossary-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.glossary-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.glossary-list::-webkit-scrollbar-thumb:hover {
+  background: var(--mut);
+}
+
+/* ── 용어집 일괄 선택 (2026-08-18 사용자 요청 ④) ────────────────── */
+
+.glossary-all {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+  cursor: pointer;
+}
+
+.glossary-all input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--o);
+  cursor: pointer;
+}
+
+/**
+ * 🔴 **삭제는 색으로 구분한다.** 「팀으로 복사」·「선택 해제」와 나란히 있는데 생김새가 같으면
+ *    되돌릴 수 없는 동작을 실수로 누른다. 배경 틴트만 쓰고 테두리 줄무늬는 쓰지 않는다.
+ */
+.chip-danger {
+  color: var(--r-deep);
+  background: var(--r-tint);
+  border-color: transparent;
+}
+
+.chip-danger:hover {
+  background: color-mix(in oklab, var(--r) 18%, var(--surface));
+}
+
+/* ── 수신자 카드 구분 (2026-08-18 사용자 지적 ②) ────────────────── */
+
+/**
+ * 🔴 **왜 필요한가.** 목록이 `.card`만으로 이어져 있어서, 편집을 펼치면 폼이 길어지고
+ *    다음 사람과의 경계가 사라졌다. 「어디까지가 james인가」를 눈이 찾지 못했다.
+ * 🔴 선을 굵게 하는 대신 **이름 줄을 머리처럼 만들고 카드 사이 간격을 벌린다** —
+ *    좁은 패널에서 굵은 선이 늘면 답답해진다.
+ */
+.person-card {
+  border-color: var(--seam, rgba(25, 31, 40, 0.16));
+  box-shadow: 0 1px 3px rgba(25, 31, 40, 0.06);
+  padding: 0;
+  overflow: hidden;
+}
+
+.person-card + .person-card {
+  margin-top: 12px;
+}
+
+/* 이름 줄 — 카드의 «머리»임을 배경으로 표시한다. */
+.person-card > .card-head {
+  background: var(--sunken);
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  padding: 11px 14px;
+}
+
+.person-card > *:not(.card-head) {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.person-card > *:last-child {
+  padding-bottom: 12px;
+}
+
+/**
+ * 🔴 **세로 스크롤바를 아예 내지 않는다** (2026-08-19 사용자 지적 ④ — 2026-08-18의 재수정).
+ *
+ * 🔴 **어제 고친 방법이 왜 부족했나.** `scrollbar-gutter: stable`은 스크롤바 자리를 항상
+ *    비워 두므로 **내용 폭은 실제로 고정된다**(측정: 있으나 없으나 329px). 그런데 그 자리는
+ *    `padding` **바깥의 오른쪽 끝**에 생긴다 — 왼쪽 여백 18px, 오른쪽 여백 18+15=33px이 되어
+ *    **카드가 왼쪽으로 치우쳐 보인다.** 폭은 안 변했지만 **여백 비율이 깨진 것**이고,
+ *    사용자가 본 것은 그쪽이다. 게다가 설정 시트·지역 목록에는 이 규칙이 없어 그 화면에서는
+ *    폭까지 흔들렸다.
+ *
+ * 🔴 **그래서 자리를 비우는 대신 바를 없앤다.** 폭도 여백도 어느 쪽으로도 변하지 않는다
+ *    (스크롤바 두께 = 0). 사이드패널은 폭이 고정된 화면이라 15px은 그냥 큰 손해이기도 하다.
+ *    스크롤은 그대로 된다 — 휠·트랙패드·키보드·드래그 전부 동작한다. 잃는 것은
+ *    **현재 위치 표시**뿐이고, 이건 사용자가 「바가 안 생기게 해 달라」고 직접 고른 쪽이다
+ *    (2026-08-18 요청 ③ 원문: "그냥 유지 되도록 바가 안생기게 할 수 있으면 진행").
+ *
+ * 🔴 세로로 스크롤되는 **세 곳 전부**에 건다 — 한 곳만 걸면 그 화면에서만 조용히 되살아난다.
+ */
+.panel-body,
+.settings-sheet,
+.region-list {
+  scrollbar-width: none; /* Firefox / Chrome 121+ */
+}
+
+.panel-body::-webkit-scrollbar,
+.settings-sheet::-webkit-scrollbar,
+.region-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }

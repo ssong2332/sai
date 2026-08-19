@@ -1,0 +1,5 @@
+node_modules/
+
+# 🔴 생성물 — `scripts/sync-core.mjs`가 `src/core/refine/`에서 복사해 넣는다.
+# 단일 출처는 src/ 쪽이므로 여기 사본은 커밋하지 않는다(두 벌이 갈리는 사고를 막는다).
+core/

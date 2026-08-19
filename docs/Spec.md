@@ -11,6 +11,7 @@
 * **제품명**: 사이 (Sai) - 사람과 사람, 언어와 언어 사이를 매끄럽게 잇는 소통 도우미
 * **타겟 언어**: 한국어 ↔ 영어, 중국어 (1차 핵심 타겟)
 * **디자인 컨셉**: 무채색(White/Gray) Base + 주황(Orange)/초록(Green) Accent
+  * 🔴 **다크 모드를 v1에 포함한다** (2026-08-12 사용자 결정 — [DS] 프로토타입에 다크 토큰이 이미 확정돼 있어 추가 비용이 거의 없다). 토큰 단일 출처는 `src/styles/tokens.css`.
 * **UI 아키텍처 (삼원화)**
   * **In-page 팝업**: 텍스트 드래그 시 가볍게 뜨는 교정(작성 모드) 및 해독(수신 모드) 전용 UI.
   * **Side Panel (사이드 패널)**: 크롬 toolbar 아이콘 클릭 시 우측에 열리는 종합 설정 패널 (`chrome.sidePanel` API 기반 — 온보딩, 용어집, 개인 프로필, 스니펫, 학습내역, B2B 팀 데모).
@@ -125,6 +126,7 @@
 
 ### 3) AI 파이프라인 (LLM & Prompt Architecture - 단일 통합 호출 G6)
 * **Main LLM**: `OpenAI API` (표준 API 사용 확정 — Azure OpenAI는 v2 로드맵 반영)
+  * 🔴 **로컬 개발·테스트에 한해 Gemini API를 대체 provider로 쓴다** (2026-08-12 사용자 결정). **배포·제출 경로와 최종 판정 기준은 OpenAI로 불변** — 두 경로는 같은 payload·같은 반환 JSON 계약을 쓰며 `src/core/refine/providers/`에서 갈린다.
 * **단일 통합 호출 API (`POST /v1/refine`)**:
   * 3~5초 이내 속도를 위해 **순차 호출을 전면 금지**하고 1회 단일호출로 구조화된 JSON 데이터 반환.
   * **반환 객체:** `refined` (교정문), `backTranslation` (역번역), `detectedIntent` (하소연 여부), `ticket` (3단 티켓), `appliedGlossary` (용어 적용내역), `urgency` (긴급도 판정결과).
