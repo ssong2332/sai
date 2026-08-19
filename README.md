@@ -1,12 +1,44 @@
-# 사이 (Sai)
+# S·AI
 
-사람과 사람, 언어와 언어 사이를 매끄럽게 잇는 글로벌 업무 메시지 AI 교정 도구 (크롬 확장 + 웹 대시보드).
+**Bridging People, Time, and Space**
+
+한국어로 **「사이」**는 둘 사이의 간격, 그리고 그 간격이 만드는 관계를 뜻한다 — 두 사람 사이,
+두 시간대 사이, **내가 의도한 것과 상대가 읽은 것 사이**. 그래서 이름을 `S·AI`로 썼다.
+
+해외 협업 메시지를 **보내기 전에** 톤·긴급도·오해 소지를 잡아 주는 크롬 확장 + 웹 대시보드.
+
+| 기둥 | 하는 일 |
+|---|---|
+| **Space** | 7개 언어(ko·en·zh·ja·de·fr·es) 교정 · 수신 메시지 해독 · 역번역 |
+| **Sync** | 듀얼 시계 · 회의 시간 추천 · 퇴근 시간대 예약 제안 |
+| **Style** | 긴급도 3단 · 문체 3단(가볍게/기본/격식) · 용어집 · 오해 위험 표시 |
+
+🔴 **메시지 본문을 서버·DB·로그에 저장하지 않는다** (Zero Retention). 올라가는 것은 정수
+카운트뿐이고, [전용 테스트](test/zeroRetention.test.js)가 이를 강제한다.
+
+## 설치 (테스터용 — 개발 환경 불필요)
+
+**[⬇ 최신 릴리스 다운로드](https://github.com/ssong2332/sai/releases/latest)**
+
+직접 링크: [sai-extension.zip](https://github.com/ssong2332/sai/releases/download/v0.1.0/sai-extension.zip) (v0.1.0)
+
+1. zip을 **옮기지 않을 자리**에 압축 해제 (나중에 옮기면 확장을 다시 로드해야 한다)
+2. 크롬에서 `chrome://extensions` → 오른쪽 위 **개발자 모드** ON
+3. **압축해제된 확장 프로그램을 로드합니다** → `manifest.json`이 있는 그 폴더 선택
+4. `Alt+S`로 사이드 패널을 열고 **구글 계정으로 로그인** (이걸 해야 교정이 된다)
+
+자세한 사용법·알려진 제약은 zip 안의 **`설치 안내.txt`**에 있다.
+
+> 릴리스 zip은 [GitHub Actions](.github/workflows/build.yml)가 만든다 — 테스트 754건을
+> 통과해야 빌드되고, `v*` 태그를 밀면 자동으로 첨부된다.
+
+## 문서
 
 - 마스터 명세: [docs/Spec.md](docs/Spec.md)
 - 태스크 보드: [docs/Tasks.md](docs/Tasks.md)
 - 이전 프로젝트 이식 지식: [docs/reference/Lessons.md](docs/reference/Lessons.md)
 
-## Quick Start
+## Quick Start (개발자용)
 
 ```bash
 # 1. 패키지 설치
