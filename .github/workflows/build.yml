@@ -39,6 +39,14 @@ jobs:
       # 🔴 `npm ci`다(`install` 아님) — package-lock.json 그대로 설치해야 재현된다.
       - run: npm ci
 
+      # 🔴 **functions/는 별도 package.json을 갖는다** (2026-08-20 CI 첫 실행에서 잡힘).
+      #    `test/teams.unit.test.js`가 `functions/teams.js`를 부르고, 그 파일이 `firebase-admin`을
+      #    임포트한다. Node는 **임포트하는 파일의 위치에서 위로** 올라가며 찾으므로
+      #    `functions/node_modules`가 필요하다 — 로컬에는 배포하며 깔려 있어서 통과했고,
+      #    깨끗한 CI에서만 `ERR_MODULE_NOT_FOUND`로 드러났다. 「로컬에선 되는데」의 전형이다.
+      - name: functions 의존성 설치
+        run: npm ci --prefix functions
+
       - name: 테스트 (ESLint 게이트 포함)
         run: npm test
 
