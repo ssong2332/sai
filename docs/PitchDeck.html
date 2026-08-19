@@ -1,0 +1,724 @@
+<title>사이 피치덱</title>
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     팔레트·타이포는 프로젝트 디자인 시스템(src/styles/tokens.css)을
+     그대로 옮겼다. 덱이 제품과 다른 색을 쓰면 그 자체가 흠이 된다.
+     구조 모티프는 로고의 SHIFT 모션 — 어긋난 두 바가 정렬되는 것.
+     그것이 이 제품의 주제(어긋난 의미를 맞춘다)와 같다.
+     ───────────────────────────────────────────────────────────── */
+
+  :root {
+    --o: #ff6100;
+    --g: #009b64;
+    --r: #ee0031;
+    --o-deep: #bf4900;
+    --g-deep: #007c50;
+    --r-deep: #d6002c;
+
+    --bg: #eef0f3;
+    --surface: #ffffff;
+    --sunken: #f2f4f6;
+    --ink: #191f28;
+    --sub: #4e5968;
+    --mut: #565f6d;
+    --line: rgba(25, 31, 40, 0.12);
+    --seam: rgba(25, 31, 40, 0.16);
+
+    --o-tint: color-mix(in oklab, var(--o) 9%, var(--surface));
+    --g-tint: color-mix(in oklab, var(--g) 11%, var(--surface));
+    --r-tint: color-mix(in oklab, var(--r) 9%, var(--surface));
+
+    --sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+      'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', 'Consolas',
+      'D2Coding', monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: #0e1116;
+      --surface: #1a1f27;
+      --sunken: #242b35;
+      --ink: #f2f4f6;
+      --sub: #c4cad3;
+      --mut: #9aa4b1;
+      --line: rgba(255, 255, 255, 0.12);
+      --seam: rgba(255, 255, 255, 0.18);
+      --o-deep: #ff7a2b;
+      --g-deep: #1aa574;
+      --r-deep: #f45c7b;
+      --o-tint: color-mix(in oklab, var(--o) 16%, var(--surface));
+      --g-tint: color-mix(in oklab, var(--g) 18%, var(--surface));
+      --r-tint: color-mix(in oklab, var(--r) 16%, var(--surface));
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --bg: #0e1116;
+    --surface: #1a1f27;
+    --sunken: #242b35;
+    --ink: #f2f4f6;
+    --sub: #c4cad3;
+    --mut: #9aa4b1;
+    --line: rgba(255, 255, 255, 0.12);
+    --seam: rgba(255, 255, 255, 0.18);
+    --o-deep: #ff7a2b;
+    --g-deep: #1aa574;
+    --r-deep: #f45c7b;
+    --o-tint: color-mix(in oklab, var(--o) 16%, var(--surface));
+    --g-tint: color-mix(in oklab, var(--g) 18%, var(--surface));
+    --r-tint: color-mix(in oklab, var(--r) 16%, var(--surface));
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── 슬라이드 ───────────────────────────────────────────────── */
+
+  .deck {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding: 28px 20px 72px;
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  .slide {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 56px 56px 52px 104px;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 22px;
+    overflow: hidden;
+  }
+
+  /* 왼쪽 이음매(seam) — "사이". 모든 슬라이드를 관통하는 하나의 선. */
+  .slide::before {
+    content: '';
+    position: absolute;
+    left: 64px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--seam);
+  }
+
+  .num {
+    position: absolute;
+    left: 0;
+    top: 52px;
+    width: 64px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--mut);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--o-deep);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(40px, 6.4vw, 76px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: clamp(26px, 3.4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.028em;
+    line-height: 1.16;
+    text-wrap: balance;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    margin: 0;
+    color: var(--sub);
+    max-width: 62ch;
+  }
+
+  .lede {
+    font-size: 19px;
+    color: var(--sub);
+  }
+
+  strong {
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .mono {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── 표지: 로고의 SHIFT를 타이포로 ─────────────────────────── */
+
+  .cover {
+    min-height: 560px;
+    background: var(--ink);
+    color: #f2f4f6;
+    border-color: transparent;
+    justify-content: flex-end;
+    gap: 30px;
+  }
+  .cover::before { background: rgba(242, 244, 246, 0.18); }
+  .cover .num { color: rgba(242, 244, 246, 0.5); }
+  .cover p { color: rgba(242, 244, 246, 0.72); }
+  .cover .eyebrow { color: var(--o); }
+
+  .bars { display: grid; gap: 9px; width: 132px; }
+  .bar { height: 9px; border-radius: 2px; background: #f8f4f4; }
+  .bar-c { background: #ec3013; width: 64%; }
+  @media (prefers-reduced-motion: no-preference) {
+    .bar-a { animation: shift-a 3.4s cubic-bezier(.2,.8,.2,1) infinite; }
+    .bar-b { animation: shift-b 3.4s cubic-bezier(.2,.8,.2,1) infinite; }
+    .bar-c { animation: shift-c 3.4s cubic-bezier(.2,.8,.2,1) infinite;
+             transform-origin: left center; }
+  }
+  @keyframes shift-a { 0%,12% { transform: translateX(-34px); } 46%,100% { transform: none; } }
+  @keyframes shift-b { 0%,12% { transform: translateX(34px); }  46%,100% { transform: none; } }
+  @keyframes shift-c { 0%,40% { transform: scaleX(0); }         76%,100% { transform: scaleX(1); } }
+
+  .cover h1 { font-size: clamp(52px, 9vw, 108px); }
+  .cover .gap { display: inline-block; width: 0.34em; }
+
+  /* ── 두 칸 대조 ─────────────────────────────────────────────── */
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+  }
+
+  .cell {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+    padding: 18px 20px;
+    background: var(--sunken);
+    border-radius: 3px;
+  }
+  .cell .k {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mut);
+  }
+  .cell .v { font-size: 17px; font-weight: 600; color: var(--ink); }
+  .cell .n { font-size: 13.5px; color: var(--sub); }
+
+  .cell-bad { background: var(--r-tint); }
+  .cell-bad .v { color: var(--r-deep); }
+  .cell-good { background: var(--g-tint); }
+  .cell-good .v { color: var(--g-deep); }
+
+  /* ── 대조 행: 어긋남을 물리적으로 보여준다 ─────────────────── */
+
+  .drift { display: grid; gap: 14px; }
+  .drift-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0;
+    align-items: stretch;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .drift-side { padding: 16px 20px; display: grid; gap: 6px; align-content: center; }
+  .drift-side + .drift-side { border-left: 1px solid var(--line); background: var(--sunken); }
+  .drift-label {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--mut);
+  }
+  .drift-text { font-size: 16px; font-weight: 600; }
+  /* ── 2×2 조합표: 두 손잡이가 서로 다른 축임을 한눈에 ─────────── */
+
+  .matrix {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  .matrix > * { background: var(--surface); padding: 9px 13px; color: var(--sub); }
+  .matrix .mh {
+    background: var(--sunken);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--mut); align-content: center;
+  }
+
+  .flag { color: var(--r-deep); }
+  .flag u { text-decoration: underline wavy var(--r); text-underline-offset: 4px; }
+
+  /* ── 근거 목록 ──────────────────────────────────────────────── */
+
+  .checks { display: grid; gap: 2px; }
+  .check {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 24px;
+    padding: 15px 0;
+    border-top: 1px solid var(--line);
+    align-items: baseline;
+  }
+  .check:last-child { border-bottom: 1px solid var(--line); }
+  .check-what { font-size: 16px; font-weight: 700; letter-spacing: -0.012em; }
+  .check-why { font-size: 13.5px; color: var(--sub); }
+
+  /* ── 수치 ───────────────────────────────────────────────────── */
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; }
+  .stat { padding: 18px 20px 18px 0; border-top: 2px solid var(--ink); display: grid; gap: 4px; }
+  .stat-v {
+    font-size: 34px; font-weight: 800; letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .stat-k { font-size: 13px; color: var(--sub); }
+  .stat-src { font-family: var(--mono); font-size: 10.5px; color: var(--mut); }
+
+  /* ── 아키텍처 ───────────────────────────────────────────────── */
+
+  .arch {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.75;
+    background: var(--sunken);
+    border-radius: 3px;
+    padding: 22px 24px;
+    overflow-x: auto;
+    color: var(--ink);
+    white-space: pre;
+  }
+
+  /* ── 목록 ───────────────────────────────────────────────────── */
+
+  ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 11px; }
+  li { display: grid; grid-template-columns: 14px 1fr; gap: 12px; color: var(--sub); }
+  li::before { content: ''; width: 6px; height: 6px; margin-top: 9px; border-radius: 50%; background: var(--o); }
+  li.g::before { background: var(--g); }
+
+  .quote {
+    font-size: clamp(20px, 2.6vw, 28px);
+    font-weight: 700;
+    letter-spacing: -0.024em;
+    line-height: 1.32;
+    color: var(--ink);
+    border-left: 3px solid var(--o);
+    padding-left: 20px;
+    max-width: 24ch;
+    text-wrap: balance;
+  }
+
+  .note {
+    font-size: 13px;
+    color: var(--mut);
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    background: var(--o-tint);
+    color: var(--o-deep);
+  }
+  .tag-g { background: var(--g-tint); color: var(--g-deep); }
+
+  .end { background: var(--ink); color: #f2f4f6; border-color: transparent; }
+  .end::before { background: rgba(242, 244, 246, 0.18); }
+  .end .num { color: rgba(242, 244, 246, 0.5); }
+  .end p { color: rgba(242, 244, 246, 0.72); }
+  .end .quote { color: #f2f4f6; }
+
+  @media (max-width: 720px) {
+    .slide { padding: 40px 24px 40px 62px; min-height: 0; }
+    .slide::before { left: 34px; }
+    .num { width: 34px; top: 38px; }
+    .check { grid-template-columns: 1fr; gap: 6px; }
+    .drift-row { grid-template-columns: 1fr; }
+    .drift-side + .drift-side { border-left: 0; border-top: 1px solid var(--line); }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .deck { gap: 0; padding: 0; max-width: none; }
+    .slide { break-after: page; border: 0; border-radius: 0; min-height: 92vh; }
+  }
+</style>
+
+<div class="deck">
+
+  <!-- 1 ───────────────────────────────────────────────────────── -->
+  <section class="slide cover">
+    <span class="num">01</span>
+    <div class="bars">
+      <span class="bar bar-a"></span>
+      <span class="bar bar-b"></span>
+      <span class="bar bar-c"></span>
+    </div>
+    <h1>S<span class="gap"></span>·<span class="gap"></span>AI</h1>
+    <p class="lede"><strong style="color:#f2f4f6">Bridging People, Time, and Space</strong><br>
+      글로벌 업무 메시지 AI 교정 크롬 확장</p>
+    <p class="mono">4인 · 10일 · 2026.08.12 — 08.21</p>
+  </section>
+
+  <!-- 2 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">02</span>
+    <span class="eyebrow">문제</span>
+    <h2>번역은 됐는데, 관계가 상했다</h2>
+    <div class="drift">
+      <div class="drift-row">
+        <div class="drift-side">
+          <span class="drift-label">내가 쓴 것</span>
+          <span class="drift-text">반드시 오늘까지 배포해야 합니다</span>
+        </div>
+        <div class="drift-side">
+          <span class="drift-label">상대가 받은 것</span>
+          <span class="drift-text">The rollout <strong>must</strong> be completed today.</span>
+          <span class="drift-label">→ 명령·질책으로 읽힘</span>
+        </div>
+      </div>
+      <div class="drift-row">
+        <div class="drift-side">
+          <span class="drift-label">내가 쓴 것</span>
+          <span class="drift-text">기획서도 확인 부탁드려요</span>
+        </div>
+        <div class="drift-side">
+          <span class="drift-label">상대가 받은 것</span>
+          <span class="drift-text flag">Please review the <u>product spec</u>.</span>
+          <span class="drift-label">→ 다른 문서를 검토함</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">두 번째 줄은 실측이다. 「기획서」를 서로 다른 번역기가 <span class="mono">product spec</span> ·
+      <span class="mono">project plan</span>으로 옮겼다 — 톤이 아니라 <strong>무엇을 하라는지가 바뀌었다.</strong></p>
+  </section>
+
+  <!-- 3 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">03</span>
+    <span class="eyebrow">왜 기존 도구로 안 되나</span>
+    <h2>아무도 "틀리지 않았는지"를<br>확인하지 않는다</h2>
+    <div class="cols">
+      <div class="cell">
+        <span class="k">번역기</span>
+        <span class="v">언어 변환</span>
+        <span class="n">톤·긴급도·상대 맥락 없음. 검증 없음</span>
+      </div>
+      <div class="cell">
+        <span class="k">문법 교정기</span>
+        <span class="v">문장 다듬기</span>
+        <span class="n">언어 간 오해는 다루지 않음</span>
+      </div>
+      <div class="cell">
+        <span class="k">LLM 챗봇</span>
+        <span class="v">다 되지만</span>
+        <span class="n">창을 옮겨야 하고, 회사 메시지를 붙여넣어야 한다</span>
+      </div>
+    </div>
+    <p class="quote">쓰던 창에서, 보내기 전에, 검증까지.</p>
+  </section>
+
+  <!-- 4 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">04</span>
+    <span class="eyebrow">해결</span>
+    <h2>세 지점에서 끼어든다</h2>
+    <div class="cols">
+      <div class="cell">
+        <span class="k">보내기 전</span>
+        <span class="v">교정 · 긴급도 · 역번역</span>
+        <span class="n">AI가 긴급도를 1차 판정하고, 상대에게 어떻게 읽히는지 되돌려 보여준다</span>
+      </div>
+      <div class="cell">
+        <span class="k">받은 뒤</span>
+        <span class="v">수신 해독</span>
+        <span class="n">직역 / 실제 의도 / 체감 긴급도 / 요구 행동 네 축으로 푼다</span>
+      </div>
+      <div class="cell">
+        <span class="k">보낼 때</span>
+        <span class="v">시간 · 예약</span>
+        <span class="n">상대 현지 시각과 공휴일을 보고 보낼 때를 제안한다</span>
+      </div>
+    </div>
+    <p class="quote">AI가 고쳐 주는 게 아니라,<br>보내기 전에 한 번 더 보여줍니다.</p>
+  </section>
+
+  <!-- 5 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">05</span>
+    <span class="eyebrow">데모</span>
+    <h2>드래그 → 클릭 → 확인 → 적용</h2>
+    <p class="lede">15초 영상 삽입 지점. 말을 얹지 않고 화면만 보여준다.</p>
+    <p class="note">발표 시 이 자리에 <span class="mono">15s.mp4</span>를 넣는다. 재생 중에는 설명하지 않는다.</p>
+  </section>
+
+  <!-- 6 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">06</span>
+    <span class="eyebrow">설계 판단</span>
+    <h2>왜 무조건 공손하게 풀지 않는가</h2>
+    <p class="lede">
+      GPT에게 우리 결과와 다른 번역기를 나란히 놓고 채점시켰다.
+      원문은 <span class="mono">"배포는 반드시 오늘까지 해야 합니다."</span>
+    </p>
+
+    <div class="drift">
+      <div class="drift-row">
+        <div class="drift-side">
+          <span class="drift-label">S·AI</span>
+          <span class="drift-text">The deployment <strong>must be completed</strong> by the end of today.</span>
+          <span class="n">공손함 ★★☆☆☆ · <strong>긴급성 ★★★★★</strong></span>
+        </div>
+        <div class="drift-side">
+          <span class="drift-label">다른 번역기</span>
+          <span class="drift-text">Please ensure that the deployment is completed… appreciate your understanding.</span>
+          <span class="n">공손함 ★★★★★ · <span class="flag">긴급성 ★★★☆☆</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="matrix">
+      <span class="mh"></span>
+      <span class="mh">캐주얼 OFF</span>
+      <span class="mh">캐주얼 ON</span>
+      <span class="mh">Critical</span>
+      <span>must be completed <strong>by today</strong></span>
+      <span>we need to deploy this <strong>by today</strong></span>
+      <span class="mh">Low</span>
+      <span>could you ensure… <strong>by today</strong> when you get a chance?</span>
+      <span><strong>Hey,</strong> could you make sure to deploy this <strong>by today</strong>?</span>
+    </div>
+
+    <div class="checks">
+      <div class="check">
+        <span class="check-what">강도는 사용자가 고른다</span>
+        <span class="check-why">긴급도는 <strong>압박</strong>을, 캐주얼은 <strong>격식</strong>을 정한다 — 서로 다른 축이다.
+          위는 같은 원문을 네 조합으로 실측한 결과이며, <strong>마감(by today)은 네 칸 모두에서 살아 있다.</strong></span>
+      </div>
+      <div class="check">
+        <span class="check-what">"완곡한 쪽이 낫다"는 전제도 검증했다</span>
+        <span class="check-why">미국·호주·캐나다는 세계에서 가장 <strong>저맥락(low-context)</strong> 문화다(에린 마이어 『컬처맵』).
+          실제 가이드도 "직설이냐 정중이냐"가 아니라 <strong>"정중하되 마감을 구체적으로"</strong>를 권한다.</span>
+      </div>
+    </div>
+
+    <p class="quote">정중함과 정확함 중 하나를 골라야 한다면, 우리는 정확함을 택했습니다.</p>
+    <p class="note">
+      🔴 한계도 같이 말한다: 우리가 상정한 상대는 <strong>함께 일하는 해외 팀</strong>이지 영업 대상 고객이 아니다.
+      관계 유형(동료 / 협력사 / 고객)을 구분하는 축은 아직 없다 — 12번 슬라이드에 적었다.
+    </p>
+  </section>
+
+  <!-- 7 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">07</span>
+    <span class="eyebrow">차별점 · 핵심</span>
+    <h2>우리는 AI를 믿지 않습니다</h2>
+    <p class="lede">아래는 전부 <strong>개발 중 실제로 잡은 결함</strong>과 그에 대한 방어다.</p>
+    <div class="checks">
+      <div class="check">
+        <span class="check-what">역번역이 내 언어로 안 오면 감춘다</span>
+        <span class="check-why">한→중 교정에서 역번역이 중국어로 나왔다. 내가 확인하려고 보는 칸인데 확인이 불가능해진다.</span>
+      </div>
+      <div class="check">
+        <span class="check-what">없는 이름·호칭을 만들면 경고한다</span>
+        <span class="check-why">수신자 「싱싱」이 중국어 교정에서 <span class="mono">上晦先生/女士</span>로 바뀌었다 — 없는 한자 이름과 성별 미상 호칭.</span>
+      </div>
+      <div class="check">
+        <span class="check-what">지어낸 마감·회의를 막는다</span>
+        <span class="check-why">모델이 하지 않은 약속을 만들면 대괄호 자리표시자로 비워 두고, 코드가 원문과 대조한다.</span>
+      </div>
+      <div class="check">
+        <span class="check-what">실패하면 실패했다고 쓴다</span>
+        <span class="check-why">원문을 그대로 두고 「교정하지 못했어요」를 띄운다. 번역 안 된 문장을 결과처럼 보여주지 않는다.</span>
+      </div>
+    </div>
+    <p class="quote">LLM은 확률적입니다.<br>그래서 프롬프트로 부탁하지 않고,<br>결과를 코드가 검사합니다.</p>
+  </section>
+
+  <!-- 8 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">08</span>
+    <span class="eyebrow">차별점 · 신뢰</span>
+    <h2>안 하는 것으로 지킨다</h2>
+    <ul>
+      <li class="g"><span><strong>Zero Retention</strong> — 메시지 본문을 서버·DB·로그에 저장하지 않는다.
+        올라가는 것은 정수 카운트뿐이고, 전용 테스트가 이를 강제한다.</span></li>
+      <li class="g"><span><strong>국가로 사람을 판단하지 않는다</strong> — 참고하는 것은 「국민성」이 아니라
+        <strong>언어 사용 관례</strong>다. 코드 수준 금지 규칙으로 박아 두었다.</span></li>
+      <li class="g"><span><strong>사람에게 점수를 매기지 않는다</strong> — 소통 가이드는 고정된 서술형 태그뿐,
+        숫자·등급·순위가 없다.</span></li>
+    </ul>
+    <p class="quote">본문을 안 받으면<br>유출될 것도 없습니다.</p>
+  </section>
+
+  <!-- 9 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">09</span>
+    <span class="eyebrow">B2B · 로드맵을 앞당김</span>
+    <h2>팀에 쌓인 마찰이 숫자가 된다</h2>
+    <p class="mono" style="font-size:15px;color:var(--ink)">Health Index = 100 − (마찰 ÷ 다듬은 메시지) × 100</p>
+    <div class="cols">
+      <div class="cell cell-good">
+        <span class="k">긍정 신호</span>
+        <span class="v">3종</span>
+        <span class="n">명확한 요청으로 교정됨 · 예약 제안 수락 · 민감정보 전송을 막음</span>
+      </div>
+      <div class="cell cell-bad">
+        <span class="k">마찰 신호</span>
+        <span class="v">5종</span>
+        <span class="n">오해 소지 표현 · 하소연 · 오프타임 강행 · 긴급도 불일치 · 기한 누락</span>
+      </div>
+      <div class="cell">
+        <span class="k">집계 단위</span>
+        <span class="v">팀 · 조직</span>
+        <span class="n">개인별로 나뉘지 않는다. 누가 냈는지는 저장하지 않는다</span>
+      </div>
+    </div>
+    <p class="note">전부 <strong>이미 내리고 있던 판정을 세는 것</strong>이다 — 새 추론을 만들지 않았다.
+      명세는 이 기능을 v2로 잡았지만 <strong>v1 기간에 구현·배포했다.</strong></p>
+  </section>
+
+  <!-- 10 ───────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">10</span>
+    <span class="eyebrow">아키텍처</span>
+    <h2>단일 호출, 교체 가능한 모델</h2>
+    <div class="arch">크롬 확장 (MV3)                        Firebase
+┌──────────────────────┐              ┌──────────────────────┐
+│  In-page 팝업         │              │  Functions           │
+│  Side Panel           │── 1 call ───▶│   /refineV1          │──▶  OpenAI
+│  React 18 · Vite 5    │   + 토큰      │   /teamV1            │     (교체 가능)
+└──────────────────────┘              │  Firestore           │
+           │                          │   카운트 · 용어집만    │
+           └── Web Dashboard ────────▶ └──────────────────────┘</div>
+    <ul>
+      <li><span><strong>단일 통합 호출</strong> — 교정·긴급도·역번역·용어집·누락 검사를 한 번에 받는다.</span></li>
+      <li><span><strong>모델은 갈아 끼울 수 있다</strong> — 지금 붙어 있는 것은 <strong>OpenAI</strong>.
+        Gemini와 <strong>같은 payload·같은 반환 JSON 계약</strong>을 써서, 개발 중 실제로 한 번
+        갈아 끼웠고 바뀐 코드는 <strong>판정표 한 곳</strong>뿐이었다.</span></li>
+      <li><span><strong>키는 확장에 없다</strong> — 확장이 가진 것은 <strong>로그인 토큰</strong>뿐이고
+        LLM 키는 서버에만 있다. 서버가 토큰을 검증하고 사용자별 일일 상한까지 센다.</span></li>
+      <li><span><strong>순수 코어</strong> — 판정 로직이 네트워크를 모르는 순수 함수라 확장과 서버가 같은 코드를 쓴다.</span></li>
+    </ul>
+  </section>
+
+  <!-- 11 ──────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">11</span>
+    <span class="eyebrow">검증</span>
+    <h2>숫자는 전부 출처가 있다</h2>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-v">741</span>
+        <span class="stat-k">단위 테스트 통과 / 0 실패</span>
+        <span class="stat-src">npm test</span>
+      </div>
+      <div class="stat">
+        <span class="stat-v">7</span>
+        <span class="stat-k">지원 언어</span>
+        <span class="stat-src">en zh ja de fr es ko</span>
+      </div>
+      <div class="stat">
+        <span class="stat-v">38<span style="font-size:20px;color:var(--mut)">/52</span></span>
+        <span class="stat-k">태스크 구현·배포 완료</span>
+        <span class="stat-src">docs/Tasks.md</span>
+      </div>
+      <div class="stat">
+        <span class="stat-v">0</span>
+        <span class="stat-k">서버에 저장된 메시지 본문</span>
+        <span class="stat-src">test/zeroRetention.test.js</span>
+      </div>
+    </div>
+    <p class="note"><strong>「버그 0」이라고 쓰지 않는다.</strong> 결함을 어떻게 잡았는지는 6번에서 이미 보여줬다.
+      <span class="tag">구현 완료</span> <span class="tag tag-g">검증 진행 중</span></p>
+  </section>
+
+  <!-- 12 ──────────────────────────────────────────────────────── -->
+  <section class="slide">
+    <span class="num">12</span>
+    <span class="eyebrow">남은 것</span>
+    <h2>알려진 한계까지 적는다</h2>
+    <div class="cols">
+      <div class="cell">
+        <span class="k">v1 잔여</span>
+        <span class="v">최종 실확장 검증</span>
+        <span class="n">회귀 20건 재실측 포함. 시연 영상이 그 증거가 된다</span>
+      </div>
+      <div class="cell">
+        <span class="k">알려진 한계</span>
+        <span class="v">팀 목록은 기기에</span>
+        <span class="n">재설치하면 초대 코드가 다시 필요하다</span>
+      </div>
+      <div class="cell">
+        <span class="k">알려진 한계</span>
+        <span class="v">캘린더는 내 것만</span>
+        <span class="n">"상대의 빈 시간"이라고 말하지 않는다 — 우리는 모른다</span>
+      </div>
+      <div class="cell">
+        <span class="k">알려진 한계 · v2 1순위</span>
+        <span class="v">관계 유형 축이 없다</span>
+        <span class="n">상황(코드리뷰·장애)과 상대의 소통 습관은 반영하지만, 「동료 / 협력사 / 고객」을 가르는 손잡이가 없다. CRITICAL이면 상대가 누구든 같은 강도로 나간다</span>
+      </div>
+    </div>
+    <p class="note"><strong>다음</strong> — 팀 용어집 자동 동기화 확대 · Slack/Teams 마크다운 문법 대응 ·
+      <span class="mono">@channel</span> 대량 알림 경고</p>
+  </section>
+
+  <!-- 13 ──────────────────────────────────────────────────────── -->
+  <section class="slide end">
+    <span class="num">13</span>
+    <div class="bars">
+      <span class="bar bar-a"></span>
+      <span class="bar bar-b"></span>
+      <span class="bar bar-c"></span>
+    </div>
+    <p class="quote">번역은 이미 잘 됩니다.<br>우리는 그다음을 만듭니다.</p>
+    <p class="lede">S·AI — Bridging People, Time, and Space</p>
+    <p class="mono">디자이너 1 · 백엔드 2 · 프론트엔드 1</p>
+  </section>
+
+</div>

@@ -7,3 +7,7 @@ dist/
 firebase-debug.log
 *.log
 .DS_Store
+
+# 테스터 배포본 (빌드 산출물) — 2026-08-17
+sai-extension-*.zip
+sai-extension-*/

@@ -1,0 +1,2314 @@
+/* 🔴 팝업의 글자 크기는 **의도적으로 사이드패널보다 작다** (2026-08-18 사용자 확인).
+      팝업은 페이지 위에 떠서 원문을 가리므로, 커지면 읽던 화면을 더 덮는다.
+      2026-08-18에 사이드패널과 함께 한 단계 올렸다가 «팝업은 괜찮다»는 확인을 받고
+      선택자 단위로 원래 값으로 되돌렸다. 사이드패널만 커져 있는 것은 실수가 아니다. */
+/* In-page 교정 팝업 스타일 — [DS] 프로토타입 "작성 교정 팝업" 인라인 스타일 이식.
+   🔴 이 파일은 Shadow DOM 안에만 주입된다. 호스트 페이지로 새어 나가지 않는다. */
+
+:host {
+  all: initial;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.sai-fab-wrap,
+.sai-popup-layer {
+  position: fixed;
+  z-index: 2147483647; /* 호스트 페이지의 어떤 오버레이보다 위 */
+  /**
+   * 🔴 S40 — 회신 초안이 옆 패널로 나올 수 있어 레이어가 **가로 배치**다(2026-08-14 사용자 요청).
+   *    자식이 하나뿐인 평소에는 렌더 결과가 예전과 같다(`.sai-popup`이 자기 폭을 가진다).
+   * 🔴 `align-items: flex-start` — 두 패널의 높이가 다르므로 위를 맞춘다. 늘어나면(stretch 기본값)
+   *    짧은 패널이 긴 패널만큼 늘어나 빈 상자가 된다.
+   * 🔴 `gap`은 `SaiOverlay`의 `PANEL_GAP`과 **같은 값**이어야 한다 — 화면 밖 방지 clamp가 이
+   *    간격까지 계산에 넣는다.
+   */
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* 해독 팝업 안에 이어 붙는 회신 초안 본문 — 위쪽 방향 줄과 붙어 보이게 여백만 줄인다. */
+.sai-reply-body {
+  margin-top: 2px;
+}
+
+/**
+ * ── 플로팅 버튼 (S20 후속) ── 로고 + 액션 버튼이 **항상 한 알약으로** 보인다.
+ *
+ * 🔴 **접힘/펼침을 없앴다** (2026-08-14 사용자 지적으로 확정). 예전엔 `:hover`로 펼쳤는데,
+ *    hover는 **기능 접근의 유일한 통로로 쓰기엔 너무 약하다**: 브라우저 자체 선택 메뉴(Edge의
+ *    미니 메뉴 등)가 위에 뜨거나, 요소가 커서 밑에서 움직이거나, 터치 기기이면 도달할 방법이
+ *    사라진다. 실제로 ChatGPT·위키백과 양쪽에서 "될 때가 있고 안 될 때가 있다"가 나왔다.
+ *
+ *    「다듬기」는 **로고 클릭**이라는 확실한 경로가 따로 있어 hover가 실패해도 살아남지만,
+ *    「결정 요약」은 주 경로가 **읽기 전용 대화를 드래그**라 hover가 실패하면 **기능에 도달할
+ *    방법이 아예 없다**(사용자 지적). 접근 경로를 모션 상태에 걸지 않는다.
+ *
+ *    대가는 버튼이 항상 조금 넓다는 것뿐이고, 좌표 clamp가 이미 이 폭(190px) 기준이라
+ *    오른쪽 끝에서 잘리지도 않는다(`FAB_EXPANDED_WIDTH`).
+ */
+.sai-fab-wrap {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgba(25, 31, 40, 0.3);
+  /* 스크롤 추적(rAF) 업데이트 사이를 보간한다 — 위치만 전환한다. */
+  transition: left 80ms linear, top 80ms linear;
+}
+
+/* 🔴 항상 보인다(위 주석 참조). 예전의 `0fr → 1fr` 펼침 전환은 제거했다 — 접히는 상태가
+   없으므로 전환할 것도 없다. */
+.sai-fab-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.sai-fab-actions > .sai-fab-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 🔴 `.sai-fab-wrap-open`/`:hover` 확장 규칙은 삭제했다 — 항상 펼쳐져 있어 할 일이 없다.
+   로고 SHIFT 모션의 `:hover` 규칙은 아래에 그대로 남아 있다(장식이라 실패해도 손해가 없다). */
+
+/**
+ * 🔴 **텍스트 라벨 → 아이콘** (2026-08-14, claude.ai/design 「Sai Toolbar Icons」 이식).
+ *    라벨은 네이티브 `title`로 옮겼다 — 직접 그린 hover 툴팁은 우리가 `:hover` 실패를 반복
+ *    확인했기 때문에 쓰지 않는다(`.sai-fab-wrap` 주석 참조).
+ * 🔴 디자인 규격 그대로: **히트 영역 34×34, 아이콘 21px.** 아이콘만 남으면 누를 곳이 작아지기
+ *    쉬운데, 히트 영역을 아이콘보다 크게 잡아 두는 것이 그 규격의 핵심이다.
+ */
+.sai-fab-action {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sub);
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  cursor: pointer;
+}
+
+/* 선택 없음 등 짧은 안내 — 버튼 바로 옆(시선 있는 자리)에 띄운다. */
+.sai-fab-hint {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--o-deep);
+  background: var(--o-tint);
+  padding: 6px 10px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+/* 계열색으로 갈린다 — 저장 문구(발신)는 주황, 결정 요약(읽기·정리)은 초록.
+   디자인 파일의 분류를 그대로 따른다. */
+.sai-fab-action:hover {
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+.sai-fab-action-green:hover {
+  background: var(--g-tint);
+  color: var(--g-deep);
+}
+
+/* 저장된 상태는 hover가 아니어도 계속 보여야 한다 — 그게 상태 표시의 목적이다. */
+.sai-fab-action-saved {
+  color: var(--o-deep);
+}
+
+/* 스니펫 목록 — 버튼 아래에 붙는다. */
+/* 🔴 화면 아래쪽에서 열면 목록이 잘렸다(2026-08-13 사용자 실측 — 작업표시줄 근처).
+   팝업과 같은 규칙으로 **아래 공간이 부족하면 위로 뒤집는다**. */
+.sai-fab-snippets {
+  position: absolute;
+  /* 🔴 버튼과 목록 사이에 간격이 있으면 그 틈에서 hover가 끊겨 목록이 사라진다
+     (2026-08-13 실측). 붙여서 **같은 hover 영역**으로 만든다. */
+  top: 100%;
+  padding-top: 10px;
+  left: 0;
+  width: 320px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+/* 목록 상단의 삽입 방식 스위치 — 고르고 나서 바로 아래 항목을 누르는 흐름. */
+/* 🔴 `space-between`은 320px 폭 양 끝으로 밀어 라벨과 스위치가 멀어 보였다(2026-08-13 지적).
+   붙여서 하나의 조작으로 읽히게 한다. */
+.sai-fab-snippet-mode {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.sai-fab-snippet {
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sai-fab-snippet:hover {
+  background: var(--sunken);
+}
+
+.sai-fab-snippets-up {
+  top: auto;
+  bottom: 100%;
+  padding-top: 6px;
+  padding-bottom: 10px;
+}
+
+.sai-fab-snippet-empty {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+
+.sai-popup-layer {
+  /* 버튼과 같은 이유 — 스크롤 추적(rAF) 업데이트 사이를 보간한다. */
+  transition: left 80ms linear, top 80ms linear;
+}
+
+/* ── 플로팅 버튼 ── */
+
+.sai-fab {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  padding: 6.3px; /* 아이콘 주변 여백 -10%(2026-08-13 사용자 요청, 기존 7px) */
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  /* 🔴 고정 빨강 배경을 실측 후 사용자가 되돌림(2026-08-13 "나는 전이 더 나은 거 같은데") —
+     로고를 원본 색(두 톤) 그대로 보여줘야 해서 단색 버튼 배경을 쓰지 않는다 — 표면색 위에
+     얹어야 잉크/레드 두 색이 클래시 없이 다 읽힌다(2026-08-13 최초 사용자 지시로 복귀). */
+  background: var(--surface);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(25, 31, 40, 0.28);
+  animation: sai-pop-in 0.18s ease;
+}
+
+.sai-fab .sai-logo-mark {
+  width: 100%;
+  height: auto;
+}
+
+/* 🔴 확장할 때 로고에 원본 설계의 SHIFT 모션을 재생한다(2026-08-13 사용자 요청).
+   `.sai-logo-mark-animated`는 이미 정의돼 있어(tokens.css) 클래스만 걸면 된다. */
+.sai-fab-wrap:hover .sai-logo-bar-a,
+.sai-fab-wrap:focus-within .sai-logo-bar-a {
+  animation: sai-logo-shift-a 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.sai-fab-wrap:hover .sai-logo-bar-b,
+.sai-fab-wrap:focus-within .sai-logo-bar-b {
+  animation: sai-logo-shift-b 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.sai-fab-wrap:hover .sai-logo-bar-c,
+.sai-fab-wrap:focus-within .sai-logo-bar-c {
+  animation: sai-logo-shift-c 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  transform-origin: 14px 76px;
+}
+
+/* ── 팝업 ── */
+
+/**
+ * 🔴 **글자색을 여기서 못 박는다** (2026-08-20 — 사용자가 세 번 지적한 「검은 글씨」의 진짜 원인).
+ *
+ *    `:host { color: var(--ink) }`가 있는데도 팝업 글자가 **라이트/다크 상관없이 검은색**이었다.
+ *    부트스트랩이 호스트에 **인라인**으로 `all:initial`을 주기 때문이다
+ *    (`content/index.jsx` — 호스트 페이지 스타일 차단이 목적). **인라인 선언은 어떤 선택자보다
+ *    세므로** `:host`의 `color`가 지고, 호스트의 계산된 색은 `initial`(검정)이 된다.
+ *    그 검정이 shadow 트리로 **상속**돼, **자기 색을 선언하지 않은 요소만** 검게 나왔다 —
+ *    그래서 「감지: …」(--mut)·마스킹 상자(--sub)는 멀쩡한데 제목만 검은,
+ *    「테마는 맞는데 한 줄만 검다」는 기묘한 그림이 됐다.
+ *
+ * 🔴 고치는 자리는 `:host`가 아니라 **여기**다. 호스트의 인라인은 격리를 위해 필요하므로 그대로
+ *    두고, shadow 트리의 **뿌리 컨테이너들이 색을 다시 세운다.** 그러면 인라인과 싸울 일이 없다.
+ * 🔴 개별 요소에 `color`를 하나씩 붙이는 방식은 쓰지 않는다 — 이번처럼 **빠뜨린 하나가
+ *    검은 글씨로 남고**, 새 컴포넌트를 만들 때마다 같은 사고가 반복된다.
+ */
+.sai-popup,
+.sai-toast,
+.sai-fab-wrap,
+.sai-fab-snippets {
+  color: var(--ink);
+}
+
+.sai-popup {
+  /* 🔴 464 → 520 (2026-08-14 실측). 464px에서는 교정문이 3줄이고 줄당 ~41자로 가독 적정
+     구간(45~75자) 아래였다. 520px에서 2줄·줄당 ~61자가 되고 팝업 높이가 739→676px로 63px
+     줄었다. 그 이상 넓혀도 줄 수는 그대로이고(620px에서 656px, -20px뿐) 남의 페이지 위에
+     뜨는 오버레이라 넓을수록 방해가 되므로 여기서 멈춘다. */
+  /* 🔴 브라우저 너비에 따라 유동적으로(2026-08-14 사용자 요청). 상·하한은 실측 근거로 잡았다:
+     아래 520px부터 교정문이 3줄→2줄로 줄고 줄당 글자수가 가독 적정 구간(45~75자)에 들어가며,
+     560px을 넘으면 줄 수가 더 줄지 않아 넓힐 이득이 없다(남의 페이지 위에 뜨는 오버레이라
+     넓을수록 방해가 된다). 좁은 창에서는 40vw가 자동으로 줄여 준다. */
+  width: clamp(360px, 40vw, 560px);
+  max-width: calc(100vw - 24px);
+  /* 🔴 120 → 88 (2026-08-14): 세로 여유를 32px 더 쓴다. 팝업은 화면 위쪽에서 열리는 경우가
+     많아 아래 여백을 크게 남길 이유가 적다. */
+  max-height: calc(100vh - 88px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+  animation: sai-pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.sai-popup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px 0;
+}
+
+.sai-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sai-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: var(--o);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+/* 로고 마크(SaiMark) — 브랜드 헤더·로딩 상태에서 세로 정렬만 맞추면 된다. */
+.sai-logo-mark {
+  flex: none;
+  display: block;
+}
+
+/**
+ * 로딩 — **로고를 빼고 「진행 중인 선」으로 바꿨다** (2026-08-19 사용자 지적 ④).
+ *
+ * 🔴 예전에는 문구 옆에 18px 로고가 3초 주기로 위아래로 움직였다. 작은 크기에서 바 세 개가
+ *    어긋났다 정렬되는 모션은 **무엇을 표현하는지 읽히지 않고**, 헤더의 로고와 겹쳐 보여
+ *    한 화면에 같은 마크가 둘이 됐다.
+ * 🔴 대신 **문구 아래를 한 줄로 훑는다.** 진행 중이라는 사실만 말하는 가장 조용한 신호이고,
+ *    문구가 1.4초마다 바뀌는 기존 연출과 리듬이 겹치지 않는다.
+ * 🔴 **가짜 진행률이 아니다** — 백엔드가 단일 호출이라 몇 %인지 알 수 없다(`useLoadingMessages`
+ *    헤더와 같은 원칙). 그래서 채워지는 막대가 아니라 **훑고 지나가는 빛**으로 그린다.
+ * 🔴 모션을 끈 사용자에게는 정지된 옅은 선으로 남는다 — 사라지면 「로딩 중」 신호가 없어진다.
+ */
+.sai-loading {
+  display: block;
+  color: var(--sub);
+}
+
+.sai-loading::after {
+  content: '';
+  display: block;
+  height: 2px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background-image: linear-gradient(90deg, transparent, var(--o), transparent);
+  background-size: 38% 100%;
+  background-repeat: no-repeat;
+  background-color: var(--sunken);
+  animation: sai-loading-sweep 1.15s ease-in-out infinite;
+}
+
+@keyframes sai-loading-sweep {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sai-loading::after {
+    animation: none;
+    background-image: none;
+    background-color: var(--o-tint);
+  }
+}
+
+/* 🔴 색을 **명시**한다 (2026-08-19 ③). 상속에 기대면 호스트 페이지 쪽 색이 새어 들어올 수 있다 —
+   남의 페이지 위에 뜨는 오버레이라 그 위험이 실재한다. */
+.sai-brand-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sai-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--o-deep);
+  background: var(--o-tint);
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.sai-segment {
+  display: inline-flex;
+  background: var(--sunken);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  flex: none;
+}
+
+.sai-seg-item {
+  border: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  /* 🔴 `--mut`(3.04:1, AA 미달) → `--sub`. 선택 안 된 항목도 **누를 수 있는 컨트롤**이라
+     읽혀야 한다. 선택 상태는 주황 배경 + 흰 글자로 이미 확실히 갈린다. */
+  color: var(--sub);
+  cursor: pointer;
+}
+
+.sai-seg-active {
+  background: var(--o);
+  color: #fff;
+}
+
+.sai-close {
+  border: 0;
+  background: transparent;
+  /* 닫기는 되돌릴 수 없는 조작이다 — 흐리게 둘 이유가 없다(`--mut` 3.04:1 → `--sub`). */
+  color: var(--sub);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex: none;
+}
+
+/* ── 수신자 선택 (S17 / Spec 필수 9 · audit 2) ── */
+
+.sai-recipient {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 18px 0;
+}
+
+.sai-select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+/**
+ * 팀 선택 (2026-08-19 ③) — 받는 사람 옆에 붙는 **보조** 선택이다.
+ * 🔴 받는 사람보다 한 단계 약하게 보여야 한다. 같은 크기·같은 진하기면 무엇이 주인지 흐려진다.
+ * 🔴 팀 이름이 길어도 줄을 밀지 않도록 상한을 둔다 — 좁은 팝업에서 듀얼 시계가 밀려난다.
+ */
+.sai-team-select {
+  font-weight: 500;
+  color: var(--mut);
+  max-width: 140px;
+}
+
+.sai-recipient-tags {
+  display: inline-flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* 🔴 서술형 태그만 — 숫자 점수 표기는 Spec 필수 9 G1/G2로 전면 금지다. */
+.sai-recipient-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--g-deep);
+  background: var(--g-tint);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.sai-recipient-private {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--mut);
+}
+
+/* ── 새 사람 추가 폼 (2026-08-17 사용자 요청 ②) ──
+   🔴 세로로 쌓는다. `.sai-recipient`는 가로 flex라 좁은 폭에서 입력칸이 짓눌린다.
+   🔴 좌우 여백(18px)을 팝업의 다른 줄과 맞춘다 — 여기만 어긋나면 폼이 붙어 있는 게 아니라
+      떠 있는 것처럼 보인다. */
+.sai-add-recipient {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 18px 0;
+  padding: 10px;
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.sai-add-input {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sai-add-input:focus-visible,
+.sai-add-region:focus-visible {
+  outline: 2px solid var(--o);
+  outline-offset: 1px;
+}
+
+/* 🔴 `width:100%`를 명시한다 — `.sai-select`는 인라인 폭이라 지역 이름이 길면 폼이 넘친다. */
+.sai-add-region {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+}
+
+.sai-add-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sai-add-hint {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--mut);
+}
+
+/* 🔴 오류는 회색 안내와 **다른 색**이어야 한다 — 같은 자리에 번갈아 나오므로 색이 같으면
+      무엇이 바뀌었는지 안 보인다.
+   🔴 `--r-deep`은 `.sai-fallback`(「교정하지 못했어요」)이 쓰는 것과 같은 토큰이다.
+      `--danger`는 이 프로젝트에 없다 — 없는 토큰을 쓰면 폴백 색으로 조용히 새는데,
+      회색이면 오류인지 안내인지 구분이 안 된다. */
+.sai-add-error {
+  color: var(--r-deep, #96281b);
+  font-weight: 600;
+}
+
+/* ── AI 판정 근거 (Spec 필수 1) ── */
+
+.sai-ainote {
+  font-size: 11.5px;
+  color: var(--sub);
+  padding: 6px 18px 10px;
+  line-height: 1.5;
+}
+
+/* 🔴 `--faint`(대비 1.57:1)에서 `--sub`(7.11:1)으로 (2026-08-14 실측).
+   여기는 **Spec 필수 1이 항상 보이라고 요구하는 판정 근거**인데, 패널에서 가장 안 보이는
+   색으로 그려져 있었다. 안 읽히는 근거는 근거를 제시한 것이 아니다. */
+.sai-reason {
+  color: var(--sub);
+}
+
+/* 🔴 오류·실패는 **레드**다 (2026-08-14 팔레트 확정). 예전엔 주황을 썼는데, 주황은 브랜드
+   강조색이라 「눈에 띄게 하고 싶은 것」과 「잘못된 것」이 같은 색이 됐다 — 색만으로는 구분이
+   안 됐다. 강조=주황 / 오류=레드로 갈라 둔다. */
+.sai-error {
+  color: var(--r-deep);
+  font-weight: 600;
+}
+
+/* ── 교정문 ── */
+
+.sai-refined {
+  /* 안쪽 `float`(직접 고치기)을 블록이 품게 한다 — 없으면 아래 블록 위로 삐져나온다. */
+  display: flow-root;
+  padding: 0 18px 6px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  white-space: pre-line;
+}
+
+/* S13 — 교정문 직접 수정. 읽기 뷰(.sai-refined)와 같은 타이포를 유지해 전환 시 글자가 안 튄다. */
+.sai-refined-edit {
+  display: block;
+  width: calc(100% - 36px);
+  margin: 0 18px 8px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  min-height: 92px;
+  resize: vertical;
+  font-family: var(--font-sans);
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--ink);
+}
+
+/* 🟡 위험 표현 밑줄 (S19 / Spec 권장 6 F-18) — 배경을 칠하지 않고 **밑줄만** 긋는다.
+   초록 하이라이트(권장 5)와 동시에 보이는 화면이라, 둘 다 배경을 칠하면 어느 쪽이 무슨
+   뜻인지 구분이 안 된다. 색이 아니라 형태(밑줄 vs 채움)로도 갈리게 했다. */
+/* 🔴 배경을 **아예 없앤다**(2026-08-13 사용자 3차 피드백): 옅은 노란 배경을 깔면 어떤 색을 쓰든
+   물결이 그 배경에 묻힌다 — 배경과 밑줄이 같은 색조라 대비가 나오지 않는 구조적 문제였다.
+   배경 대신 **글자색 자체를 바꾸고** 물결은 원래 노랑(#eab308)으로 되돌린다(사용자가 이전 색이
+   낫다고 확인). 초록(채운 배경)과는 배경 유무·밑줄 모양으로 이중 구분된다. */
+.sai-risk {
+  background: transparent;
+  color: var(--sai-risk-ink);
+  font-weight: 600;
+  text-decoration: underline wavy #eab308;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* ⚪ 밈·신조어 (Spec 권장 4 후반부).
+   🔴 **중립색 점선**(2026-08-14 사용자 결정). 밈은 위험이 아니라 "설명이 있는 단어"라 경고색을
+      쓰지 않는다 — 주황은 이미 경고·강조(`.sai-meta-warn`)가 쓰고 있어 겹치면 오해된다.
+   🔴 색으로만 갈리지 않는다: 초록=직선, 노랑=물결, 밈=**점선**. 세 종류가 모양으로도 구분되어
+      색을 구별하지 못해도 읽힌다(초록/노랑에 이미 적용한 규칙과 동일).
+   🔴 글자색은 본문 그대로 둔다 — 초록·노랑은 글자색까지 바꾸지만, 밈은 셋 중 가장 약한 신호라
+      밑줄만으로 표시한다. 강도 순서가 그대로 보이게 하는 것이 목적이다. */
+.sai-meme {
+  background: transparent;
+  color: inherit;
+  text-decoration: underline dotted var(--mut);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* 🔴 키보드 포커스가 보여야 한다 — `tabIndex`를 줬으면서 표시가 없으면 어디에 있는지 모른다. */
+.sai-meme:focus-visible {
+  outline: 2px solid var(--o);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* 밈 해설 줄 — 교정문 바로 아래 고정 자리. 떠 있는 말풍선을 쓰지 않은 이유는
+   `RefinePopup.jsx`의 `hoveredMeme` 주석 참조(팝업이 스크롤 영역이라 말풍선이 잘린다). */
+.sai-meme-strip {
+  margin: 0;
+  padding: 0 18px 6px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--sub);
+  /* 올리기 전후로 높이가 같아야 아래 내용이 밀리지 않는다(한 줄 = 11.5px × 1.5). */
+  min-height: 17.25px;
+}
+
+.sai-meme-strip-term {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sai-meme-strip-idle {
+  color: var(--mut);
+}
+
+/* ── 하이라이트 범례 (S19 후속) ── */
+
+.sai-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 18px 10px;
+  font-size: 10.5px;
+  color: var(--mut);
+}
+
+/* 설명 섹션 본문 — 항목을 세로로 쌓는다(역번역 본문과 같은 자리). */
+/* 🔴 설명을 `.sai-back` 섹션 안으로 옮기면서 글씨가 커졌다(2026-08-13 사용자 지적) —
+   섹션의 본문 크기를 물려받았기 때문이다. 원래 범례 크기로 되돌린다. */
+.sai-legend-body {
+  display: grid;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+
+.sai-legend-body b {
+  font-weight: 700;
+}
+
+.sai-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/**
+ * 「왜 이렇게 바꿨나」 (2026-08-14 제안 ③).
+ * 🔴 글자색은 `--sub`(4.5:1 이상)을 쓴다 — `--mut`은 3.04:1로 AA 미달이다(위 세그먼트에서
+ *    같은 이유로 이미 한 번 올렸다). 근거는 **읽으라고** 내는 것이라 흐리면 낼 이유가 없다.
+ */
+.sai-why-body {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+.sai-why-reason {
+  margin: 0;
+}
+
+.sai-why-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.sai-why-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+/* 라벨은 줄어들지 않게 — 대응 문구가 길어져도 「기한 유지」가 쪼개지면 안 된다. */
+.sai-why-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--g-tint);
+  color: var(--g-deep);
+  white-space: nowrap;
+}
+
+.sai-why-tag-risk {
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+.sai-why-pair {
+  min-width: 0;
+}
+
+.sai-why-pair b {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* 근거는 주장보다 한 단계 뒤로 — 읽는 순서가 「무엇이 문제」 → 「왜 그렇게 보나」다. */
+.sai-why-evidence {
+  color: var(--mut);
+}
+
+.sai-why-honorifics {
+  margin: 0;
+}
+
+/* 토글은 오른쪽 끝에 붙여 둔다 — 범례 항목 개수가 바뀌어도 자리가 흔들리지 않는다. */
+.sai-legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+
+/* 견본은 본문보다 작게 — 범례가 본문보다 튀면 안 된다. */
+.sai-legend mark {
+  font-size: 10.5px;
+}
+
+/* ── 이모지 자동 교체 안내 (S19 / Spec 권장 4) ── */
+
+.sai-emoji-note {
+  display: grid;
+  gap: 3px;
+  margin: 0 18px 10px;
+  padding: 8px 12px;
+  background: var(--sunken);
+  border-radius: 10px;
+}
+
+.sai-emoji-line {
+  font-size: 10.5px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+
+/* 🟢 용어 적용 (Spec 권장 5).
+   🔴 배경을 **제거**했다(2026-08-13 사용자 요청): 초록 배경이 옆 단어의 노란 물결을 덮어
+      가리는 일이 실사용에서 반복됐다. 노랑과 같은 방식(글자색 + 밑줄)으로 통일한다.
+   🔴 노랑과는 **밑줄 모양**으로 갈린다: 초록은 직선, 노랑은 물결. 색을 구분하지 못해도
+      형태로 구분된다. */
+.sai-glossary {
+  background: transparent;
+  color: var(--g-deep);
+  font-weight: 700;
+  text-decoration: underline solid var(--g);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* 역번역에 병기하는 용어 뜻 — 본문보다 작고 옅게. */
+.sai-glossary-gloss {
+  font-size: 0.85em;
+  font-weight: 600;
+  opacity: 0.8;
+  margin-left: 1px;
+}
+
+.sai-meta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 18px 12px;
+  font-size: 10.5px;
+}
+
+.sai-meta-green {
+  color: var(--g-deep);
+  font-weight: 600;
+}
+
+.sai-meta-warn {
+  color: var(--o-deep);
+  font-weight: 700;
+}
+
+/* ── 역번역 (Spec 필수 3) ── */
+
+/* 역번역을 끄면 헤더(제목+토글)만 남는다 — 아래 여백을 줄여 패널이 실제로 짧아지게 한다. */
+/* 🔴 세로가 길어져 스크롤바가 생긴다는 지적(2026-08-14) — 섹션이 4개까지 늘어난 지금은
+   박스마다의 여백이 그대로 높이가 된다. 바깥 간격 12→8, 안쪽 12→10으로 줄였다.
+   (섹션 4개 기준 약 -24px) */
+.sai-back {
+  margin: 0 18px 8px;
+  background: var(--sunken);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+/* 🔴 꺼진 섹션 — 박스 장식을 없애고 **라벨+스위치를 오른쪽으로 모은다**(2026-08-13 사용자 요청).
+   한쪽만 꺼져 있어도 그 줄은 오른쪽 정렬이라, 켜진 섹션과 시각적으로 구분된다.
+   명시도를 `.sai-back.sai-back-off`로 올려 기본 규칙보다 확실히 이긴다. */
+.sai-back.sai-back-off {
+  background: transparent;
+  padding: 0;
+  margin: 0 18px 8px;
+}
+
+.sai-back.sai-back-off .sai-back-head {
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+/* 꺼진 줄에서는 라벨이 남는 공간을 먹지 않아야 스위치가 라벨 옆에 붙는다. */
+.sai-back.sai-back-off .sai-back-head > .sai-label:first-child {
+  flex: none;
+}
+
+.sai-back-head {
+  margin-bottom: 0;
+}
+
+
+.sai-back-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* 라벨이 남는 공간을 먹고 토글들이 오른쪽에 나란히 선다. */
+.sai-back-head > .sai-label:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.sai-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--sub);
+}
+
+/* 🔴 `justify-content: flex-start ↔ flex-end`로 노브를 옮기면 **레이아웃 재계산**이라 전환이
+   튄다(2026-08-13 사용자 지적 "간헐적으로 부드럽지 못하다"). 위치를 고정하고 노브를
+   `transform`으로만 움직인다 — 합성 단계에서 처리돼 매끄럽다. */
+.sai-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: 10px;
+  padding: 2px;
+  background: var(--faint);
+  cursor: pointer;
+  flex: none;
+  transition: background 160ms ease;
+}
+
+.sai-switch-on {
+  background: var(--o);
+}
+
+.sai-switch-knob {
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #fff;
+  transform: translateX(0);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sai-switch-on .sai-switch-knob {
+  transform: translateX(12px);
+}
+
+.sai-back-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+/* ── 직전 대화 맥락 미리보기 (S21 / Spec 권장 8) ── */
+
+/* 🔴 범례와 같은 11px — 이건 **참고 자료**이지 교정 결과가 아니다. 교정문·역번역과 같은 크기로
+   두면 무엇이 결과이고 무엇이 배경인지 구분이 사라진다. */
+.sai-thread-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--mut);
+}
+
+/* 오래된 것 → 최신 순서를 왼쪽 선으로 묶어 "이건 한 덩어리의 앞 대화"임을 보이게 한다. */
+.sai-thread-item {
+  border-left: 2px solid var(--line);
+  padding-left: 8px;
+  /* 한 줄 유지 — 맥락 미리보기가 교정문보다 길어지면 주객이 바뀐다. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 내용 펼침/접힘 셰브런 — 방향으로 상태를 보여준다(닫힘 → 오른쪽, 열림 → 아래). */
+.sai-thread-chevron {
+  border: 0;
+  background: transparent;
+  color: var(--sub);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  transform: rotate(0deg);
+  transition: transform 120ms ease;
+  /* 🔴 라벨과의 간격을 절반으로(2026-08-13 사용자 요청) — `.sai-back-head`의 `gap: 8px`가
+     양옆에 똑같이 적용되는데, 스위치 쪽 간격은 그대로 두고 라벨 쪽만 좁혀야 해서 이 요소의
+     왼쪽 마진만 당긴다. */
+  margin-left: -4px;
+}
+
+.sai-thread-chevron-open {
+  transform: rotate(90deg);
+}
+
+
+/* ── 퇴근 요정 배너 (Spec 필수 6, 계산은 S14 `src/core/schedule/fairy.js`) ── */
+
+.sai-fairy {
+  margin: 0 18px 12px;
+  background: var(--o-tint);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 11.5px;
+  color: var(--o-deep);
+  line-height: 1.45;
+}
+
+.sai-fairy-note {
+  color: var(--mut);
+  font-weight: 600;
+}
+
+.sai-todo {
+  color: var(--mut);
+  font-weight: 600;
+}
+
+/* ── 푸터 ── */
+
+/* 🔴 버튼 3개 + 안내문을 한 줄에 넣으니 464px에서 줄바꿈되고 글자가 세로로 쪼개졌다
+   (2026-08-13 사용자 실측). 안내문을 **윗줄**로 올리고 버튼은 아랫줄에 `nowrap`으로 둔다. */
+/* 🔴 내용이 길어 스크롤이 생겨도 **버튼은 항상 보이게** 하단에 고정한다(2026-08-14 요청).
+   `position: sticky`는 스크롤 컨테이너(`.sai-popup`) 기준으로 붙으므로, 스크롤이 없을 때는
+   평소처럼 흐름에 그대로 있고 생겼을 때만 바닥에 남는다. 배경을 칠해야 뒤 내용이 비치지 않는다. */
+/* 🔴 `grid`(항상 2행)에서 **`flex` + `wrap`**으로 바꾼다 (2026-08-14): 폭이 남으면 한 줄로
+   붙어 행 하나를 회수하고, 좁으면 예전처럼 두 줄로 내려간다. 위 주석의 464px 사고는
+   "무조건 한 줄"이어서 버튼 글자가 쪼개진 것이었다 — `wrap`은 쪼개는 대신 줄을 바꾼다.
+   버튼 줄 자체는 `nowrap`이라 그 사고는 재발하지 않는다. */
+.sai-popup-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 18px 12px;
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.sai-foot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  margin-left: auto;
+}
+
+.sai-foot-actions .sai-button {
+  white-space: nowrap;
+}
+
+/* 🔴 Zero Retention 문구는 **Spec 필수 5를 사용자가 눈으로 확인하는 유일한 지점**이다.
+   1.57:1로 흐려 두면 주장하지 않은 것과 같다 — `--mut`(3.04:1)도 AA 미달이라 `--sub`. */
+.sai-foot-note {
+  font-size: 10.5px;
+  color: var(--sub);
+}
+
+.sai-button {
+  border: 0;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.sai-button-primary {
+  background: var(--o);
+  color: #fff;
+}
+
+/* 보조 버튼도 **배경을 가져 버튼으로 보이게** 한다(2026-08-13 사용자 요청: 링크처럼 보였다). */
+.sai-button-quiet {
+  background: var(--sunken);
+  color: var(--sub);
+  border: 1px solid var(--border);
+}
+
+.sai-button-quiet:hover:not(:disabled) {
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+.sai-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sai-link {
+  border: 0;
+  background: transparent;
+  /* 링크도 컨트롤이다 — `--mut` 3.04:1은 AA 미달이라 `--sub`. */
+  color: var(--sub);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 교정문 마지막 줄 오른쪽에 얹히는 링크 — 전용 행을 없앤다(위 JSX 주석 참조).
+   `float`은 만난 줄의 오른쪽에 놓이므로, 소스상 문단 끝에 두면 마지막 줄에 붙는다. */
+.sai-link-inline {
+  float: right;
+  margin-left: 10px;
+  /* 15px/1.55 본문의 베이스라인에 맞춰 살짝 내린다 — 글자 크기가 다르면 위로 뜬다. */
+  margin-top: 3px;
+  font-size: 11.5px;
+}
+
+/* ── 토스트 (S07 / Spec 필수 5 — 클립보드 폴백 안내) ── */
+
+/* 🔴 어두운 배경(--ink)은 다크 사이트 위에서 배경과 섞여 잘 안 읽혔다(2026-08-13 사용자 지적).
+   표면색 + 테두리로 바꿔 어떤 페이지 위에서도 카드처럼 떠 보이게 한다. */
+.sai-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  background: var(--surface);
+  color: var(--ink);
+  /* 흰 배경 페이지에서도 경계가 보이도록 테두리를 또렷하게 둔다(2026-08-13 사용자 요청). */
+  border: 1.5px solid var(--faint);
+  border-radius: 14px;
+  padding: 12px 20px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  animation: sai-toast-up 0.3s ease;
+  max-width: calc(100vw - 40px);
+  /* S24 — 되돌리기 버튼이 문구 오른쪽에 나란히 서야 한다. */
+  display: flex;
+  align-items: center;
+}
+
+/* ── 하소연 감지 제안 (S09 / Spec 필수 4) ── */
+
+.sai-popup-narrow {
+  width: 430px;
+}
+
+.sai-vent-body {
+  padding: 10px 18px 16px;
+}
+
+.sai-vent-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.sai-vent-desc {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--mut);
+  line-height: 1.55;
+}
+
+.sai-vent-evidence {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+
+.sai-vent-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sai-vent-actions .sai-button {
+  flex: 1;
+  padding: 10px 0;
+}
+
+/* ── 수신 해독 (S10 / Spec 필수 10) ── */
+
+.sai-badge-green {
+  color: var(--g-deep);
+  background: var(--g-tint);
+}
+
+/**
+ * 🔴 **다크에서 배지 글자를 한 단계 밝게** (2026-08-19 사용자 지적 ③ — "뜻풀기 글씨가 잘 안 보여").
+ *
+ *    측정값이 그대로 말해 준다(다크, 실제 RGB로 환산):
+ *    | 요소 | 대비 |
+ *    |---|---|
+ *    | 로고 글씨 「사이」 | 15.01 : 1 |
+ *    | 로딩 문구 | 10.03 : 1 |
+ *    | **「뜻 풀기」 배지** | **4.65 : 1** ← 여기만 겨우 통과 |
+ *
+ *    4.5:1을 넘기긴 하지만 **10.5px 굵은 글씨**라 실제로는 읽기 힘들다. 기준을 통과한다고
+ *    읽히는 것은 아니다. 배경(tint)은 그대로 두고 **글자만** 밝힌다 — 배경을 밝히면 배지가
+ *    화면에서 튀어 제목보다 강해진다.
+ * 🔴 라이트는 건드리지 않는다 — 그쪽은 어두운 글자라 이미 충분하다.
+ */
+:host([data-theme='dark']) .sai-badge-green {
+  color: #4fd6a4;
+}
+
+/**
+ * 🔴 **변형 배지를 명시적으로 제외한다** (2026-08-19 자체 점검에서 잡은 회귀).
+ *
+ *    처음에는 `.sai-badge`에 그냥 걸었는데, 이 선택자는
+ *    ① 바로 위 `.sai-badge-green` 규칙과 **특이도가 같고 뒤에 와서** 초록 배지를 주황으로
+ *       덮었고(「뜻 풀기」·「회신 초안」),
+ *    ② `.sai-badge-alert`(특이도 0,1,0)보다 **세서** 민감정보 경고의 「전송 차단됨」이
+ *       다크에서 흰색 → 주황(#ff8a3d on #d92d20, 대비 ~1.9:1)이 됐다 — 안전 경고가 안 읽힌다.
+ *    `:not()`으로 변형이 있는 배지를 아예 매칭에서 빼면 순서·특이도 싸움 자체가 없어진다.
+ */
+:host([data-theme='dark']) .sai-badge:not(.sai-badge-green):not(.sai-badge-alert) {
+  color: #ff8a3d;
+}
+
+.sai-decode-body {
+  padding: 4px 18px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.sai-decode-section {
+  display: grid;
+  gap: 4px;
+}
+
+.sai-decode-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mut);
+}
+
+.sai-decode-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+.sai-decode-none {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--mut);
+}
+
+.sai-decode-intent {
+  background: var(--g-tint);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.sai-decode-intent-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--g-deep);
+  margin-bottom: 3px;
+}
+
+.sai-decode-intent-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sai-decode-evidence {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--mut);
+}
+
+.sai-decode-gap-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sai-decode-gap-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--o-deep);
+}
+
+.sai-decode-gap-same {
+  font-size: 11px;
+  color: var(--mut);
+}
+
+.sai-decode-gap-track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunken);
+}
+
+.sai-decode-gap-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--g) 55%, var(--surface)), var(--o));
+}
+
+.sai-decode-gap-dot {
+  position: absolute;
+  top: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 2.5px solid var(--faint);
+  transform: translateX(-50%);
+}
+
+.sai-decode-gap-dot-actual {
+  border-color: var(--o);
+}
+
+.sai-decode-gap-reason {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+
+.sai-decode-actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.sai-decode-actions li {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.sai-decode-action-num {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--g-tint);
+  color: var(--g-deep);
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+/* ── 회신 초안 (S37 / 제안 ①) ──────────────────────────────────────────
+   🔴 해독 4축과 **시각적으로 분리**한다. 위 네 축은 "받은 메시지가 무슨 뜻인가"(읽기)이고,
+      여기부터는 "내가 무엇을 보내는가"(쓰기)다. 같은 흐름으로 읽히면 초안이 해독 결과의
+      일부처럼 보여, 검토 없이 복사하게 된다. 그래서 위쪽에 실선 하나를 둔다. */
+.sai-reply {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.sai-reply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.sai-reply-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--mut);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sai-reply-auto input {
+  margin: 0;
+  accent-color: var(--g);
+}
+
+/* ── 사전 질문 카드 ──────────────────────────────────────────────────
+   🔴 초안이 들어설 자리에 **대신** 뜬다. 초안 위에 겹쳐 두면 이전 메시지의 초안을 보면서
+      새 질문에 답하게 되어, 어느 초안이 어느 답변의 결과인지 알 수 없다. */
+.sai-reply-ask {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--sunken);
+  display: grid;
+  gap: 10px;
+}
+
+.sai-reply-ask-head {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sub);
+}
+
+.sai-reply-ask-item {
+  display: grid;
+  gap: 5px;
+}
+
+.sai-reply-ask-q {
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.sai-reply-ask-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.sai-reply-ask-chip {
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--sub);
+  cursor: pointer;
+}
+
+.sai-reply-ask-chip-on {
+  background: var(--g-tint);
+  border-color: var(--g);
+  color: var(--g-deep);
+  font-weight: 700;
+}
+
+.sai-reply-ask-input {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sai-reply-ask-input::placeholder {
+  color: var(--mut);
+}
+
+.sai-reply-ask-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 🔴 「질문 없이 만들기」는 항상 있다 — 답변을 강제하지 않는다. 다만 주 동작은 아니므로
+   초록 버튼 옆에서 한 단계 뒤로 물린다. */
+.sai-reply-ask-skip {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  color: var(--mut);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.sai-reply-ask-actions .sai-reply-copy {
+  margin-top: 0;
+  margin-left: auto;
+}
+
+.sai-reply-intents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sai-reply-intent {
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--sunken);
+  color: var(--sub);
+  cursor: pointer;
+}
+
+.sai-reply-intent:hover:not(:disabled) {
+  color: var(--g-deep);
+  border-color: var(--g);
+}
+
+.sai-reply-intent:disabled {
+  cursor: default;
+  color: var(--mut);
+}
+
+/* ── 추천 방향 (S39) ──────────────────────────────────────────────────
+   🔴 **선택(초록)과 다른 색을 쓴다.** 추천은 "사이가 권하는 것", 선택은 "내가 고른 것"이라
+      의미가 다르다. 같은 초록으로 두면 아직 아무것도 안 골랐는데 이미 고른 것처럼 보인다.
+      제품 전반에서 초록=우리 판정, 주황=주의·강조로 쓰고 있으므로 주황을 쓴다. */
+.sai-reply-intent-rec {
+  border-color: var(--o);
+  color: var(--o-deep);
+}
+
+.sai-reply-rec-tag {
+  margin-left: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+/* 어느 방향을 고른 초안인지 화면에 남아 있어야 한다 — 초안만 보면 알 수 없다.
+   🔴 추천보다 **선택이 이긴다** — 골랐다는 사실이 권유보다 강한 정보다. */
+.sai-reply-intent-on,
+.sai-reply-intent-rec.sai-reply-intent-on {
+  background: var(--g-tint);
+  border-color: var(--g);
+  color: var(--g-deep);
+}
+
+.sai-reply-draft {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--sunken);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+/* 🔴 초안 **바로 아래** 붙는다. 토글 뒤로 보내면 안 보고 보낸다. */
+.sai-reply-check {
+  margin-top: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.sai-reply-check-line {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+.sai-reply-check-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--g-tint);
+  color: var(--g-deep);
+  white-space: nowrap;
+}
+
+/* 자리표시자는 "할 일"이고 미검증 구체값은 "사고 위험"이다 — 색으로 갈라 둔다. */
+.sai-reply-check-tag-warn {
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+.sai-reply-check-warn {
+  color: var(--o-deep);
+}
+
+/* 🔴 한국어 초안보다 한 단계 뒤로 물린다 — 사용자가 판단하는 것은 위쪽 한국어다(v4).
+   다만 실제로 전송되는 문장이므로 읽을 수는 있어야 해서 `--sub`를 쓴다(`--mut`은 AA 미달). */
+.sai-reply-send {
+  margin: 8px 0 0;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+.sai-reply-send-label {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--mut);
+}
+
+.sai-reply-copy {
+  margin-top: 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--g);
+  color: #fff;
+  cursor: pointer;
+}
+
+.sai-reply-copy:hover {
+  background: var(--g-deep);
+}
+
+/* ── 민감정보 경고 (S15 / Spec 필수 11) ── */
+
+.sai-mark-alert {
+  background: #d92d20;
+}
+
+.sai-badge-alert {
+  color: #fff;
+  background: #d92d20;
+}
+
+/* 🔴 마스킹된 결과만 담는다 — 원래 값은 이 화면 어디에도 없다. */
+.sai-masked-preview {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--sunken);
+  border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--sub);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+/* ── 티켓 변환 (S09 / Spec 필수 4) ── */
+
+/* 🔴 서술형만 — 숫자 점수 표기는 Spec 필수 9 G1/G2로 전면 금지다. */
+/* 🔴 예전엔 헤더 안에서 `nowrap` + `max-width:190px` + `ellipsis`라 **문장이 잘렸다**
+   (2026-08-14 사용자 지적). 감정을 "삭제하지 않고 보존"하는 것이 이 필드의 존재 이유인데
+   읽을 수 없으면 보존한 의미가 없다. 3단 아래 전용 줄로 내리고 줄바꿈을 허용한다. */
+.sai-concern {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 18px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* 3단(문제점/영향/요청사항)과 같은 라벨 폭을 써서 세로선이 맞는다. */
+.sai-concern-label {
+  flex: none;
+  width: 56px; /* `.sai-ticket-label`과 같은 값 — 세로선을 맞춘다 */
+  color: var(--mut);
+  font-weight: 700;
+}
+
+.sai-concern-text {
+  color: var(--o-deep);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.sai-ticket {
+  margin: 10px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.sai-ticket-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sai-ticket-row:last-child {
+  border-bottom: 0;
+}
+
+.sai-ticket-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--o-deep);
+  width: 56px;
+  flex: none;
+  padding-top: 1px;
+}
+
+.sai-ticket-value {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sub);
+}
+
+/* 긴급도 변경 확인 안내 (Spec 권장 2) — 팝업 안에서, 결정 버튼과 같은 화면에 둔다. */
+.sai-urgency-notice {
+  margin: 8px 18px 0;
+  padding: 8px 12px;
+  background: var(--o-tint);
+  color: var(--o-deep);
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/**
+ * 핵심 업무 정보 누락 경고 (2026-08-14 제안 ② / A안).
+ * 🔴 긴급도 알림(`--o-tint` 채움)과 **다른 형태**로 만든다: 저쪽은 우리가 내린 판정이고
+ *    이쪽은 사용자가 고칠 것이다. 같은 주황 박스로 그리면 둘이 한 덩어리로 읽힌다 —
+ *    여기는 **왼쪽 띠**만 쓰고 배경은 표면 그대로 둔다.
+ */
+.sai-missing {
+  margin: 6px 18px 0;
+  padding: 8px 0 8px 10px;
+  border-left: 3px solid var(--o);
+  display: grid;
+  gap: 5px;
+}
+
+.sai-missing-head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--o-deep);
+}
+
+.sai-missing-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.sai-missing-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+.sai-missing-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--o-tint);
+  color: var(--o-deep);
+  white-space: nowrap;
+}
+
+.sai-missing-text {
+  min-width: 0;
+}
+
+/* 어느 요청을 두고 하는 말인지 — 주장보다 한 단계 뒤로 물린다. */
+.sai-missing-quote {
+  color: var(--mut);
+}
+
+/* 설명·역번역 두 섹션 묶음 (S19/S06 후속) */
+.sai-toggles {
+  display: grid;
+  gap: 0;
+}
+
+/* 둘 다 꺼지면 스위치 줄만 남으므로 가로로 나란히 둔다 — 빈 줄이 두 개 생기지 않게. */
+.sai-toggles-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+/* 🔴 한 줄에 둘이 붙으면 어디까지가 한 항목인지 모호하다(2026-08-13 지적) — 사이에 세로선을
+   넣어 구분한다. 🔴 이 규칙이 안 보였던 원인은 접힘을 **인라인 스타일**로 줘서 여기 padding/
+   margin이 덮인 것이었다(클래스로 바꿔 해결). */
+.sai-toggles-row > .sai-back.sai-back-off {
+  flex: none;
+  margin: 0 0 8px;
+}
+
+/**
+ * 🔴 **구분선이 괄호처럼 보였다** (2026-08-16 사용자 지적: "왜 괄호 같은 게 있는 거야?").
+ *    원인은 이 규칙이 아니라 **위의 `.sai-back { border-radius: 14px }`**다. 테두리를 왼쪽
+ *    하나만 그리면 브라우저는 그 선을 **모서리 반경을 따라 휘게** 그린다 — 그래서 곧은 `|`가
+ *    아니라 `(` 모양의 호가 나온다. 꺼진 항목은 배경도 padding도 없앴는데 **반경만 남아 있었다.**
+ * 🔴 반경을 0으로 되돌린다. 배경이 없는 항목에 모서리 반경은 아무 일도 하지 않으면서
+ *    구분선 모양만 망가뜨린다.
+ */
+.sai-toggles-row > .sai-back.sai-back-off {
+  border-radius: 0;
+}
+
+/**
+ * 🔴 **간격 14px → 8px** (2026-08-16 — 다섯 항목을 한 줄에 넣기 위해).
+ *    구분선 4개에서 좌우 여백이 각각 14px이면 **112px**을 쓴다 — 항목 하나 값이다.
+ *    8px으로 줄이면 48px이 남는다. 구분선이 이미 경계를 만들고 있어 여백이 그만큼 클 이유가 없다.
+ * 🔴 그래도 안 들어가면 **접힌다**(`flex-wrap`) — 잘리거나 겹치지 않는다. 팝업 폭이
+ *    `clamp(360px, 40vw, 560px)`로 유동적이라 모든 창에서 한 줄을 보장할 수는 없다.
+ */
+.sai-toggles-row > .sai-back.sai-back-off + .sai-back.sai-back-off {
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+  margin-left: 8px;
+}
+
+/* 오른쪽 끝에서 시작하도록 바깥 여백은 래퍼가 잡는다. */
+.sai-toggles-row {
+  padding: 0 18px;
+}
+
+/* 🔴 꺼진 항목은 **내용 폭만큼만** 차지한다(2026-08-14). `flex: 1`로 늘리면 두 개일 때와
+   네 개일 때 각 항목 폭이 달라져 스위치 위치가 흔들린다 — 오른쪽 정렬로 모아 붙인다. */
+.sai-toggles-row > .sai-back.sai-back-off {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+/* ── 듀얼 시계 위젯 (S26 / Spec 부가 8) ── */
+
+.sai-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--mut);
+  white-space: nowrap;
+}
+
+.sai-clock-slot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+/* 🔴 `--faint`(1.57:1) → `--sub`(7.11:1). 시계 라벨은 "누구의 시각인가"를 알려주는 유일한
+   단서라 안 보이면 숫자 두 개가 정체불명으로 남는다. `--mut`도 3.04:1로 AA 미달이라 여기까지
+   올리고, **위계는 색이 아니라 굵기로** 만든다 — 시각은 700, 라벨은 기본 굵기. */
+.sai-clock-label {
+  font-size: 10.5px;
+  color: var(--sub);
+}
+
+.sai-clock-time {
+  font-weight: 700;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 상대가 퇴근 시간대면 그 시각만 주황으로 — 배지와 함께 읽히게. */
+.sai-clock-off .sai-clock-time {
+  color: var(--o-deep);
+}
+
+/* `+1일`/`-1일`은 시차 때문에 **날짜가 넘어갔다**는 사실 — 시각 숫자만큼 중요하다. */
+.sai-clock-day {
+  font-size: 10.5px;
+  color: var(--sub);
+  font-weight: 600;
+}
+
+.sai-clock-sep {
+  color: var(--mut);
+}
+
+.sai-clock-badge {
+  background: var(--o-tint);
+  color: var(--o-deep);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* ── 의도 검증 피드백 (S26 / Spec 부가 5) ── */
+
+.sai-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.sai-feedback-btn {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 1px 3px;
+  font-size: 11.5px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  opacity: 0.75;
+}
+
+.sai-feedback-btn:hover {
+  opacity: 1;
+  background: var(--sunken);
+}
+
+.sai-feedback-done {
+  color: var(--g-deep);
+  font-weight: 700;
+}
+
+/* ── URGENT 태그 (S24 / Spec 부가 2) ── */
+
+.sai-urgent-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 8px;
+  padding: 8px 12px;
+  background: var(--o-tint);
+  border-radius: var(--radius-md);
+}
+
+.sai-urgent-tag-chip {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--o-deep);
+  white-space: nowrap;
+}
+
+.sai-urgent-tag-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--sub);
+}
+
+/* ── 되돌리기 토스트 (S24 / Spec 부가 1) ── */
+
+.sai-toast-text {
+  min-width: 0;
+}
+
+.sai-toast-undo {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--o-deep);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin-left: 10px;
+}
+
+.sai-toast-undo:hover {
+  text-decoration: underline;
+}
+
+/* ── 팝업 끌어 옮기기 (S24 후속) ── */
+
+/* 헤더가 손잡이임을 커서로 알린다. */
+.sai-popup-head {
+  cursor: grab;
+  /* 끌 때 텍스트가 선택되면 커서가 글자를 훑는 모양이 되어 방해된다. */
+  user-select: none;
+}
+
+.sai-popup-dragging .sai-popup-head {
+  cursor: grabbing;
+}
+
+/* 🔴 끄는 동안은 위치 보간을 끈다 — 스크롤 추적용 transition이 남아 있으면 커서보다
+   한 박자 늦게 따라와 "무겁다"고 느껴진다. */
+.sai-popup-dragging {
+  transition: none;
+}
+
+/* 펼쳐진 패널 — 좁은 모드에서 ☰로 켠 항목의 내용이 본문 아래에 쌓인다. */
+.sai-panel {
+  margin: 0 18px 8px;
+  background: var(--sunken);
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: grid;
+  gap: 6px;
+}
+
+/* ── 좁은 폭 압축 모드 (2026-08-14 사용자 요청) ── */
+
+/* 긴급도 드롭다운 — 세 버튼(세그먼트)이 헤더 폭을 다 먹어 로고까지 밀어냈다. */
+.sai-urgency-select {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 4px 6px;
+  flex: none;
+}
+
+/* 🔴 좁을 때 지우는 것들 — "알려주는" 정보이지 번역에 필수는 아니다.
+   듀얼 시계·AI 판정 근거·수신자 태그가 여기 해당한다. 판정 자체(긴급도)는 드롭다운으로 남는다. */
+.sai-popup-compact .sai-clock,
+.sai-popup-compact .sai-ainote,
+.sai-popup-compact .sai-recipient-tags {
+  display: none;
+}
+
+/* 🔴 ☰를 **수신자 줄로 올렸다**(2026-08-14 사용자 요청: "메뉴 버튼 위치를 위쪽으로").
+   아래쪽에 있으면 드롭다운이 팝업 바닥에 걸려 잘리거나 스크롤을 만든다 — 위로 올리면
+   드롭다운이 펼쳐질 자리가 본문만큼 확보된다. */
+/* 🔴 `display: flex`가 없으면 안쪽 inline-flex 버튼 아래에 줄상자 여백(디센더)이 남아
+   래퍼가 버튼보다 커진다 — 그러면 래퍼는 가운데 정렬돼도 **버튼은 3.8px 내려앉는다**
+   (2026-08-14 계측: 수신자 select 중심 582.4 vs 버튼 중심 586.2). 래퍼를 flex로 바꿔
+   여백을 없앤다. */
+.sai-compact-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: auto; /* 수신자 줄 오른쪽 끝 */
+  flex: none;
+}
+
+/* 🔴 드롭다운이 팝업 밖으로 넘쳐도 잘리지 않아야 한다 — 부모의 `overflow-y: auto`가
+   자르기 때문에, 압축 모드에서 메뉴가 열려 있는 동안만 잘림을 푼다. */
+.sai-popup-menu-open {
+  overflow: visible;
+}
+
+.sai-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  background: var(--sunken);
+  color: var(--sub);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 9px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.sai-menu-button-open {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* 계급장 모양 — 가로 3줄. */
+.sai-menu-icon {
+  display: inline-grid;
+  gap: 2.5px;
+  width: 13px;
+}
+
+.sai-menu-icon > span {
+  display: block;
+  height: 1.6px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+/* 켜진 항목 수 — 닫아 둔 채로도 상태를 안다. */
+.sai-menu-count {
+  min-width: 15px;
+  height: 15px;
+  border-radius: 8px;
+  background: var(--o);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sai-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 18px;
+  z-index: 2;
+  min-width: 200px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.sai-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sai-menu-row:hover {
+  background: var(--sunken);
+}
+
+.sai-menu-row-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* 🔴 해독 팝업의 목업 경고 (Lessons #5) — 눈에 띄어야 한다. 이걸 놓치면 "분석할 게 없는
+   문장"과 "분석하지 않은 문장"을 구분할 수 없다. */
+.sai-decode-mock {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  background: var(--o-tint);
+  border: 1px solid var(--o);
+  border-radius: var(--radius-md);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--o-deep);
+}
+
+/* 액션 컨테이너 밖으로 나온 안내 — 래퍼(flex)의 마지막 칸으로 자연스럽게 붙는다. */
+.sai-fab-hint-loose {
+  flex: none;
+}
+
+/* ── 회신 초안 편집·인계 (S41) ────────────────────────────────────────
+   🔴 초안을 **편집 가능**하게 만든 자리다. 자리표시자를 모국어에서 채운 뒤 다듬기가 번역한다. */
+.sai-reply-draft-edit {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  border: 1px solid var(--border);
+  resize: vertical;
+}
+
+.sai-reply-draft-edit:focus {
+  outline: none;
+  border-color: var(--g);
+}
+
+.sai-reply-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sai-reply-actions .sai-reply-copy {
+  margin-top: 0;
+  margin-left: auto;
+}
+
+/* 「초안 복사」는 보조 경로다 — 여기서 나가는 문장은 아직 모국어라 그대로 보낼 수 없다. */
+.sai-reply-plain {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  color: var(--mut);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.sai-reply-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mut);
+}
+
+/* 🔴 해독 팝업의 Zero Retention 한 줄 — 다듬기와 같은 문구·같은 크기로 둔다(2026-08-15).
+   구분선 위에 얹어 본문 카드들과 섞이지 않게 한다. */
+.sai-decode-zr {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* 🔴 빈칸을 남긴 채 넘기려 할 때의 확인 (S41 후속). 주황 = 주의, 초록 = 안전한 선택. */
+.sai-reply-confirm {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--o);
+  background: var(--o-tint);
+}
+
+.sai-reply-confirm-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--o-deep);
+}
+
+.sai-reply-confirm .sai-reply-actions {
+  margin-top: 8px;
+}
+
+/* 다듬기 팝업의 빈칸 경고 — 누락 경고(`.sai-missing`)와 같은 자리·다른 문구. */
+.sai-blank-head {
+  color: var(--o-deep);
+}
+
+.sai-blank-text {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+/**
+ * 감지된 대화 상대 제안 줄 (2026-08-16).
+ * 🔴 등록을 **권하는** 자리지 자동으로 되는 자리가 아니다 — 버튼을 눌러야 저장된다.
+ */
+.sai-person-suggest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: var(--g-tint);
+  border-radius: var(--radius-sm);
+}
+.sai-person-suggest-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--sub);
+}
+.sai-person-add {
+  flex-shrink: 0;
+  white-space: nowrap;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--g);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+/**
+ * 역번역 실패 안내 (2026-08-16 ⓑ).
+ * 🔴 문장처럼 보이면 안 된다 — 여기 있는 글자는 "상대에게 이렇게 읽혀요"가 아니라 **우리 사과**다.
+ *    기울임 + 흐린 색으로 본문과 성격을 갈라 놓는다.
+ */
+.sai-back-failed {
+  font-style: italic;
+  color: var(--sai-mut, #565f6d);
+}
+
+/**
+ * 폴백 안내 (2026-08-16 ②) — 「이건 교정 결과가 아니다」.
+ * 🔴 **오류 색(빨강)을 쓴다.** 주황은 이 팝업에서 「강조·주의」이고, 여기는 그것보다 강하다 —
+ *    사용자가 이 문장을 못 보고 원문을 그대로 보내면 상대는 읽지 못한다.
+ * 🔴 접히지 않는다. 토글 뒤에 숨기면 안 보는 사람이 반드시 생긴다.
+ */
+.sai-fallback {
+  margin: 0 18px 10px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--r, #c0392b);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in oklab, var(--r, #c0392b) 8%, transparent);
+}
+
+.sai-fallback-head {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--r-deep, #96281b);
+  margin-bottom: 4px;
+}
+
+.sai-fallback-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sub);
+}

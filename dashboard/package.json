@@ -1,0 +1,20 @@
+{
+  "name": "sai-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "사이 B2B 웹 대시보드 (S18) — 확장과 완전히 분리된 별도 Vite 앱. 절대 확장의 dist/를 공유하지 않는다(Lessons #11).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}

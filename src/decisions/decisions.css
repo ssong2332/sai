@@ -1,0 +1,396 @@
+/* 🔴 글자 크기 눈금 한 단계 상향 (2026-08-18) — sidepanel.css·content.css와 같은 표를 쓴다.
+      결정 로그 페이지만 남겨 두면 같은 제품 안에서 화면마다 글자가 달라진다. */
+/* 결정 로그 페이지 (S25 / Spec 부가 7).
+   🔴 사이드패널(352px)과 달리 **전체 탭**이라 폭 제약이 없다 — 표를 표답게 그린다.
+   🔴 대비는 사이드패널·팝업과 같은 규칙을 쓴다: 읽으라고 쓴 글자는 `--sub` 이상(AA 4.5:1).
+      `--mut`(3.04:1)은 AA 미달이라 본문 텍스트에 쓰지 않는다. */
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+/* ── 헤더 ── */
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.brand-sub {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--o-deep);
+  background: var(--o-tint);
+  padding: 3px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+.head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 버튼 ── */
+
+.btn {
+  border: 0;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--o);
+  color: #fff;
+}
+
+.btn-quiet {
+  background: var(--surface);
+  color: var(--sub);
+  border: 1px solid var(--border);
+}
+
+.btn-quiet:hover {
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+.btn-sm {
+  font-size: 13px;
+  padding: 5px 10px;
+}
+
+.btn-lg {
+  font-size: 14px;
+  padding: 12px 22px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.notice {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: var(--g-tint);
+  color: var(--g-deep);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── 동의 화면 ── */
+
+.consent {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+}
+
+.consent-title {
+  margin: 0 0 10px;
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+.consent-lead {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--sub);
+}
+
+.consent-facts {
+  margin: 0 0 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.consent-facts > div {
+  display: grid;
+  grid-template-columns: 116px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.consent-facts dt {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  padding-top: 2px;
+}
+
+.consent-facts dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sub);
+}
+
+.consent-facts code {
+  font-size: 13px;
+  background: var(--sunken);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+/* 🔴 우리가 대신 약속할 수 없는 것 — 눈에 띄되 경고색은 아니다(겁주는 화면이 아니라 알리는 화면). */
+.consent-caveat {
+  margin: 0 0 22px;
+  padding: 12px 14px;
+  background: var(--sunken);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sub);
+}
+
+.consent-foot {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--sub);
+}
+
+/* ── 카드 ── */
+
+.logs {
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px 20px;
+}
+
+/* 저장 전 요약은 주황 테두리로 "아직 확정 아님"을 형태로도 말한다. */
+.card-pending {
+  border-color: var(--o);
+  margin-bottom: 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+}
+
+.card-meta {
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.src {
+  margin-right: 8px;
+  padding: 2px 7px;
+  background: var(--sunken);
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.meta-warn {
+  color: var(--o-deep);
+  font-weight: 700;
+}
+
+.card-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.warn-line {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  background: var(--o-tint);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+.empty {
+  margin: 0;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--sub);
+}
+
+/* ── 표 ── */
+
+/* 폭이 좁아지면 표만 가로 스크롤한다 — 페이지 전체가 흔들리지 않게. */
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sub);
+  padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 11px 12px 11px 0;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.55;
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 미확정 행 — 왼쪽 띠로 표시한다. 색만으로 구분하지 않도록 「미정」 글자가 칸에 함께 있다. */
+.row-unresolved td:first-child {
+  box-shadow: inset 3px 0 0 var(--o);
+  padding-left: 11px;
+}
+
+.none {
+  color: var(--sub);
+  font-style: italic;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.tag-ok {
+  color: var(--g-deep);
+  background: var(--g-tint);
+}
+
+.tag-warn {
+  color: var(--o-deep);
+  background: var(--o-tint);
+}
+
+/* 🔴 「불명」은 회색이다 — 모르는 것을 색으로 단정하지 않는다. */
+.tag-unknown {
+  color: var(--sub);
+  background: var(--sunken);
+}
+
+.evidence {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sub);
+  max-width: 320px;
+}
+
+/* 🔴 실패 안내 — 「결정 없음」(회색 `.empty`)과 **형태로 구분한다**. 뜻이 정반대인 두 상태를
+   같은 모양으로 두면 사용자가 자기 대화에 결정이 없다고 오해한다. */
+.fail {
+  margin: 0;
+  padding: 16px 18px;
+  background: var(--o-tint);
+  border: 1px solid var(--o);
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.fail-sub {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sub);
+}
+
+/* 읽은 범위 안내. 🔴 자동 수집(`-auto`)은 **틀릴 수 있는 경로**라 주황 배경으로 구분한다 —
+   선택 읽기와 같은 모양으로 두면 사용자가 차이를 모른 채 표를 믿는다. */
+.source-line {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  background: var(--sunken);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--sub);
+}
+
+.source-line-auto {
+  background: var(--o-tint);
+}
+
+.source-sub {
+  display: block;
+  margin-top: 4px;
+}

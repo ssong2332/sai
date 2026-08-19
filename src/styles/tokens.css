@@ -1,18 +1,257 @@
 /* Spec §6-1 디자인 시스템 토큰 — 무채색 Base + 주황/초록 Accent.
-   값 확정은 [DS] S04 소관이며, 여기 이름을 바꾸면 전 화면에 영향. */
-:root {
-  --primary-orange: #ff6b00;
-  --primary-green: #10b981;
+   🔴 출처: [DS] Figma 프로토타입 핸드오프 `Sai Prototype.dc.html` (2026-08-12 확정, S04).
+      값을 임의로 바꾸지 않는다. 바꿔야 하면 프로토타입을 먼저 고치고 여기로 옮긴다.
+   🔴 이름을 바꾸면 전 화면에 영향. */
 
-  --bg: #ffffff;
-  --bg-subtle: #f5f6f7;
-  --text: #1f2328;
-  --text-subtle: #656d76;
-  --border: #d0d7de;
+/* 🔴 `:host`를 함께 쓰는 이유: 콘텐츠 스크립트 팝업은 Shadow DOM 안에서 렌더된다
+   (호스트 페이지 CSS 차단 — Lessons #3). Shadow root 안에서는 `:root`가 매치되지 않으므로
+   두 선택자를 나란히 둬서 토큰 정의를 한 파일로 유지한다. */
+:root,
+:host {
+  /**
+   * ── Accent ──
+   * 🔴 **2026-08-14 사용자 지정 팔레트로 교체.** 이전 값(#ff6b00 / #10b981)은 Figma 핸드오프
+   *    이식본이었고, 이번에 브랜드 포인트 컬러를 직접 지정받았다. 중요한 것은 주황·그린 둘이며
+   *    레드·그레이는 보조다.
+   * 🔴 **원색은 "칠하는 색"이지 "글자 색"이 아니다** — 흰 배경 대비가 주황 3.02:1, 그린 3.58:1로
+   *    본문 글자로는 AA(4.5:1) 미달이다. **글자에는 반드시 `-deep`을 쓴다.**
+   * 🔴 **주황 버튼 위의 흰 글자는 3.02:1로 AA 미달인 채로 둔다** (2026-08-14 사용자 결정).
+   *    한 번 진한 주황(`#CC4E00`)으로 낮췄다가 "너무 진하다"는 지적으로 지정색으로 되돌렸다 —
+   *    브랜드 정확도를 대비보다 우선한 판단이다. 대신 **글자 토큰은 전부 AA를 지킨다**(아래 표).
+   */
+  --primary-orange: #ff6100;
+  --primary-green: #009b64;
+  --primary-red: #ee0031;
 
-  --radius-md: 8px;
+  /* 짧은 별칭 — 프로토타입이 쓰던 이름. 인라인 스타일 이식 시 그대로 매칭된다. */
+  --o: var(--primary-orange);
+  --g: var(--primary-green);
+  --r: var(--primary-red);
+
+  /* ── 무채색 스케일 ── */
+  --bg: #eef0f3; /* 페이지 배경 (표면보다 어둡다 — 카드가 떠 보이게) */
+  --surface: #ffffff; /* 카드·팝업 표면 */
+  --sunken: #f2f4f6; /* 표면보다 눌린 영역 (세그먼트 트랙, 인풋) */
+  --border: rgba(25, 31, 40, 0.08);
+
+  /* ── 텍스트 4단계 ── */
+  /**
+   * 🔴 **2026-08-16 — 대비를 실제로 계산해 두 값을 고쳤다** (사용자 지적: "흰 바탕에 회색 글씨,
+   *    가독성이 괜찮나"). 계산 결과 지적이 맞았다:
+   *      `--mut` #8b95a1 → 흰 배경 **3.04:1** · 패널 배경 **2.66:1** (WCAG AA 본문 기준 4.5 미달,
+   *        패널 배경에서는 큰 글씨 기준 3.0마저 미달)
+   *      `--faint` #cdcdcd → **1.59:1 / 1.39:1** (글자로는 사실상 안 보인다)
+   *    `--mut`은 라벨·캡션 41곳에 쓰여 화면에서 가장 흔한 회색이고, 작은 글씨(10.5~12px)라
+   *    큰 글씨 예외도 적용되지 않는다.
+   * 🔴 **`--faint`를 글자에 쓰지 않는다.** 원래 용도가 테두리·구분선이라 그 값은 그대로 두고
+   *    (테두리는 대비 기준이 다르다), 글자용은 `--mut`으로 옮긴다.
+   * 🔴 **2026-08-16 2차 — 색만으로는 부족했다.** 사용자가 다시 지적했다: "흰 배경에 회색 글씨라
+   *    잘 안 보인다, **글씨 크기도 작으니까**". 실제로 패널에서 설명을 나르는 `.meta`가
+   *    **10.5px + 회색**이었다 — 작은 글씨와 낮은 대비가 겹치면 어느 한쪽만 고쳐서는 안 읽힌다.
+   *    그래서 ① `--mut`을 한 단계 더 진하게(6.45:1) ② 설명 문구는 `--sub`(7.11:1)로 올리고
+   *    ③ 작은 글씨의 크기 자체를 키웠다(`sidepanel.css`). 셋을 함께 해야 효과가 있다.
+   * 🔴 다크 모드는 이미 통과한다(#8b95a1 on #1a1f27 = 5.45:1) — 손대지 않는다.
+   */
+  --ink: #191f28; /* 본문 — 16.56:1 */
+  --sub: #4e5968; /* 보조 — 7.11:1 */
+  --mut: #565f6d; /* 라벨·캡션 — 6.45:1 (흰 배경) / 5.65:1 (패널 배경) */
+  --faint: #cdcdcd; /* 🔴 **테두리·구분선 전용.** 글자색으로 쓰지 않는다(1.59:1). */
+
+  /**
+   * ── Accent 파생 ──
+   * 각 값의 용도가 정해져 있다. **바꿀 때는 대비를 다시 계산한다**(눈으로 고르지 않는다).
+   * | 토큰 | 용도 | 실측 대비 |
+   * |---|---|---|
+   * | `--o` / `--g` / `--r` | 채우기·테두리·아이콘 | 흰배경 3.02 / 3.58 / 4.49 |
+   * | `--o-deep` / `--g-deep` / `--r-deep` | **글자색** | 흰 5.04·5.25·5.39 / tint 4.56·4.61·4.60 |
+   * | `--o-tint` / `--g-tint` / `--r-tint` | 배지·강조 배경 | — |
+   *
+   * 🔴 `-deep`은 **흰 배경과 tint 배경 둘 다에서** 4.5:1을 넘도록 잡았다. 배지는 tint 위에
+   *    글자를 얹으므로 흰 배경만 보고 고르면 배지에서 미달한다(이전 팔레트가 그랬다).
+   */
+  --o-deep: #bf4900;
+  --g-deep: #007c50;
+  --r-deep: #d6002c;
+  --o-tint: color-mix(in oklab, var(--o) 9%, var(--surface));
+  --g-tint: color-mix(in oklab, var(--g) 11%, var(--surface));
+  --r-tint: color-mix(in oklab, var(--r) 9%, var(--surface));
+
+  --shadow: 0 24px 64px rgba(25, 31, 40, 0.18);
+
+  /* ── 모양 ── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-pill: 999px;
+
   --font-sans:
-    'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic',
-    sans-serif;
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'Malgun Gothic', system-ui, sans-serif;
+
+  /* ── 로고 마크 전용 색 (`SaiMark.jsx`) ── */
+  /* 🔴 브랜드 accent 토큰(`--o`/`--g`)과 별개다 — 로고는 어디서나 원본 색 그대로 쓴다
+     (2026-08-13 사용자 지시). 라이트 락업 값. */
+  /* S19 위험 표현 글자색 — 배경 없이 글자색만으로 구분한다(라이트: 진한 앰버). */
+  --sai-risk-ink: #92400e;
+  --sai-logo-bar: #201e1d;
+  --sai-logo-accent: #ec3013;
+}
+
+/* 다크 모드 — 프로토타입 `body.dark` 오버라이드 이식 (2026-08-12 사용자 결정으로 v1 포함).
+   `data-theme="dark"`를 <html>(사이드패널) 또는 shadow host(콘텐츠 팝업)에 세우면 적용된다. */
+:root[data-theme='dark'],
+:host([data-theme='dark']) {
+  /**
+   * 🔴 **브라우저에게도 다크임을 알린다** (2026-08-19). CSS 변수는 우리 규칙에만 적용되고,
+   *    네이티브로 그려지는 것들 — `<select>` 펼침 목록, 스크롤바, 자동완성 배경 — 은
+   *    `color-scheme`을 본다. 이게 없으면 다크 팝업 안에서 셀렉트 목록만 흰색으로 떠서
+   *    「검은 글씨」 계열 문제가 그쪽에서 재발한다.
+   */
+  color-scheme: dark;
+  --bg: #0e1116;
+  --surface: #1a1f27;
+  --sunken: #242b35;
+  --border: rgba(255, 255, 255, 0.09);
+
+  --ink: #f2f4f6;
+  --sub: #c4cad3;
+  --mut: #8b95a1;
+  --faint: #525a66;
+
+  /**
+   * 어두운 배경에서는 accent를 밝은 쪽으로 뒤집는다 — 라이트용 deep을 그대로 쓰면 안 읽힌다.
+   * 🔴 값은 계산으로 잡았다. surface(#1a1f27)·sunken(#242b35)·tint 세 배경 **모두**에서
+   *    4.5:1을 넘긴다 — sunken이 가장 빡빡한 조건이라 거기에 맞췄다.
+   *    실측: o 4.73 / g 4.54 / r 4.53 (sunken 기준).
+   * 🔴 주황은 **원색 그대로가 다크에서 이미 충분히 밝다**(sunken 4.73) — 굳이 흐리지 않는다.
+   */
+  --o-deep: #ff6100;
+  --g-deep: #1aa574;
+  --r-deep: #f45c7b;
+
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  /* 원본 "다크 · 반전" 락업 — 바는 크림색으로 뒤집힌다. 액센트(레드)는 두 락업 모두 고정. */
+  /* 다크에서는 진한 앰버가 안 읽힌다 — 밝은 앰버로 뒤집는다. */
+  --sai-risk-ink: #fbbf24;
+  --sai-logo-bar: #f8f4f4;
+}
+
+/* ── 모션 (프로토타입 keyframes 이식) ── */
+@keyframes sai-pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sai-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sai-toast-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sai-flash {
+  0% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--o) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+@keyframes sai-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes sai-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 로고 마크 "SHIFT" 모션 — 3초 루프, 어긋난 두 바가 정렬된 뒤 아래 바가 자란다.
+   `SaiMark` 컴포넌트(`animated` prop)와 `.sai-logo-mark-animated`가 이 규칙을 쓴다.
+   출처: claude.ai/design MEDIATE 로고 03 SHIFT 전개.dc.html(2026-08-13 임포트, 형태만). */
+@keyframes sai-logo-shift-a {
+  0%,
+  12% {
+    transform: translateX(-26px);
+  }
+  46%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes sai-logo-shift-b {
+  0%,
+  12% {
+    transform: translateX(26px);
+  }
+  46%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes sai-logo-shift-c {
+  0%,
+  40% {
+    transform: scaleX(0);
+  }
+  76%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+.sai-logo-mark-animated .sai-logo-bar-a {
+  animation: sai-logo-shift-a 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.sai-logo-mark-animated .sai-logo-bar-b {
+  animation: sai-logo-shift-b 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.sai-logo-mark-animated .sai-logo-bar-c {
+  animation: sai-logo-shift-c 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  transform-origin: 14px 76px;
+}
+
+/* 모션 최소화를 요청한 사용자에게는 애니메이션을 끈다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

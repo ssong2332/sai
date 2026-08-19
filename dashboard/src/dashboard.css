@@ -1,0 +1,794 @@
+/**
+ * S18 — B2B 웹 대시보드 스타일.
+ * 🔴 2026-08-13 — 클로드 디자인 시안(`Sai Dashboard.dc.html`)의 토큰·수치를 그대로 옮겼다.
+ *    메인 확장의 `tokens.css`와 값이 미묘하게 다르다(예: `--o-deep`) — 이 대시보드는 별도로
+ *    커미션된 시안이 원본이라 그 값을 그대로 따른다(주황/초록 브랜드 색상 자체는 동일).
+ *    다크 모드는 프로젝트의 나머지 부분과 같은 `data-theme` 속성 방식을 쓴다(시안 원본은
+ *    `body.dark` 클래스를 썼지만, 이 프로젝트 전체 관례(사이드패널·팝업)와 맞춰 속성 방식으로
+ *    이식했다 — 시각 결과는 동일하다).
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  /* 🔴 확장의 `src/styles/tokens.css`와 **같은 팔레트**를 쓴다 (2026-08-14 사용자 지정).
+     둘이 갈리면 같은 브랜드가 두 색으로 보인다 — 값을 바꿀 때는 반드시 양쪽을 함께 고친다. */
+  --o: #ff6100;
+  --g: #009b64;
+  --r: #ee0031;
+
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --sunken: #f2f4f6;
+  --border: rgba(25, 31, 40, 0.09);
+  --ink: #191f28;
+  --sub: #4e5968;
+  --mut: #8b95a1;
+  --faint: #cdcdcd;
+
+  /* 글자용 — 흰 배경·tint 배경 둘 다에서 4.5:1을 넘도록 계산한 값이다. */
+  --o-deep: #bf4900;
+  --g-deep: #007c50;
+  --r-deep: #d6002c;
+  --o-tint: color-mix(in oklab, var(--o) 10%, var(--surface));
+  --g-tint: color-mix(in oklab, var(--g) 11%, var(--surface));
+  --r-tint: color-mix(in oklab, var(--r) 9%, var(--surface));
+  --o-bar: color-mix(in oklab, var(--o) 88%, black 2%);
+  --g-bar: color-mix(in oklab, var(--g) 82%, black 4%);
+
+  /* ── 로고 마크 전용 색 (`SaiMark.jsx`, `src/styles/tokens.css`와 값을 맞춘다) ──
+     🔴 브랜드 accent 토큰(--o/--g)과 별개다 — 로고는 어디서나 원본 색 그대로 쓴다. */
+  --sai-logo-bar: #201e1d;
+  --sai-logo-accent: #ec3013;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e1116;
+  --surface: #1a1f27;
+  --sunken: #242b35;
+  --border: rgba(255, 255, 255, 0.09);
+  --ink: #f2f4f6;
+  --sub: #c4cad3;
+  --mut: #9aa3ad;
+  --faint: #525a66;
+
+  /* 다크 — sunken(#242b35)까지 포함해 4.5:1을 넘는 값(확장 tokens.css와 동일). */
+  --o-deep: #ff6100;
+  --g-deep: #1aa574;
+  --r-deep: #f45c7b;
+  --o-bar: color-mix(in oklab, var(--o) 80%, white 6%);
+  --g-bar: color-mix(in oklab, var(--g) 75%, white 6%);
+
+  /* 🔴 로고 액센트(빨강)는 라이트/다크 두 락업 모두 고정 — 다크 블록에서 재정의하지 않는다
+     (`SaiMark.jsx` 헤더 주석과 동일한 규칙). 바 색만 크림으로 바뀐다. */
+  --sai-logo-bar: #f8f4f4;
+}
+
+body {
+  margin: 0;
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  color: var(--ink);
+  transition: background 0.25s;
+}
+
+a {
+  color: var(--o-deep);
+}
+a:hover {
+  color: var(--o);
+}
+button {
+  font-family: inherit;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.dash-shell {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 헤더 ── */
+.dash-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 32px;
+}
+
+/* 🔴 예전엔 텍스트 배지("사")였다 — 이제 실제 로고 마크(SaiMark)를 쓴다. 여백만 맞춘다. */
+.dash-brand-mark {
+  flex: none;
+  display: block;
+}
+
+.dash-brand-name {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.dash-brand-team {
+  font-size: 12px;
+  color: var(--mut);
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+}
+
+.dash-spacer {
+  flex: 1;
+}
+
+.dash-theme-toggle {
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--sunken);
+  border-radius: 10px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--sub);
+}
+
+/* ── 목업 배너 ── */
+.dash-mock-banner {
+  background: var(--o-tint);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 32px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.dash-mock-banner-icon {
+  font-size: 14px;
+}
+
+.dash-mock-banner-strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--o-deep);
+}
+
+.dash-mock-banner-note {
+  font-size: 12.5px;
+  color: var(--sub);
+}
+
+/* ── 본문 ── */
+.dash-main {
+  flex: 1;
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 32px 40px;
+  display: grid;
+  gap: 20px;
+}
+
+.dash-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dash-title {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* 세그먼트 토글(기간 선택 · 차트/표) 공통. */
+.dash-segment {
+  display: inline-flex;
+  background: var(--sunken);
+  border-radius: 11px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.dash-segment-btn {
+  border: 0;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 9px;
+  color: var(--mut);
+  background: transparent;
+}
+
+.dash-segment-btn-sm {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.dash-segment-btn-active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 28px 32px;
+}
+
+/* ── 히어로 게이지 ── */
+.dash-hero {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  flex-wrap: wrap;
+}
+
+.dash-gauge {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  flex: none;
+  border-radius: 84px;
+}
+
+.dash-gauge-inner {
+  position: absolute;
+  inset: 13px;
+  border-radius: 71px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-gauge-value {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.dash-gauge-label {
+  font-size: 11px;
+  color: var(--mut);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.dash-hero-side {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dash-hero-formula {
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 1.6;
+}
+
+.dash-stat-row {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.dash-stat-label {
+  font-size: 11px;
+  color: var(--mut);
+  font-weight: 600;
+}
+
+.dash-stat-value {
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.dash-stat-value-o {
+  color: var(--o-deep);
+}
+
+.dash-stat-value-g {
+  color: var(--g-deep);
+}
+
+.dash-hero-note {
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.55;
+  max-width: 420px;
+}
+
+/* ── 차트 섹션 ── */
+.dash-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dash-chart-title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dash-chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.dash-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.dash-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sub);
+}
+
+.dash-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.dash-swatch-positive {
+  background: var(--g-bar);
+}
+
+.dash-swatch-friction {
+  background: var(--o-bar);
+}
+
+/* ── 나비형(mirror) 막대 — 라벨이 바깥쪽, 막대가 중앙선을 향해 자란다. ── */
+.dv-wrap {
+  position: relative;
+  margin-top: 18px;
+}
+
+.dv-centerline {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--border);
+  transform: translateX(-0.75px);
+}
+
+.dv-group {
+  display: grid;
+  gap: 4px 0;
+}
+
+.dv-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+.dv-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5px 1fr;
+  align-items: center;
+  min-height: 52px;
+}
+
+.dv-row-positive .dv-label-col {
+  text-align: right;
+  padding-right: 16px;
+}
+
+.dv-row-positive .dv-bar-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 2px;
+}
+
+.dv-row-friction .dv-bar-col {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-right: 2px;
+}
+
+.dv-row-friction .dv-label-col {
+  text-align: left;
+  padding-left: 16px;
+}
+
+.dv-item-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dv-item-desc {
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.4;
+}
+
+.dv-bar {
+  height: 22px;
+  min-width: 3px;
+  transition: width 0.4s ease;
+}
+
+.dv-bar-positive {
+  border-radius: 0 6px 6px 0;
+  background: var(--g-bar);
+}
+
+.dv-bar-friction {
+  border-radius: 6px 0 0 6px;
+  background: var(--o-bar);
+}
+
+.dv-value {
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.dv-value-positive {
+  color: var(--g-deep);
+}
+
+.dv-value-friction {
+  color: var(--o-deep);
+}
+
+/* ── 표 보기 ── */
+.dv-table {
+  margin-top: 16px;
+}
+
+.dv-table th {
+  text-align: left;
+  font-size: 11.5px;
+  color: var(--mut);
+  font-weight: 700;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dv-table th:last-child {
+  text-align: right;
+}
+
+.dv-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dv-table-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 7px;
+}
+
+.dv-table-badge-positive {
+  background: var(--g-tint);
+  color: var(--g-deep);
+}
+
+.dv-table-badge-friction {
+  background: var(--o-tint);
+  color: var(--o-deep);
+}
+
+.dv-table-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dv-table-desc {
+  font-size: 12.5px;
+  color: var(--sub);
+}
+
+.dv-table-count {
+  font-size: 13.5px;
+  font-weight: 800;
+  text-align: right;
+}
+
+/* ── 푸터 ── */
+.dash-footer {
+  text-align: center;
+  padding: 8px 0 4px;
+  display: grid;
+  gap: 6px;
+}
+
+.dash-footer-zero {
+  font-size: 12px;
+  color: var(--mut);
+}
+
+.dash-footer-copy {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+/* ── 로고 마크 "SHIFT" 모션 (`SaiMark.jsx`) — `src/styles/tokens.css`와 동일한 규칙을 그대로
+   옮겼다. 확장 쪽과 같은 로고가 같은 방식으로 움직여야 "다른 앱"처럼 보이지 않는다. */
+@keyframes sai-logo-shift-a {
+  0%,
+  12% {
+    transform: translateX(-26px);
+  }
+  46%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes sai-logo-shift-b {
+  0%,
+  12% {
+    transform: translateX(26px);
+  }
+  46%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes sai-logo-shift-c {
+  0%,
+  40% {
+    transform: scaleX(0);
+  }
+  76%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+.sai-logo-mark-animated .sai-logo-bar-a {
+  animation: sai-logo-shift-a 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.sai-logo-mark-animated .sai-logo-bar-b {
+  animation: sai-logo-shift-b 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.sai-logo-mark-animated .sai-logo-bar-c {
+  animation: sai-logo-shift-c 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  transform-origin: 14px 76px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sai-logo-mark-animated .sai-logo-bar-a,
+  .sai-logo-mark-animated .sai-logo-bar-b,
+  .sai-logo-mark-animated .sai-logo-bar-c {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* 실데이터일 때 기간 선택 대신 쓰는 라벨 (2026-08-15). 세그먼트와 같은 자리·같은 높이. */
+.dash-range-note {
+  font-size: 13px;
+  color: var(--sub);
+  padding: 6px 10px;
+}
+
+/* 팀 전환 드롭다운 (2026-08-16) — 헤더의 팀 이름 자리를 그대로 쓴다. */
+.dash-team-select {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--sub);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 8px;
+  max-width: 320px;
+}
+
+/* 신호 필터 (2026-08-16) — 끈 신호는 지수 계산에서도 빠진다. */
+.dash-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.dash-filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+  margin-right: 4px;
+}
+.dash-filter-chip {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--sub);
+  cursor: pointer;
+}
+/**
+ * 🔴 **꺼진 것이 꺼져 보여야 한다** (2026-08-16 사용자 지적: "선택 여부가 똑같아서 가독성이
+ *    떨어져"). 테두리 굵기 1px 차이는 화면에서 사실상 구분되지 않았다. 세 가지를 함께 바꾼다:
+ *    배경(채움 vs 빈칸) · 글자색 · 앞의 표시(● / ○). 색만으로 갈리지 않아 색각 이상에서도 읽힌다.
+ */
+.dash-filter-chip::before {
+  content: '○ ';
+  font-size: 11px;
+}
+.dash-filter-chip {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+.dash-filter-chip-on::before {
+  content: '● ';
+}
+.dash-filter-chip-on {
+  opacity: 1;
+  text-decoration: none;
+  border-width: 2px;
+  border-color: var(--g-bar);
+  background: var(--g-tint);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/**
+ * 신호 필터를 **긍정/마찰 두 줄로** 나눈다 (2026-08-16 사용자 요청 ⑥).
+ * 🔴 켜진 칩의 색이 **그 줄의 극성 색**이다 — 위 차트의 초록/주황과 같은 색이라 필터와 차트가
+ *    같은 언어를 쓴다. 예전에는 마찰 신호를 켜도 초록으로 칠해져 짝이 어긋났다.
+ * 🔴 색은 **보조**다 — 줄 라벨(「긍정 신호」/「마찰 신호」)과 ●/○ 표시가 색 없이도 구분을 만든다.
+ */
+.dash-filter-block {
+  margin-bottom: 4px;
+}
+.dash-filter-row:last-of-type {
+  margin-bottom: 8px;
+}
+.dash-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 66px;
+}
+.dash-filter-chip-friction.dash-filter-chip-on {
+  border-color: var(--o-bar);
+  background: var(--o-tint);
+}
+.dash-filter-note {
+  font-size: 12px;
+  color: var(--sub);
+  margin: 0 0 14px;
+}
+
+/**
+ * 추이 막대 툴팁 (2026-08-16 ③) — 어느 신호가 몇 건인지.
+ * 🔴 JS 없이 hover/focus로만 연다 — 상태를 만들면 30개 칸마다 리렌더가 돈다.
+ * 🔴 `pointer-events: none`이라 툴팁 자체가 마우스를 가로채 깜빡이지 않는다.
+ */
+.dash-trend-col {
+  position: relative;
+}
+.dash-trend-tip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  min-width: 190px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 14%);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+  text-align: left;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.dash-trend-col:hover .dash-trend-tip,
+.dash-trend-col:focus-visible .dash-trend-tip {
+  display: block;
+}
+/* 🔴 양 끝 칸은 툴팁이 화면 밖으로 나간다 — 안쪽으로 붙인다. */
+.dash-trend-col:first-child .dash-trend-tip {
+  left: 0;
+  transform: none;
+}
+.dash-trend-col:last-child .dash-trend-tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.dash-trend-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+.dash-trend-tip-none {
+  color: var(--sub);
+  margin-top: 3px;
+}
+
+/* 날짜별 추이 (2026-08-16). 🔴 라이브러리 없이 CSS 막대로 그린다. */
+.dash-trend { margin-top: 8px; }
+.dash-trend-plot {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 180px;
+  padding-bottom: 4px;
+}
+.dash-trend-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+.dash-trend-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  width: 100%;
+  justify-content: center;
+}
+/* 🔴 0건도 얇게 그린다 — 아무것도 없으면 "그날이 없는지 0인지" 구분되지 않는다. */
+.dash-trend-bar {
+  width: 45%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+}
+.dash-trend-bar-positive { background: var(--g-bar); }
+.dash-trend-bar-friction { background: var(--o); }
+.dash-trend-label {
+  font-size: 10px;
+  color: var(--sub);
+  white-space: nowrap;
+  margin-top: 4px;
+  height: 12px;
+}
+.dash-trend-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--sub);
+}
