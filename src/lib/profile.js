@@ -103,11 +103,16 @@ export const COLLAB_STYLES = [
     id: 'brief',
     label: '짧게',
     hint:
-      'Make the message as short as it can be. Drop greetings, preamble, filler, and closing ' +
-      'pleasantries, and compress what remains into the fewest words that still carry it — for ' +
-      'example "I have reviewed all the code" becomes "Code review complete" and "There are no ' +
-      'issues" becomes "No issues found". Keep every fact, deadline, number, and required action, ' +
-      'and keep the sentence type: a permission such as "you may proceed" stays a permission.',
+      'Make the message as short as it can be while keeping every fact, deadline, number, and ' +
+      'required action, and keeping the sentence type (a permission such as "you may proceed" ' +
+      'stays a permission). Drop greetings, preamble, filler, and closing pleasantries. Then ' +
+      'compress what remains: prefer short sentences, cut words that carry no information, and ' +
+      'replace long phrasings with short ones. Examples: "I have reviewed all the code" becomes ' +
+      '"Code review complete"; "There are no issues" becomes "No issues found"; "Could you please ' +
+      'share the draft API document we discussed last time by this Friday?" becomes "Could you ' +
+      'share the API doc draft by Friday?". The result must be clearly shorter than an ordinary ' +
+      'translation of the same message — if it is about the same length, you have not applied ' +
+      'this setting.',
   },
   {
     id: 'conclusion',

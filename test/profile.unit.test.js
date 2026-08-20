@@ -332,3 +332,18 @@ test('🔴 직접적으로 힌트가 허가문 보존을 «예시»로 못 박�
   assert.match(direct.hint, /"you may proceed" stays "you may proceed"/);
   assert.match(direct.hint, /must NOT become "please proceed"/);
 });
+
+/**
+ * 🔴 **「짧게」는 예시가 «한 종류»면 그 종류에서만 듣는다** (2026-08-20 3·4차 제보).
+ *    코드 리뷰(진술문) 예시만 있을 때, 요청문에서는 부드럽게와 거의 같은 길이가 나왔다.
+ *    그래서 «요청문» 예시와 «자기 점검» 문장을 함께 넣었다.
+ */
+test('🔴 짧게 힌트는 진술문·요청문 «둘 다» 예시를 갖고, 길이 자기 점검을 요구한다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  const brief = COLLAB_STYLES.find((item) => item.id === 'brief');
+  assert.match(brief.hint, /Code review complete/, '진술문 예시가 없다');
+  assert.match(brief.hint, /Could you share the API doc draft by Friday/, '요청문 예시가 없다');
+  assert.match(brief.hint, /must be clearly shorter/, '길이 자기 점검이 없다');
+  // 🔴 압축이 내용을 지우면 안 된다 — 이 문장이 빠지면 마감이 사라질 수 있다.
+  assert.match(brief.hint, /keeping every fact, deadline, number, and required action/);
+});
