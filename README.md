@@ -20,7 +20,10 @@
 
 **[⬇ 최신 릴리스 다운로드](https://github.com/ssong2332/sai/releases/latest)**
 
-직접 링크: [sai-extension.zip](https://github.com/ssong2332/sai/releases/download/v0.1.0/sai-extension.zip) (v0.1.0)
+직접 링크: [sai-extension.zip](https://github.com/ssong2332/sai/releases/latest/download/sai-extension.zip)
+(🔴 버전을 박지 않는다 — `releases/latest/download/`는 GitHub이 **항상 최신 릴리스의 같은 이름 파일로**
+돌려주므로, 릴리스를 낼 때마다 이 줄을 고칠 필요가 없다. v0.1.0을 박아 뒀다가 v0.1.1을 낸 뒤
+**옛 파일을 가리킨 채로 남아 있었다.**)
 
 1. zip을 **옮기지 않을 자리**에 압축 해제 (나중에 옮기면 확장을 다시 로드해야 한다)
 2. 크롬에서 `chrome://extensions` → 오른쪽 위 **개발자 모드** ON
