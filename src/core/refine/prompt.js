@@ -47,7 +47,7 @@
 // Spec 필수 2 3순위 — 언어권 **어법** 관습(국민성 아님).
 import { conventionRules } from './conventions.js';
 
-export const REFINE_PROMPT_VERSION = 'refine-v20';
+export const REFINE_PROMPT_VERSION = 'refine-v21';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];

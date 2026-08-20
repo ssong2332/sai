@@ -90,12 +90,24 @@ export const COLLAB_STYLES = [
       'sentence type exactly and soften only the wording. Soften what is already there: do NOT add ' +
       'greetings, thanks, compliments, or closing pleasantries that the original does not contain.',
   },
+  /**
+   * 🔴 **「짧게」가 짧지 않았다** (2026-08-20 사용자 3차 제보 — 단어 수를 세어 보니
+   *    직접적으로(15) < 짧게(17) < 부드럽게(19)로 **이름과 순서가 어긋났다**).
+   *    원인: 옛 문구는 「인사·군더더기를 «빼라»」였는데, 이 문장에는 애초에 뺄 인사가 없었다.
+   *    빼는 것만으로는 «압축»이 되지 않는다 — 있는 문장을 **짧은 형태로 바꾸라**고 해야 한다.
+   * 🔴 예시를 준다 — 이 프로젝트에서 추상 지시가 안 먹힌다는 것을 세 번 확인했다.
+   * 🔴 **압축이 내용을 지우면 안 된다.** 사실·마감·숫자·요구 행동, 그리고 문장의 «화행»은
+   *    그대로다 — 짧게 만든다고 허가문이 명령문이 되면 안 된다.
+   */
   {
     id: 'brief',
     label: '짧게',
     hint:
-      'Drop greetings, preamble, and closing pleasantries. Keep only what the message actually ' +
-      'says — its point, any deadline, and anything it requires.',
+      'Make the message as short as it can be. Drop greetings, preamble, filler, and closing ' +
+      'pleasantries, and compress what remains into the fewest words that still carry it — for ' +
+      'example "I have reviewed all the code" becomes "Code review complete" and "There are no ' +
+      'issues" becomes "No issues found". Keep every fact, deadline, number, and required action, ' +
+      'and keep the sentence type: a permission such as "you may proceed" stays a permission.',
   },
   {
     id: 'conclusion',
