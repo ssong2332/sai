@@ -20,7 +20,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 확장 버전 | **v0.1.2** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
+| 확장 버전 | **v0.1.3** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
 | 주 provider | OpenAI `gpt-4o` |
 | 한도 폴오버 | **openai → gemini → openai/`gpt-4.1`** ([src/core/refine/failover.js](src/core/refine/failover.js)) |
 | 단위 테스트 | 767건 |
