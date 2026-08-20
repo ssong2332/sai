@@ -11,3 +11,5 @@ firebase-debug.log
 # 테스터 배포본 (빌드 산출물) — 2026-08-17
 sai-extension-*.zip
 sai-extension-*/
+# 로컬 보관본의 «무엇이 들었는지» 기록 — 저장소가 아니라 그 폴더에서만 의미가 있다.
+sai-extension-VERSIONS.txt

@@ -9,118 +9,152 @@
 
 | 기둥 | 하는 일 |
 |---|---|
-| **Space** | 7개 언어(ko·en·zh·ja·de·fr·es) 교정 · 수신 메시지 해독 · 역번역 |
+| **Space** | 7개 언어(ko·en·zh·ja·de·fr·es) 교정 · 수신 메시지 뜻 풀기 · 역번역 · 원문 언어 자동 감지 |
 | **Sync** | 듀얼 시계 · 회의 시간 추천 · 퇴근 시간대 예약 제안 |
-| **Style** | 긴급도 3단 · 문체 3단(가볍게/기본/격식) · 용어집 · 오해 위험 표시 |
+| **Style** | 긴급도 3단 · 격식 3단(가볍게/기본/격식체) · **선호 말투 5종** · 용어집(개인·팀) · 오해 위험 표시 |
 
 🔴 **메시지 본문을 서버·DB·로그에 저장하지 않는다** (Zero Retention). 올라가는 것은 정수
 카운트뿐이고, [전용 테스트](test/zeroRetention.test.js)가 이를 강제한다.
+
+## 지금 상태
+
+| 항목 | 값 |
+|---|---|
+| 확장 버전 | **v0.1.2** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
+| 주 provider | OpenAI `gpt-4o` |
+| 한도 폴오버 | **openai → gemini → openai/`gpt-4.1`** ([src/core/refine/failover.js](src/core/refine/failover.js)) |
+| 단위 테스트 | 767건 |
+
+🔴 **프롬프트는 «서버»에 있다.** 교정 품질과 관련된 수정은 zip을 새로 받아도 반영되지 않는다 —
+`firebase deploy --only functions`가 필요하다. 반대로 화면·설정 변경은 확장 zip 쪽이다.
 
 ## 설치 (테스터용 — 개발 환경 불필요)
 
 **[⬇ 최신 릴리스 다운로드](https://github.com/ssong2332/sai/releases/latest)**
 
 직접 링크: [sai-extension.zip](https://github.com/ssong2332/sai/releases/latest/download/sai-extension.zip)
-(🔴 버전을 박지 않는다 — `releases/latest/download/`는 GitHub이 **항상 최신 릴리스의 같은 이름 파일로**
-돌려주므로, 릴리스를 낼 때마다 이 줄을 고칠 필요가 없다. v0.1.0을 박아 뒀다가 v0.1.1을 낸 뒤
-**옛 파일을 가리킨 채로 남아 있었다.**)
 
 1. zip을 **옮기지 않을 자리**에 압축 해제 (나중에 옮기면 확장을 다시 로드해야 한다)
 2. 크롬에서 `chrome://extensions` → 오른쪽 위 **개발자 모드** ON
-3. **압축해제된 확장 프로그램을 로드합니다** → `manifest.json`이 있는 그 폴더 선택
-4. `Alt+S`로 사이드 패널을 열고 **구글 계정으로 로그인** (이걸 해야 교정이 된다)
+3. **압축해제된 확장 프로그램을 로드합니다** → 압축을 푼 그 폴더 선택
+   (`설치 안내.txt`가 보이는 폴더가 맞다)
+4. 툴바의 S·AI 아이콘으로 사이드 패널을 열고 **구글 계정으로 로그인** — 이걸 해야 교정이 된다
 
 자세한 사용법·알려진 제약은 zip 안의 **`설치 안내.txt`**에 있다.
 
-> 릴리스 zip은 [GitHub Actions](.github/workflows/build.yml)가 만든다 — 테스트 754건을
-> 통과해야 빌드되고, `v*` 태그를 밀면 자동으로 첨부된다.
+> 릴리스 zip은 [GitHub Actions](.github/workflows/build.yml)가 만든다 — `npm test`(ESLint
+> 게이트 포함)를 통과해야 빌드되고, `v*` 태그를 밀면 자동으로 첨부된다.
+> 🔴 **태그를 밀 때 `src/manifest.js`의 `version`도 함께 올린다.** 크롬 확장 관리 화면에는
+> 그 값이 뜨므로, 어긋나면 테스터가 어느 버전을 깔았는지 알 수 없다.
 
 ## 문서
 
-- 마스터 명세: [docs/Spec.md](docs/Spec.md)
-- 태스크 보드: [docs/Tasks.md](docs/Tasks.md)
+- 마스터 명세: [docs/Spec.md](docs/Spec.md) — **모든 충돌의 최종 승자**
+- 태스크 보드: [docs/Tasks.md](docs/Tasks.md) — 예약 항목(i18n·말투 검증)도 여기
 - 이전 프로젝트 이식 지식: [docs/reference/Lessons.md](docs/reference/Lessons.md)
+- 작업 규칙·검증된 명령: [CLAUDE.md](CLAUDE.md)
 
 ## Quick Start (개발자용)
 
 ```bash
-# 1. 패키지 설치
 npm install
 
-# 2. 환경 변수
-#    .env.example을 .env로 복사하고 값 채우기 (표는 아래 Configuration 참조)
+# .env.example을 .env로 복사하고 값 채우기 (아래 Configuration)
+# 🔴 .env는 git 워크트리마다 따로 있다 — 워크트리에서 작업하면 그 루트에 있어야 한다
 
-# 3. 크롬 확장 프로그램 개발 모드 실행
 npm run dev
-
-# 4. 크롬 브라우저 설정
-#    chrome://extensions → '개발자 모드' ON → '압축해제된 확장 프로그램을 로드합니다' → dist 폴더 선택
-#    (JSX는 빌드해야 동작하므로 프로젝트 루트가 아닌 dist만 유효)
+# chrome://extensions → 개발자 모드 ON → 압축해제된 확장 프로그램을 로드합니다 → dist 폴더
+# (JSX는 빌드해야 동작하므로 프로젝트 루트가 아닌 dist만 유효)
 ```
 
 ## Configuration
 
 | 변수 | 위치 | 설명 |
 |---|---|---|
-| `OPENAI_API_KEY` | Functions 환경 | OpenAI API 키 — **Spec §6-3 기준 provider**(배포·제출 경로). 서버 전용, 클라이언트 번들 포함 금지 |
-| `GEMINI_API_KEY` | 로컬 `.env` | Gemini API 키 — **로컬 개발/테스트 전용 대체 provider**. 서버 전용 |
+| `OPENAI_API_KEY` | Secret Manager + 로컬 `.env` | **주 provider**(`gpt-4o`). 서버 전용, 클라이언트 번들 포함 금지 |
+| `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | **예비 provider.** 로컬 전용이 아니라 **배포에서도 쓴다** — 한도 폴오버 2단계 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
+| `SAI_CACHE_TTL_MS` | 로컬 `.env` | 프록시 캐시 수명(기본 10분 · 상한 6시간). 시연 촬영 때 호출을 줄이는 용도 |
 
-> provider 선택: `refine()`의 `deps.provider`(`openai` | `gemini`). 생략하면 Spec 기준인 `openai`.
-> 로컬 러너는 `GEMINI_API_KEY`가 있으면 gemini를 먼저 고른다 — **제출 판정은 openai 실행 결과로 한다.**
+> 🔴 **키를 시크릿에 등록할 때는 파일로 넘긴다.** `firebase functions:secrets:set`의 숨김
+> 프롬프트에 붙여넣으면 조용히 빈 값이 들어가고, 끝 개행이 섞이면 401을 받고 **코드 문제로
+> 오진하게 된다.** 절차는 [CLAUDE.md](CLAUDE.md)에 명령 원문으로 있다.
 
 ## 백엔드
 
 확장은 LLM을 직접 부르지 않는다 — **API 키가 확장 번들에 들어가면 안 되기 때문**이다.
 [src/config.js](src/config.js)의 `REFINE_ENDPOINT`가 백엔드 주소를 정한다.
 
-### 프로덕션 (기본값, 2026-08-13 배포됨)
+### 프로덕션
 
 ```
 https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/refineV1
 ```
 
-- `functions/index.js`는 `src/core/refine/`(→ `scripts/sync-core.mjs`가 배포 직전 `functions/core/`로
-  복사)를 얇게 감싼 Cloud Functions 2세대다. 키는 Secret Manager(`GEMINI_API_KEY`)에만 있다.
-- 코드를 고치면: `firebase deploy --only functions` (동시 다건 배포가 GCS 버킷 생성 경합으로
-  간헐 실패하면 `firebase deploy --only functions:<이름>`으로 개별 재시도).
-- 확인: `curl https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/health`
-- 🔴 지금 CORS가 전체 허용이다 — 확장 ID가 정해지면 그 오리진으로 좁혀야 한다.
+- `functions/index.js`는 `src/core/{refine,decode,decisions,reply}`(→ `scripts/sync-core.mjs`가
+  배포 직전 `functions/core/`로 복사)를 얇게 감싼 Cloud Functions 2세대다.
+- 🔴 **로그인하지 않으면 401이다.** 인증이 없던 시절에는 URL만 알면 누구나 우리 키를 썼다.
+  하루 교정 상한도 서버가 센다(한국 시간 자정 초기화).
+- 🔴 **CORS는 확장 ID 오리진으로 좁혀져 있다** — `refineV1`은 전체 허용이 아니다.
+- 배포: `firebase deploy --only functions` · 확인: `curl …/health`
+- 🔴 **새 함수를 추가하면 `invoker: 'public'`을 명시한다.** 2세대 기본값은 「인증된 호출자만」이고
+  Firebase ID 토큰은 Cloud IAM 신원이 아니라, 로그인한 사용자여도 IAM 단계에서 먼저 잘린다.
+
+### 한도 폴오버
+
+| 순서 | provider · 모델 | 넘어가는 조건 |
+|---|---|---|
+| 1 | openai · `gpt-4o` | — |
+| 2 | gemini · 기본 | 1번이 `quota` |
+| 3 | openai · `gpt-4.1` | 2번이 `quota` |
+
+- 🔴 **한도는 모델별로 따로다** — 그래서 3단계가 성립한다(같은 키인데 `gpt-4o`가 0일 때
+  `gpt-4.1`은 별도 한도를 갖는다는 것을 응답 헤더로 실측했다).
+- 🔴 **`quota`일 때«만»** 넘긴다. 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패한다.
+- 🔴 요청이 provider를 **명시**했으면 대체하지 않는다 — 어느 모델의 출력인지 모르는 채 품질을
+  논하게 되기 때문이다.
+- 표는 **한 파일에만** 있다([failover.js](src/core/refine/failover.js)). 프록시와 Functions가
+  같은 파일을 임포트하므로 두 곳이 어긋날 수 없다.
+- 어느 쪽이 답했는지는 응답의 `providerUsed`·`modelUsed`에 남는다.
 
 ### 로컬 프록시 (오프라인 개발용)
 
 ```bash
-# .env에 GEMINI_API_KEY(또는 OPENAI_API_KEY)를 넣고
-npm run proxy
-
-# 상태 확인
+npm run proxy                    # 기본 8787
+SAI_PROXY_PORT=8799 npm run proxy   # 포트를 바꿔 남의 프록시를 죽이지 않는다
 curl http://127.0.0.1:8787/health
 ```
 
-`src/config.js`의 `REFINE_ENDPOINT`를 파일 안의 `LOCAL_PROXY_ENDPOINT` 값으로 바꾸면(그리고
-`src/manifest.js`의 `host_permissions`에 `http://127.0.0.1:8787/*`를 추가하면) 이쪽을 쓴다.
-`server/refine-proxy.js`도 같은 `src/core/refine/`를 그대로 실행하므로 동작이 프로덕션과 같다.
+- 🔴 **코드를 고치면 반드시 재시작한다.** Node는 import 시점에 모듈을 고정하므로, 띄워 둔 채
+  `src/core/**`를 고치면 **옛 코드가 계속 응답한다** — 프롬프트를 고치고 "모델이 말을 안 듣는다"고
+  오진하기 딱 좋다.
+- 🔴 **새로 띄우기 전에 그 포트가 비었는지 확인한다.** 이전 세션의 프록시가 남아 있으면 새
+  프로세스는 뜨지도 못하는데 curl은 **좀비 프록시**에 닿아 정상 응답을 준다.
+- `server/refine-proxy.js`도 같은 `src/core/`를 실행하므로 동작이 프로덕션과 같다.
 
 ### 공통
 
-- 백엔드가 죽어 있으면 확장은 **목업 응답으로 폴백**하며 화면에 "목업 응답 — 실제 교정 결과 아님"을
-  표시한다 (Lessons #5 — 폴백을 실제 결과로 오인시키지 않는다).
+- 백엔드가 죽어 있으면 확장은 **목업 응답으로 폴백**하며 화면에 "실제 교정 결과 아님"을 표시한다
+  (Lessons #5 — 폴백을 실제 결과로 오인시키지 않는다).
+- 🔴 **401·429는 목업으로 덮지 않는다.** 로그인만 하면 될 사람에게 그럴듯한 예시를 보여 주면
+  **문제가 있다는 사실 자체가 숨는다.**
 
 ## Testing
 
 ```bash
-# 단위 테스트 (API 키 불필요 — LLM은 스텁)
-npm test
+npm test                                          # 단위 767건 (LLM은 스텁, 키 불필요)
 
-# /v1/refine 실 API 통합 20건 (레거시 74건에서 선별)
-#   키가 없으면 실행하지 않고 exit 2 — 미실행을 통과로 기록하지 않는다
-npm run test:refine:live                          # GEMINI_API_KEY 있으면 gemini
-npm run test:refine:live -- --provider openai     # Spec 기준 경로
-npm run test:refine:live -- --model <모델명>      # 모델 교체
+# /v1/refine 실 API 통합 21건 — 키가 없으면 실행하지 않고 exit 2
+npm run test:refine:live
+npm run test:refine:live -- --provider gemini
+npm run test:refine:live -- --model <모델명>
 ```
 
 > ⚠️ 단위 테스트가 green이어도 **확장이 브라우저에서 동작한다는 근거가 되지 않는다**
 > ([Lessons #1](docs/reference/Lessons.md)). 확장 기능은 unpacked 실브라우저 로드 확인이 있어야 done.
+
+> 🔴 실 API 러너는 **1건이 요청 약 2건**을 쓴다. 무료 티어에서 21건 완주는 한도를 넘길 수 있으니
+> provider별 잔여를 먼저 확인한다.
 
 ## 팀 (4인)
 
