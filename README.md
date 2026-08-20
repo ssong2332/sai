@@ -20,10 +20,10 @@
 
 | 항목 | 값 |
 |---|---|
-| 확장 버전 | **v0.1.5** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
+| 확장 버전 | **v0.1.6** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
 | 주 provider | OpenAI `gpt-4o` |
 | 한도 폴오버 | **openai → gemini → openai/`gpt-4.1`** ([src/core/refine/failover.js](src/core/refine/failover.js)) |
-| 단위 테스트 | 773건 |
+| 단위 테스트 | 775건 |
 
 🔴 **교정 품질을 고칠 때 «어느 쪽»을 배포해야 하는지 반드시 확인한다** (2026-08-20에 실제로
 틀렸다 — 서버만 배포하고 「반영됐다」고 안내했는데 절반만 반영됐다).
@@ -152,7 +152,7 @@ curl http://127.0.0.1:8787/health
 ## Testing
 
 ```bash
-npm test                                          # 단위 773건 (LLM은 스텁, 키 불필요)
+npm test                                          # 단위 775건 (LLM은 스텁, 키 불필요)
 
 # /v1/refine 실 API 통합 21건 — 키가 없으면 실행하지 않고 exit 2
 npm run test:refine:live

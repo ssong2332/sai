@@ -93,9 +93,20 @@ function getAuthToken({ interactive, identityImpl }) {
       const failure = globalThis.chrome?.runtime?.lastError;
       if (failure || !token) {
         const raw = failure?.message ?? 'no token';
-        // 🔴 원문을 콘솔에도 남긴다 — 화면 문구만으로 못 좁히는 경우가 있다. 일정 내용이 아니라
-        //    크롬이 준 오류 문자열이므로 Zero Retention과 무관하다.
-        console.warn('[사이] 캘린더 인증 실패:', raw);
+        /**
+         * 🔴 **`interactive: false`일 때는 찍지 않는다** (2026-08-20 테스터 제보).
+         *
+         *    사이드패널은 열릴 때마다 «조용히» 연결 여부를 확인한다(`isCalendarLinked`).
+         *    캘린더를 연결한 적 없는 사람에게는 **실패가 정상 상태**인데, 그때마다 여기서
+         *    경고를 찍으면 `chrome://extensions`의 「오류」 목록에 빨갛게 쌓인다 —
+         *    테스터는 「설치가 잘못됐나?」로 읽는다. 실제로 그 보고를 받았다.
+         *
+         * 🔴 **버튼을 눌러 연결을 시도한 경우(`interactive: true`)에는 그대로 남긴다.**
+         *    그건 사용자가 «되기를 기대한» 동작이라 실패에 진단이 필요하고, 화면 문구만으로
+         *    좁히지 못하는 경우가 있다. 일정 내용이 아니라 크롬이 준 오류 문자열이므로
+         *    Zero Retention과 무관하다.
+         */
+        if (interactive) console.warn('[사이] 캘린더 인증 실패:', raw);
         reject(
           new CalendarError(
             interactive ? classifyIdentityFailure(raw) : CALENDAR_ERRORS.NOT_SIGNED_IN,

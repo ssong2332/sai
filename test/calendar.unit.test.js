@@ -10,6 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   excludeBusySlots,
@@ -219,4 +220,34 @@ test('모든 실패 사유에 사람이 읽을 문구가 있다', () => {
     assert.ok(message.length > 0, `${reason}에 문구가 없다`);
     assert.ok(!message.includes('undefined'));
   }
+});
+
+/**
+ * 🔴 **조용한 확인은 조용해야 한다** (2026-08-20 테스터 제보).
+ *
+ *    사이드패널은 열릴 때마다 `interactive: false`로 캘린더 연결 여부를 확인한다.
+ *    캘린더를 연결한 적 없는 사람에게는 **실패가 정상 상태**인데, 그때마다 `console.warn`을
+ *    찍으면 `chrome://extensions`의 「오류」 목록에 빨갛게 쌓여 **테스터가 설치 실패로 읽는다.**
+ *    실제로 그 보고를 받았다.
+ * 🔴 반대로 버튼을 눌러 시도한 경우(`interactive: true`)에는 남겨야 한다 — 사용자가 되기를
+ *    기대한 동작이라 진단이 필요하다.
+ */
+test('🔴 조용한 연결 확인(interactive:false)은 콘솔에 경고를 남기지 않는다', async () => {
+  const { isCalendarLinked } = await import('../src/lib/calendarClient.js');
+  const identityImpl = { getAuthToken: (_opts, cb) => cb(undefined) }; // 토큰 없음 = 미연결
+
+  const warned = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warned.push(args);
+  try {
+    assert.equal(await isCalendarLinked({ identityImpl }), false);
+  } finally {
+    console.warn = realWarn;
+  }
+  assert.deepEqual(warned, [], `조용한 확인이 경고를 남겼다: ${JSON.stringify(warned)}`);
+});
+
+test('🔴 사용자가 «버튼으로» 시도한 실패는 콘솔에 남는다 — 진단이 필요하다', async () => {
+  const src = readFileSync(new URL('../src/lib/calendarClient.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(interactive\) console\.warn\('\[사이\] 캘린더 인증 실패:'/);
 });
