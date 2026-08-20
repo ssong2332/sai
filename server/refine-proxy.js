@@ -28,6 +28,10 @@ import {
   MemoryCacheStore as DecisionsCacheStore,
 } from '../src/core/decisions/index.js';
 import { reply, MemoryCacheStore as ReplyCacheStore } from '../src/core/reply/index.js';
+// 🔴 폴오버 사슬은 `src/core/refine/failover.js` 한 곳에만 있다 — Functions도 같은 파일을 쓴다
+//    (sync-core가 복사한다). 두 서버에 표를 각각 적으면 어긋나고, 그 증상이
+//    「로컬에선 되는데 배포하면 다르다」로 나온다.
+import { remainingChain, sameStep, stepLabel } from '../src/core/refine/failover.js';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -61,16 +65,15 @@ if (!apiKey) {
  *
  * 🔴 **한도(`quota`)일 때«만» 넘긴다.** 네트워크 오류·응답 형식 오류로는 넘기지 않는다 —
  *    그건 두 번 불러도 같은 이유로 실패하고, 조용한 이중 호출은 한도만 더 태운다.
- * 🔴 **한 번만** 재시도한다. 예비까지 실패하면 원래대로 폴백 응답을 낸다.
+ * 🔴 **사슬 끝까지** 내려간다 (2026-08-20). openai → gemini → openai/gpt-4.1.
+ *    근거는 «한도가 모델별로 따로»라는 실측이다 — `src/core/refine/failover.js` 헤더 참조.
+ *    사슬을 다 쓰고도 실패하면 원래대로 폴백 응답을 낸다.
  * 🔴 **어느 쪽이 답했는지 응답에 남긴다**(`providerUsed`) — 모델이 바뀌면 문체가 달라지는데
  *    그걸 모른 채 결과를 비교하면 "프롬프트를 고쳤더니 달라졌다"고 오진하게 된다.
  */
-const backupName = Object.keys(PROVIDERS).find(
-  (name) => name !== providerName && process.env[PROVIDERS[name].envKey],
-);
-const backup = backupName
-  ? { providerName: backupName, apiKey: process.env[PROVIDERS[backupName].envKey] }
-  : null;
+// 🔴 예전의 `backup`(예비 «하나») 상수는 지웠다 — 2026-08-20부터 예비가 사슬이라
+//    `remainingChain()`이 그 역할을 대신한다. 남겨 두면 「예비는 한 개」라는 옛 모델이
+//    코드에 계속 보인다.
 
 /**
  * 프로세스 메모리 캐시를 공유한다 — 같은 문장 재시연이 공짜가 된다(Lessons #6).
@@ -164,7 +167,10 @@ const MODES = {
     run: (request, creds) =>
       refine(request, {
         ...creds,
-        model,
+        // 🔴 `creds.model`이 이기게 둔다 — 사슬 단계마다 모델이 다르다. 예전에는 `model`(CLI
+        //    플래그)이 뒤에 와서 creds를 «덮었고», `--model gpt-4.1`로 띄운 채 한도에 걸리면
+        //    **Gemini에게 openai 모델명을 넘겨** 그쪽에서 또 실패했다.
+        model: creds.model ?? model,
         cache: refineCache,
         logger: logRefineEvent,
       }),
@@ -174,7 +180,10 @@ const MODES = {
     run: (request, creds) =>
       decode(request, {
         ...creds,
-        model,
+        // 🔴 `creds.model`이 이기게 둔다 — 사슬 단계마다 모델이 다르다. 예전에는 `model`(CLI
+        //    플래그)이 뒤에 와서 creds를 «덮었고», `--model gpt-4.1`로 띄운 채 한도에 걸리면
+        //    **Gemini에게 openai 모델명을 넘겨** 그쪽에서 또 실패했다.
+        model: creds.model ?? model,
         cache: decodeCache,
         logger: logDecodeEvent,
       }),
@@ -184,7 +193,10 @@ const MODES = {
     run: (request, creds) =>
       summarizeDecisions(request, {
         ...creds,
-        model,
+        // 🔴 `creds.model`이 이기게 둔다 — 사슬 단계마다 모델이 다르다. 예전에는 `model`(CLI
+        //    플래그)이 뒤에 와서 creds를 «덮었고», `--model gpt-4.1`로 띄운 채 한도에 걸리면
+        //    **Gemini에게 openai 모델명을 넘겨** 그쪽에서 또 실패했다.
+        model: creds.model ?? model,
         cache: decisionsCache,
         logger: logDecisionsEvent,
       }),
@@ -194,7 +206,10 @@ const MODES = {
     run: (request, creds) =>
       reply(request, {
         ...creds,
-        model,
+        // 🔴 `creds.model`이 이기게 둔다 — 사슬 단계마다 모델이 다르다. 예전에는 `model`(CLI
+        //    플래그)이 뒤에 와서 creds를 «덮었고», `--model gpt-4.1`로 띄운 채 한도에 걸리면
+        //    **Gemini에게 openai 모델명을 넘겨** 그쪽에서 또 실패했다.
+        model: creds.model ?? model,
         cache: replyCache,
         logger: logReplyEvent,
       }),
@@ -205,7 +220,7 @@ const MODES = {
 const primaryCreds = { apiKey, provider: providerName };
 
 /**
- * 한도에 걸렸을 때만 예비 provider로 한 번 더 부른다 (2026-08-19 ⓓ).
+ * 한도에 걸렸을 때만 사슬의 다음 단계로 넘어간다 (2026-08-19 ⓓ → 2026-08-20 사슬로 확장).
  *
  * 🔴 **코어를 고치지 않았다.** 네 모드의 `refine/decode/decisions/reply`는 실패를 던지지 않고
  *    `{fallback: true, fallbackReason}` 응답으로 흡수한다 — 그 «결과»만 보고 판단하면
@@ -213,17 +228,35 @@ const primaryCreds = { apiKey, provider: providerName };
  * 🔴 `model` 플래그는 넘기지 않는다 — provider마다 모델 이름이 달라서, openai 모델명을
  *    gemini에 그대로 주면 그쪽에서 또 실패한다(각 provider의 기본 모델을 쓴다).
  */
-async function runWithFailover(mode, request) {
-  const first = await mode.run(request, primaryCreds);
-  if (!backup || !first?.fallback || first.fallbackReason !== 'quota') return first;
+function keyFor(providerId) {
+  const entry = PROVIDERS[providerId];
+  const value = entry && process.env[entry.envKey];
+  return value ? { apiKey: value, provider: providerId } : null;
+}
 
-  console.log(`[${mode.name}] ${providerName} 한도 — ${backup.providerName}로 한 번 더 시도합니다.`);
-  const second = await mode.run(request, { apiKey: backup.apiKey, provider: backup.providerName });
-  if (second?.fallback) {
-    console.log(`[${mode.name}] ${backup.providerName}도 실패(${second.fallbackReason}) — 폴백 응답을 냅니다.`);
-    return second;
+async function runWithFailover(mode, request) {
+  const start = { provider: providerName, model: model ?? null };
+  let used = start;
+  let result = await mode.run(request, primaryCreds);
+
+  for (const step of remainingChain(used)) {
+    // 🔴 매 단계마다 다시 본다 — 중간 단계가 quota 아닌 이유로 실패하면 거기서 멈춘다.
+    if (!result?.fallback || result.fallbackReason !== 'quota') break;
+
+    const creds = keyFor(step.provider);
+    if (!creds) continue; // 그 provider의 키가 없다 — 건너뛴다(멈추지 않는다)
+
+    console.log(`[${mode.name}] ${stepLabel(used)} 한도 — ${stepLabel(step)}로 다시 시도합니다.`);
+    result = await mode.run(request, { ...creds, model: step.model ?? undefined });
+    used = { provider: step.provider, model: step.model ?? null };
   }
-  return { ...second, providerUsed: backup.providerName };
+
+  if (sameStep(used, start)) return result;
+  if (result?.fallback) {
+    console.log(`[${mode.name}] ${stepLabel(used)}도 실패(${result.fallbackReason}) — 폴백 응답을 냅니다.`);
+    return result;
+  }
+  return { ...result, providerUsed: used.provider, modelUsed: used.model };
 }
 
 function sendJson(res, status, body) {
@@ -300,7 +333,17 @@ const server = createServer(async (req, res) => {
 server.listen(port, '127.0.0.1', () => {
   console.log(`사이 refine 프록시 — http://127.0.0.1:${port}`);
   console.log(`  provider=${providerName}  model=${model ?? provider.defaultModel}`);
-  console.log(`  예비 provider=${backup ? backup.providerName : '없음'} (한도일 때만 사용)`);
+  /**
+   * 🔴 **키가 없는 단계는 빼고 찍는다.** 부팅 로그가 「gpt-4.1까지 간다」고 말해 놓고 실제로는
+   *    키가 없어 건너뛰면, 촬영 중에 왜 멈췄는지 알 수 없다.
+   */
+  const chain = [
+    stepLabel({ provider: providerName, model }),
+    ...remainingChain({ provider: providerName, model: model ?? null })
+      .filter((step) => keyFor(step.provider))
+      .map(stepLabel),
+  ];
+  console.log(`  폴오버 사슬=${chain.join(' → ')} (한도일 때만 다음으로 넘어감)`);
   console.log(`  캐시 수명=${(cacheTtlMs ?? 10 * 60 * 1000) / 60000}분`);
   console.log(`  POST /v1/refine · GET /health`);
   console.log('  🔴 localhost 전용 — 인증이 없으므로 외부에 노출하지 마세요.');

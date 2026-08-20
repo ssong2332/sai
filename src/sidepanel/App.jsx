@@ -245,16 +245,19 @@ export default function App() {
   };
   const [toast, setToast] = useState('');
 
-  // 저장된 테마를 복원한다. 저장값이 없으면 OS 설정을 따른다.
+  /**
+   * 저장된 테마를 복원한다.
+   * 🔴 **저장값이 없으면 라이트다** (2026-08-20 사용자 결정). 그전에는 **OS 설정을 따랐다** —
+   *    그래서 OS가 다크인 사람은 설치 직후 다크로 시작했고, 본인이 고른 적 없는 상태라
+   *    「왜 검은색이지」가 됐다. 기본값은 한 가지로 고정하고, 바꾸고 싶으면 설정에서 켠다.
+   * 🔴 **저장값은 언제나 이긴다** — 다크를 고른 사람이 라이트로 되돌아가면 안 된다.
+   */
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const stored = await getLocal(STORAGE_KEYS.THEME, null);
       if (cancelled) return;
-      const prefersDark =
-        typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-      setTheme(stored ?? (prefersDark ? 'dark' : 'light'));
+      setTheme(stored ?? 'light');
     })();
     return () => {
       cancelled = true;

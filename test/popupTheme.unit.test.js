@@ -29,7 +29,23 @@ test('🔴 shadow 트리의 뿌리 컨테이너가 글자색을 다시 세운다
   }
 });
 
-test('🔴 테마 적용은 저장소 읽기를 기다리지 않는다 — 읽기가 실패해도 라이트로 굳지 않게', () => {
+test('🔴 테마 적용은 저장소 읽기를 기다리지 않는다 — 고아 컨텍스트에서도 attribute가 붙는다', () => {
   assert.match(boot, /applyTheme\(null\)/, '동기 1차 적용이 없다');
   assert.match(boot, /\.catch\(/, '저장소 읽기 실패 경로가 없다');
+});
+
+/**
+ * 🔴 **기본 테마는 라이트다** (2026-08-20 사용자 결정). 예전 기본값은 「OS 설정을 따름」이라
+ *    OS가 다크인 사람은 **고른 적도 없는데** 다크로 시작했다.
+ * 🔴 **두 화면이 같은 기본값을 써야 한다.** 팝업(콘텐츠 스크립트)과 사이드패널이 갈리면 같은
+ *    페이지에서 패널은 라이트, 팝업은 다크가 된다 — 이 테스트가 그 어긋남을 잠근다.
+ */
+test('🔴 저장값이 없을 때 팝업·사이드패널 둘 다 라이트로 시작한다', () => {
+  const panel = readFileSync(new URL('../src/sidepanel/App.jsx', import.meta.url), 'utf8');
+
+  assert.match(boot, /data-theme',\s*theme \?\? 'light'/, '팝업 기본값이 라이트가 아니다');
+  assert.match(panel, /setTheme\(stored \?\? 'light'\)/, '사이드패널 기본값이 라이트가 아니다');
+  // 🔴 OS 선호를 «기본값 결정»에 다시 쓰면 안 된다 — 그게 예전 동작이다.
+  assert.doesNotMatch(boot, /prefers-color-scheme/, '팝업이 아직 OS 설정을 본다');
+  assert.doesNotMatch(panel, /prefers-color-scheme/, '사이드패널이 아직 OS 설정을 본다');
 });

@@ -37,9 +37,12 @@ function mount() {
   shadow.appendChild(mountPoint);
 
   // 사이드패널에서 고른 테마를 팝업에도 적용한다 (2026-08-12 결정으로 다크모드 v1 포함).
+  /**
+   * 🔴 **저장값이 없으면 라이트다** (2026-08-20 사용자 결정). 사이드패널의 기본값과 **같아야
+   *    한다** — 두 화면이 서로 다른 기본을 쓰면 같은 페이지에서 패널은 라이트, 팝업은 다크가 된다.
+   */
   const applyTheme = (theme) => {
-    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    host.setAttribute('data-theme', theme ?? (prefersDark ? 'dark' : 'light'));
+    host.setAttribute('data-theme', theme ?? 'light');
   };
   /**
    * 🔴 **저장 읽기를 기다리지 않고 먼저 한 번 적용한다** (2026-08-19 실사용 결함 — 다크
@@ -60,16 +63,12 @@ function mount() {
       /* 고아 컨텍스트 — 위의 OS 기준 적용이 그대로 유효하다. */
     });
 
-  // 🔴 저장값이 없어 OS를 따르는 동안, OS 테마가 바뀌면 즉시 따라간다.
-  //    (저장값이 있으면 아래 storage 리스너가 이기므로 이 리스너는 겹치지 않는다.)
-  window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', async () => {
-    try {
-      const stored = await getLocal(STORAGE_KEYS.THEME, null);
-      if (stored === null) applyTheme(null);
-    } catch {
-      applyTheme(null);
-    }
-  });
+  /**
+   * 🔴 **OS 테마 변경 구독을 뺐다** (2026-08-20). 기본값이 「OS 따라감」이 아니라 **라이트**로
+   *    바뀌었으므로, 이 리스너가 할 일이 없다. 남겨 두면 주석이 거짓말을 하고, 나중에 누군가
+   *    「OS를 따라가는 모드가 있다」고 오해한다. 테마를 바꾸는 경로는 **설정 토글 하나뿐**이고
+   *    그 변경은 아래 `chrome.storage.onChanged`가 받는다.
+   */
 
   /**
    * 🔴 마운트 때 한 번만 읽으면 **사이드패널에서 테마를 바꿔도 팝업은 그대로**다

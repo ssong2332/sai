@@ -33,6 +33,8 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { refine, MemoryCacheStore as RefineCacheStore } from './core/refine/index.js';
+// 🔴 폴오버 사슬은 `src/core/refine/failover.js` 한 곳에만 있다 — sync-core가 복사한다.
+import { remainingChain, sameStep, stepLabel } from './core/refine/failover.js';
 import { decode, MemoryCacheStore as DecodeCacheStore } from './core/decode/index.js';
 import {
   summarizeDecisions,
@@ -131,27 +133,39 @@ function resolveProviderAndKey(requested) {
  *    논하게 된다**(위 판정표의 원칙과 같다). 미지정일 때만 넘긴다.
  * 🔴 **한도일 때만.** 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패하고, 조용한 이중
  *    호출은 한도만 더 태운다.
- * 🔴 **한 번만.** 예비까지 실패하면 원래대로 폴백 응답을 낸다.
- * 🔴 어느 쪽이 답했는지 `providerUsed`로 남긴다 — 문체가 달라진 이유를 나중에 추적할 수 있어야 한다.
+ * 🔴 **사슬 끝까지.** 2026-08-20부터 한 번이 아니라 `FAILOVER_CHAIN`(openai → gemini →
+ *    openai/gpt-4.1)을 순서대로 내려간다. 근거는 **한도가 모델별로 따로**라는 실측이다 —
+ *    `core/refine/failover.js` 헤더 참조. 사슬을 다 쓰고도 실패하면 폴백 응답을 낸다.
+ * 🔴 어느 쪽이 답했는지 `providerUsed`·`modelUsed`로 남긴다 — 1·3단계가 **둘 다 openai**라
+ *    provider만으로는 구분되지 않는다. 문체가 달라진 이유를 나중에 추적할 수 있어야 한다.
  * 🔴 코어(`refine/decode/...`)는 고치지 않았다. 실패를 던지지 않고 `{fallback, fallbackReason}`
  *    으로 흡수하므로, **결과만 보고** 판단하면 네 모드에 한 번에 적용된다.
  */
 async function runWithFailover(mode, modeName, selected, body) {
-  const first = await mode.run(selected);
-  if (body?.provider) return first; // 명시 요청 — 대체하지 않는다
-  if (!first?.fallback || first.fallbackReason !== 'quota') return first;
+  let used = { provider: selected.provider, model: selected.model ?? null };
+  let result = await mode.run(selected);
+  if (body?.provider) return result; // 명시 요청 — 대체하지 않는다
 
-  const other = selected.provider === 'openai' ? 'gemini' : 'openai';
-  const backup = resolveProviderAndKey(other);
-  if (!backup) return first;
+  for (const step of remainingChain(used)) {
+    // 🔴 여기서 매번 다시 본다 — 사슬 중간 단계가 quota 아닌 이유로 실패하면 거기서 멈춘다.
+    if (!result?.fallback || result.fallbackReason !== 'quota') break;
 
-  console.log(`[${modeName}] ${selected.provider} 한도 — ${backup.provider}로 한 번 더 시도합니다.`);
-  const second = await mode.run(backup);
-  if (second?.fallback) {
-    console.log(`[${modeName}] ${backup.provider}도 실패(${second.fallbackReason}) — 폴백을 냅니다.`);
-    return second;
+    const creds = resolveProviderAndKey(step.provider);
+    if (!creds) continue; // 그 provider의 키가 없다 — 건너뛴다(멈추지 않는다)
+
+    const next = { ...creds, model: step.model ?? undefined };
+    console.log(`[${modeName}] ${stepLabel(used)} 한도 — ${stepLabel(step)}로 다시 시도합니다.`);
+    result = await mode.run(next);
+    used = { provider: step.provider, model: step.model ?? null };
   }
-  return { ...second, providerUsed: backup.provider };
+
+  // 1차가 그대로 성공했으면 표기를 붙이지 않는다(예전 동작 유지).
+  if (sameStep(used, { provider: selected.provider, model: selected.model ?? null })) return result;
+  if (result?.fallback) {
+    console.log(`[${modeName}] ${stepLabel(used)}도 실패(${result.fallbackReason}) — 폴백을 냅니다.`);
+    return result;
+  }
+  return { ...result, providerUsed: used.provider, modelUsed: used.model };
 }
 
 /** 시크릿이 등록돼 있지 않으면 접근 자체가 던진다 — 그걸 null로 흡수한다. */
@@ -237,10 +251,12 @@ export const refineV1 = onRequest(
           refine(req.body ?? {}, {
             apiKey: creds.apiKey,
             provider: creds.provider,
+            // 🔴 사슬 단계마다 모델이 다르다(`core/refine/failover.js`). undefined면 provider 기본 모델.
+            model: creds.model,
             cache: refineCache,
             logger: (event) =>
               console.log(
-                `[refine] provider=${selected.provider} urgency=${event.urgency ?? '-'} ` +
+                `[refine] provider=${creds.provider}${creds.model ? `/${creds.model}` : ''} urgency=${event.urgency ?? '-'} ` +
                   `intent=${event.detectedIntent ?? '-'} cache=${event.cacheHit ? 'hit' : 'miss'} ` +
                   `fallback=${event.fallback ? (event.fallbackReason ?? 'yes') : 'no'} ${event.latencyMs}ms`,
               ),
@@ -251,10 +267,12 @@ export const refineV1 = onRequest(
           decode(req.body ?? {}, {
             apiKey: creds.apiKey,
             provider: creds.provider,
+            // 🔴 사슬 단계마다 모델이 다르다(`core/refine/failover.js`). undefined면 provider 기본 모델.
+            model: creds.model,
             cache: decodeCache,
             logger: (event) =>
               console.log(
-                `[decode] provider=${selected.provider} surface=${event.surfaceUrgency ?? '-'} ` +
+                `[decode] provider=${creds.provider}${creds.model ? `/${creds.model}` : ''} surface=${event.surfaceUrgency ?? '-'} ` +
                   `actual=${event.actualUrgency ?? '-'} gap=${event.urgencyGap ?? '-'} ` +
                   `cache=${event.cacheHit ? 'hit' : 'miss'} ` +
                   `fallback=${event.fallback ? (event.fallbackReason ?? 'yes') : 'no'} ${event.latencyMs}ms`,
@@ -266,11 +284,13 @@ export const refineV1 = onRequest(
           summarizeDecisions(req.body ?? {}, {
             apiKey: creds.apiKey,
             provider: creds.provider,
+            // 🔴 사슬 단계마다 모델이 다르다(`core/refine/failover.js`). undefined면 provider 기본 모델.
+            model: creds.model,
             cache: decisionsCache,
             // 🔴 건수와 플래그뿐 — 결정 문구·담당자 이름은 남기지 않는다.
             logger: (event) =>
               console.log(
-                `[decisions] provider=${selected.provider} decisions=${event.decisionCount ?? '-'} ` +
+                `[decisions] provider=${creds.provider}${creds.model ? `/${creds.model}` : ''} decisions=${event.decisionCount ?? '-'} ` +
                   `unresolved=${event.unresolvedCount ?? '-'} ` +
                   `unknownAuthority=${event.unknownAuthorityCount ?? '-'} ` +
                   `cache=${event.cacheHit ? 'hit' : 'miss'} ` +
@@ -283,11 +303,13 @@ export const refineV1 = onRequest(
           reply(req.body ?? {}, {
             apiKey: creds.apiKey,
             provider: creds.provider,
+            // 🔴 사슬 단계마다 모델이 다르다(`core/refine/failover.js`). undefined면 provider 기본 모델.
+            model: creds.model,
             cache: replyCache,
             // 🔴 초안 본문은 남기지 않는다 — 의도 키와 길이 수치뿐이다.
             logger: (event) =>
               console.log(
-                `[reply] provider=${selected.provider} intent=${event.intent ?? '-'} ` +
+                `[reply] provider=${creds.provider}${creds.model ? `/${creds.model}` : ''} intent=${event.intent ?? '-'} ` +
                   `len=${event.draftLength ?? '-'} cache=${event.cacheHit ? 'hit' : 'miss'} ` +
                   `fallback=${event.fallback ? (event.fallbackReason ?? 'yes') : 'no'} ${event.latencyMs}ms`,
               ),
