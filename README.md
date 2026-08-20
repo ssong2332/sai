@@ -20,13 +20,23 @@
 
 | 항목 | 값 |
 |---|---|
-| 확장 버전 | **v0.1.3** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
+| 확장 버전 | **v0.1.4** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
 | 주 provider | OpenAI `gpt-4o` |
 | 한도 폴오버 | **openai → gemini → openai/`gpt-4.1`** ([src/core/refine/failover.js](src/core/refine/failover.js)) |
-| 단위 테스트 | 767건 |
+| 단위 테스트 | 772건 |
 
-🔴 **프롬프트는 «서버»에 있다.** 교정 품질과 관련된 수정은 zip을 새로 받아도 반영되지 않는다 —
-`firebase deploy --only functions`가 필요하다. 반대로 화면·설정 변경은 확장 zip 쪽이다.
+🔴 **교정 품질을 고칠 때 «어느 쪽»을 배포해야 하는지 반드시 확인한다** (2026-08-20에 실제로
+틀렸다 — 서버만 배포하고 「반영됐다」고 안내했는데 절반만 반영됐다).
+
+| 무엇 | 어디에 있나 | 무엇을 배포해야 하나 |
+|---|---|---|
+| 프롬프트 «틀»(규칙 문장·조립 순서·`REFINE_PROMPT_VERSION`) | 서버 `src/core/refine/prompt.js` | `firebase deploy --only functions` |
+| **말투 힌트** `COLLAB_STYLES` | **확장** `src/lib/profile.js` | **새 릴리스(zip)** |
+| **수신자 태그 힌트** `RECIPIENT_TAGS` | **확장** `src/lib/recipients.js` | **새 릴리스(zip)** |
+| **상황 템플릿 힌트** `SITUATION_TEMPLATES` | **확장** `src/lib/profile.js` | **새 릴리스(zip)** |
+
+확장이 `buildProfileForRefine()`으로 **힌트 «문자열»을 만들어 payload에 실어 보내고**, 서버는 받은
+문자열을 그대로 쓴다. 그래서 힌트를 고치면 서버 배포로는 아무 일도 일어나지 않는다.
 
 ## 설치 (테스터용 — 개발 환경 불필요)
 
@@ -142,7 +152,7 @@ curl http://127.0.0.1:8787/health
 ## Testing
 
 ```bash
-npm test                                          # 단위 767건 (LLM은 스텁, 키 불필요)
+npm test                                          # 단위 772건 (LLM은 스텁, 키 불필요)
 
 # /v1/refine 실 API 통합 21건 — 키가 없으면 실행하지 않고 exit 2
 npm run test:refine:live
