@@ -220,10 +220,45 @@ test('말투 id가 수신자 태그 id와 겹치지 않는다 — 「내가 쓰�
   }
 });
 
-test('말투 힌트는 모두 "The user"로 시작한다 — 상대가 아니라 나에 대한 지시여야 한다', async () => {
+test('말투 힌트는 상대가 아니라 «내 문장»에 대한 지시다 - 수신자를 언급하지 않는다', async () => {
   const { COLLAB_STYLES } = await import('../src/lib/profile.js');
   assert.ok(COLLAB_STYLES.length >= 5, '결론 먼저·근거를 함께가 빠졌다');
   for (const style of COLLAB_STYLES) {
-    assert.match(style.hint, /^The user prefers /, `힌트 주어가 틀렸다: ${style.id}`);
+    assert.ok(style.hint.trim().length > 20, `힌트가 너무 짧다: ${style.id}`);
+    assert.doesNotMatch(style.hint, /recipient/i, `수신자를 언급한다: ${style.id}`);
   }
+  const hints = new Set(COLLAB_STYLES.map((item) => item.hint));
+  assert.equal(hints.size, COLLAB_STYLES.length, '같은 힌트가 두 번 쓰였다');
+});
+
+/**
+ * 🔴 **힌트를 «구체적 지시»로 바꾸면서 생긴 새 위험** (2026-08-20 ⓒ′).
+ *    추상적 선호일 때는 모델이 알아서 자제했지만, 이제는 시키는 대로 한다 - 그래서
+ *    「근거를 함께」가 **없는 이유를 지어낼** 수 있다. 지어내지 않는다는 금지를 힌트 안에
+ *    박아 두고, 그게 지워지지 않게 잠근다 (Spec: 원문에 없는 사실을 만들지 않는다).
+ */
+test('「근거를 함께」 힌트는 이유를 지어내는 것을 금지한다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  const rationale = COLLAB_STYLES.find((item) => item.id === 'rationale');
+  assert.ok(rationale, 'rationale 항목이 없다');
+  assert.match(rationale.hint, /never invent/i);
+});
+
+/**
+ * 🔴 **override는 «축»에 한정되어야 한다** (2026-08-20 ⓒ′).
+ *    `profile`은 클라이언트가 보내는 값이라, "무엇이든 이긴다"로 쓰면 프롬프트 주입 통로가 된다.
+ *    문장 형태·공손도까지만 이기고 마감·숫자·요구 행동은 못 건드린다는 문장이 함께 있어야 한다.
+ */
+test('프로필 규칙의 override가 마감·숫자·요구 행동까지 열어 주지 않는다', async () => {
+  const { buildRefinePayload } = await import('../src/core/refine/prompt.js');
+  const payload = buildRefinePayload({
+    text: '금요일까지 올려 주세요.',
+    sourceLanguage: 'ko',
+    targetLanguage: 'en',
+    userUrgency: null,
+    profile: { situation: null, collabStyle: 'x'.repeat(30), learned: [] },
+    referenceDate: '2026-08-20',
+  });
+  assert.match(payload.instruction, /sentence form and politeness level ONLY/);
+  assert.match(payload.instruction, /NEVER weaken, delay, blur, or remove a deadline/);
 });

@@ -43,18 +43,40 @@ export const SITUATION_TEMPLATES = [
  *    이쪽은 「내가 쓰는 방식」이다. id를 겹치지 않게 둔다.
  */
 export const COLLAB_STYLES = [
-  { id: 'direct', label: '직접적으로', hint: 'The user prefers direct, unhedged phrasing.' },
-  { id: 'warm', label: '부드럽게', hint: 'The user prefers warm, considerate phrasing.' },
-  { id: 'brief', label: '짧게', hint: 'The user prefers brief messages with minimal preamble.' },
+  {
+    id: 'direct',
+    label: '직접적으로',
+    hint:
+      'Phrase the request as a direct imperative statement. Do not wrap it in optional scaffolding ' +
+      'such as "I was wondering if" or "Could you possibly".',
+  },
+  {
+    id: 'warm',
+    label: '부드럽게',
+    hint:
+      'Phrase the request as a polite question (for example "Could you ...?") rather than a bare ' +
+      'imperative, and include one brief considerate touch such as a thanks or an acknowledgement.',
+  },
+  {
+    id: 'brief',
+    label: '짧게',
+    hint:
+      'Drop greetings, preamble, and closing pleasantries. Keep only the request, its deadline, ' +
+      'and what is required.',
+  },
   {
     id: 'conclusion',
     label: '결론 먼저',
-    hint: 'The user prefers the conclusion or the request in the first sentence, before any background.',
+    hint:
+      'Put the request or the conclusion in the FIRST sentence. Any background or context comes ' +
+      'after it.',
   },
   {
     id: 'rationale',
     label: '근거를 함께',
-    hint: 'The user prefers a short reason to accompany each request.',
+    hint:
+      'Include the reason for the request in one short clause. Use only a reason that is present ' +
+      'in the original text — never invent one.',
   },
 ];
 

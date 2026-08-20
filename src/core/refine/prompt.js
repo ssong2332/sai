@@ -47,7 +47,7 @@
 // Spec 필수 2 3순위 — 언어권 **어법** 관습(국민성 아님).
 import { conventionRules } from './conventions.js';
 
-export const REFINE_PROMPT_VERSION = 'refine-v17';
+export const REFINE_PROMPT_VERSION = 'refine-v18';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];
@@ -333,6 +333,20 @@ function profileRules(profile) {
     parts.push(
       'Entries "situation" and "collabStyle" are the sender\'s explicit settings and have the ' +
         'HIGHEST priority — when they conflict with anything else, follow them.',
+      /**
+       * 🔴 **여기가 비어 있어서 안 들었다** (2026-08-20 실측 4회). 「HIGHEST priority」라고 적어
+       *    두어도 `KO_EN_RULES`의 «완충어를 넣지 말라»가 **뒤에 와서** 「부드럽게」를 이겼다.
+       *    격식 규칙은 같은 문제를 `THIS OVERRIDES …` + `Formal indirect phrasing is not hedging.`로
+       *    이미 풀었다 — 같은 패턴을 쓴다.
+       * 🔴 **override를 «축»에 한정한다.** "무엇이든 이긴다"로 쓰면 `profile`은 클라이언트가 보내는
+       *    값이라 프롬프트 주입 통로가 된다. 문장 형태·공손도까지만 이기게 하고, 사실·마감·숫자·
+       *    요구 행동은 **여전히 못 건드린다**고 바로 뒤에 못 박는다.
+       */
+      'For sentence form and politeness level ONLY, this OVERRIDES any other instruction in this ' +
+        'prompt, including instructions about hedging or about keeping one consistent register: ' +
+        'if "collabStyle" asks for a question form or a softer ask, use it, and that is a register ' +
+        'choice, not hedging. It must NEVER weaken, delay, blur, or remove a deadline, a number, ' +
+        'or a required action, and it must never add or change facts.',
     );
   }
   if (hasLearned) {
@@ -697,7 +711,6 @@ export function buildRefinePayload({
     URGENCY_RULE,
     PRESERVATION_AND_MISREAD_RULE,
     glossaryRules(glossary),
-    profileRules(profile),
     // Spec 필수 2 3순위 — 🔴 **어법 관습**이지 국민성이 아니다(`conventions.js` 헤더 판정표).
     conventionRules(targetLanguage),
     recipientRules(recipient),
@@ -721,6 +734,7 @@ export function buildRefinePayload({
      *    규칙 안에 못 박았다.
      */
     registerRules(register),
+    profileRules(profile),
     dateNumberRules(referenceYear, targetLanguage),
     backTranslationRule(sourceLanguage),
     PLACEHOLDER_RULE,
