@@ -637,9 +637,9 @@
            └── Web Dashboard ────────▶ └──────────────────────┘</div>
     <ul>
       <li><span><strong>단일 통합 호출</strong> — 교정·긴급도·역번역·용어집·누락 검사를 한 번에 받는다.</span></li>
-      <li><span><strong>모델은 갈아 끼울 수 있다</strong> — 지금 붙어 있는 것은 <strong>OpenAI</strong>.
-        Gemini와 <strong>같은 payload·같은 반환 JSON 계약</strong>을 써서, 개발 중 실제로 한 번
-        갈아 끼웠고 바뀐 코드는 <strong>판정표 한 곳</strong>뿐이었다.</span></li>
+      <li><span><strong>한도에 걸려도 멈추지 않는다</strong> — 지금은 <strong>OpenAI</strong>.
+        한도에 걸리면 <strong>Gemini → gpt-4.1로 자동으로 넘어간다.</strong>
+        <strong>같은 payload·같은 반환 계약</strong>을 쓰기 때문이고, 어느 쪽이 답했는지는 응답에 남는다.</span></li>
       <li><span><strong>키는 확장에 없다</strong> — 확장이 가진 것은 <strong>로그인 토큰</strong>뿐이고
         LLM 키는 서버에만 있다. 서버가 토큰을 검증하고 사용자별 일일 상한까지 센다.</span></li>
       <li><span><strong>순수 코어</strong> — 판정 로직이 네트워크를 모르는 순수 함수라 확장과 서버가 같은 코드를 쓴다.</span></li>
@@ -653,7 +653,7 @@
     <h2>숫자는 전부 출처가 있다</h2>
     <div class="stats">
       <div class="stat">
-        <span class="stat-v">741</span>
+        <span class="stat-v">773</span>
         <span class="stat-k">단위 테스트 통과 / 0 실패</span>
         <span class="stat-src">npm test</span>
       </div>
@@ -685,8 +685,8 @@
     <div class="cols">
       <div class="cell">
         <span class="k">v1 잔여</span>
-        <span class="v">최종 실확장 검증</span>
-        <span class="n">회귀 20건 재실측 포함. 시연 영상이 그 증거가 된다</span>
+        <span class="v">시연 촬영 · 회귀</span>
+        <span class="n">실확장 확인은 8/20에 했다. 화면은 아직 한국어뿐이다</span>
       </div>
       <div class="cell">
         <span class="k">알려진 한계</span>
