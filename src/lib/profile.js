@@ -55,21 +55,40 @@ export const COLLAB_STYLES = [
   {
     id: 'direct',
     label: '직접적으로',
+    /**
+     * 🔴 **추상적인 「요청이 없으면 그대로 두라」로는 부족했다** (2026-08-20 사용자 2차 제보).
+     *    허가문 「배포하셔도 됩니다」가 여전히 `so please proceed`(요청)로 뒤집혀 나왔다.
+     *    이 프로젝트에서 이미 배운 것과 같은 교훈이다 — **추상 지시는 모델이 행동으로 옮기지
+     *    않는다.** 그래서 「그대로 두라」 대신 **무엇을 그대로 두는지 예시로** 박는다
+     *    (`"you may proceed" stays "you may proceed"`).
+     * 🔴 「직접적으로」가 특히 위험하다 — 「군더더기를 빼라」는 지시가 허가문을 짧은 명령문으로
+     *    누르는 방향으로 작동한다. 그래서 이 항목에만 금지 문장을 하나 더 붙였다.
+     */
     hint:
       'If the message asks for something, phrase that ask as a direct imperative statement and ' +
       'drop optional scaffolding such as "I was wondering if" or "Could you possibly". If the ' +
-      'message does not ask for anything, leave its sentence type as it is — do not turn a ' +
-      'statement, an approval, or a permission into an instruction.',
+      'message does not ask for anything — for example when it reports a result, gives approval, ' +
+      'or grants permission — keep that sentence type exactly as it is: "you may proceed" stays ' +
+      '"you may proceed" and must NOT become "please proceed" or "proceed". Being direct means ' +
+      'removing padding, never converting a permission or a report into an instruction.',
   },
   {
     id: 'warm',
     label: '부드럽게',
+    /**
+     * 🔴 **「감사 한 마디를 «추가»하라」를 뺐다** (2026-08-20 사용자 2차 제보).
+     *    그 지시 때문에 원문에 없는 `Thank you for your work on this.`가 붙어 나왔다 —
+     *    번역이 아니라 «확장»이다. 「원문에 없는 것을 지어내지 않는다」와 정면 충돌인데,
+     *    부드럽게를 세게 만들려다 **내가 직접 시킨** 문장이었다.
+     * 🔴 부드럽게 = **있는 것을 부드럽게, 없는 것은 만들지 않는다.** 명령형 → 의문형이라는
+     *    «다시 쓰기»만으로 충분히 갈린다(실측). «덧붙이기»는 필요 없다.
+     */
     hint:
       'If the message asks for something, phrase that ask as a polite question (for example ' +
-      '"Could you ...?") rather than a bare imperative, and add one brief considerate touch such ' +
-      'as a thanks or an acknowledgement. If the message does not ask for anything, keep it as a ' +
-      'statement and soften only the wording — never turn a report, an approval, or a permission ' +
-      'into a request.',
+      '"Could you ...?") rather than a bare imperative. If the message does not ask for anything — ' +
+      'for example when it reports a result, gives approval, or grants permission — keep that ' +
+      'sentence type exactly and soften only the wording. Soften what is already there: do NOT add ' +
+      'greetings, thanks, compliments, or closing pleasantries that the original does not contain.',
   },
   {
     id: 'brief',

@@ -309,3 +309,26 @@ test('🔴 어떤 힌트도 무조건적으로 "the request"가 있다고 말하
     );
   }
 });
+
+/**
+ * 🔴 **「부드럽게」가 원문에 없는 감사를 «추가»하면 안 된다** (2026-08-20 사용자 2차 제보).
+ *    첫 문구가 `add one brief considerate touch such as a thanks`였고, 그대로 실행돼
+ *    원문에 없는 `Thank you for your work on this.`가 붙어 나왔다 — 번역이 아니라 확장이다.
+ */
+test('🔴 부드럽게는 «덧붙이지» 않는다 — 없는 인사·감사를 만들지 않는다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  const warm = COLLAB_STYLES.find((item) => item.id === 'warm');
+  assert.doesNotMatch(warm.hint, /\badd one\b/i, '무언가를 추가하라고 지시한다');
+  assert.match(warm.hint, /do NOT add greetings, thanks/, '추가 금지 문장이 없다');
+});
+
+/**
+ * 🔴 **「직접적으로」는 허가를 명령으로 누르기 쉽다** — 「군더더기를 빼라」가 그 방향으로 작동한다.
+ *    추상적인 「그대로 두라」로는 못 막았고(v19 실패), 구체 예시를 박아야 했다.
+ */
+test('🔴 직접적으로 힌트가 허가문 보존을 «예시»로 못 박는다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  const direct = COLLAB_STYLES.find((item) => item.id === 'direct');
+  assert.match(direct.hint, /"you may proceed" stays "you may proceed"/);
+  assert.match(direct.hint, /must NOT become "please proceed"/);
+});
