@@ -22,11 +22,40 @@ export const SITUATION_TEMPLATES = [
   { id: 'report', label: '진행 보고', hint: 'The context is a progress report or status update.' },
 ];
 
-/** 개인 협업 성향 고정 집합 (Spec 필수 2 1순위 "개인 협업 성향"). */
+/**
+ * 개인 협업 성향 고정 집합 (Spec 필수 2 1순위 "개인 협업 성향").
+ *
+ * 🔴 **「결론 먼저」·「근거를 함께」를 더했다** (2026-08-20 사용자 결정 ⓑ). 기존 3개에는
+ *    **「구조」 축이 통째로 없었다** — 결론을 먼저 낼지 배경을 먼저 깔지는 다른 나라 기업과
+ *    일할 때 가장 자주 부딪히는 지점인데 설정할 방법이 없었다.
+ *
+ * 🔴 **여전히 단일 선택이고, 그래서 축이 섞여 있다**(강도: 직접적으로↔부드럽게 / 길이: 짧게 /
+ *    구조: 결론 먼저·근거를 함께). 「부드럽지만 짧게」는 지금도 못 고른다. 축을 나눠 다중
+ *    선택으로 가는 안(ⓒ)은 저장 구조·프롬프트가 바뀌어 **실호출 재검증**이 따라오므로 미뤘다.
+ *
+ * 🔴 **「친근하게」류를 넣지 않는다** — 다듬기 패널의 가볍게/기본/격식(`register`)과 **같은 축**이라
+ *    이 프로젝트에서 두 번 겪은 「한 눈금에 버튼 두 개」 충돌이 재발한다.
+ *
+ * 🔴 **id는 `DEFAULT_TONES`와 같아야 한다**(`lib/onboarding.js` · 테스트가 강제). 온보딩의
+ *    「기본 톤」이 그대로 이 값이 되므로, 한쪽에만 더하면 프로필에서 고른 값이 홈 요약에서
+ *    **「미설정」으로 보인다.**
+ * 🔴 `RECIPIENT_TAGS`의 `conclusion-first`와 **다른 값이다** — 저쪽은 「그 상대가 원하는 것」,
+ *    이쪽은 「내가 쓰는 방식」이다. id를 겹치지 않게 둔다.
+ */
 export const COLLAB_STYLES = [
   { id: 'direct', label: '직접적으로', hint: 'The user prefers direct, unhedged phrasing.' },
   { id: 'warm', label: '부드럽게', hint: 'The user prefers warm, considerate phrasing.' },
   { id: 'brief', label: '짧게', hint: 'The user prefers brief messages with minimal preamble.' },
+  {
+    id: 'conclusion',
+    label: '결론 먼저',
+    hint: 'The user prefers the conclusion or the request in the first sentence, before any background.',
+  },
+  {
+    id: 'rationale',
+    label: '근거를 함께',
+    hint: 'The user prefers a short reason to accompany each request.',
+  },
 ];
 
 const EMPTY_PROFILE = { situationId: null, collabStyleId: null };

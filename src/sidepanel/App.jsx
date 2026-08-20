@@ -78,6 +78,7 @@ import {
 import {
   getOnboarding,
   saveOnboarding,
+  setMyLanguage,
   resetOnboarding,
   onboardingLabels,
   MY_LANGUAGES,
@@ -326,6 +327,17 @@ export default function App() {
     setOnboarding(await getOnboarding());
   };
 
+  /**
+   * 🔴 **내 언어를 프로필에서도 고칠 수 있게 한다** (2026-08-20 사용자 결정 ⓨ).
+   *    지금까지 이 값을 바꾸는 길은 홈의 **「3초 온보딩 다시 하기」뿐**이었다 — 언어 하나를
+   *    바꾸려고 설정을 통째로 지우고 처음부터 다시 답해야 했다.
+   * 🔴 저장 위치는 그대로다(`sai.onboarding`) — 화면만 하나 더 열었다.
+   */
+  const changeMyLanguage = async (language) => {
+    setOnboarding(await setMyLanguage(language));
+    setToast('내 언어를 바꿨어요');
+  };
+
   // 토스트는 2.2초 뒤 사라진다 (프로토타입 showToast와 같은 시간).
   useEffect(() => {
     if (!toast) return undefined;
@@ -451,6 +463,18 @@ export default function App() {
 
   const changeProfile = async (patch) => {
     setProfileState(await setProfile(patch));
+    /**
+     * 🔴 **같은 축이 두 곳에 저장돼 어긋나 있었다** (2026-08-20 ⓨ 작업 중 확인).
+     *    「선호하는 말투」는 `sai.profile.collabStyleId`, 온보딩의 「기본 톤」은
+     *    `sai.onboarding.tone`인데 **id가 같다**(direct·warm·brief). 온보딩 → 프로필 방향은
+     *    `saveOnboarding()`이 맞춰 주지만 **반대 방향이 없었다** — 프로필에서 말투를 바꾸면
+     *    홈의 접힌 요약 「설정 완료 ✓ 한국어 · 직접적으로」가 **옛 값을 계속 보여줬다.**
+     * 🔴 **아직 온보딩을 안 끝냈으면 건드리지 않는다** — 여기서 `saveOnboarding`을 부르면
+     *    `completedAt`이 찍혀 첫 설정 화면이 사라진다.
+     */
+    if (patch?.collabStyleId !== undefined && onboarding?.completedAt) {
+      setOnboarding(await saveOnboarding({ ...onboarding, tone: patch.collabStyleId }));
+    }
     setToast('프로필을 저장했어요');
   };
 
@@ -555,6 +579,8 @@ export default function App() {
             onClear={clearLearned}
             profile={profile}
             onProfileChange={changeProfile}
+            onboarding={onboarding}
+            onChangeMyLanguage={changeMyLanguage}
             recipients={recipients}
             onToggleTag={toggleRecipientTag}
             onDeleteRecipient={deleteRecipient}
@@ -2457,7 +2483,29 @@ function TeamJoinForm({ identity, hasTeams, onCancel, onDone, onToast }) {
  *    바뀌지는 않는다는 것을 화면에 쓴다(안 쓰면 "고쳤는데 왜 그대로"가 된다).
  */
 // 🔴 `bare` — 프로필 탭에서는 카드가 아니라 「나」 카드 **안의 구획**으로 그린다(⑤).
-function IdentityCard({ onNotice, bare = false }) {
+/**
+ * 🔴 **「팀에서 보이는 내 이름」 → 「내 정보」로 넓혔다** (2026-08-20 사용자 결정 ⓨ).
+ *
+ *    문제: 사용자에게는 전부 「내 정보」인데, 저장 위치가 다르다는 이유로 **화면이 갈라져
+ *    있었다.** 이름·역할은 프로필 탭, 내 언어는 **홈의 온보딩 카드**, 지역은 아무 데도 없었다.
+ *    그중 내 언어는 더 나빴다 — 완료 후에는 「3초 온보딩 **다시 하기**」로 설정을 통째로 지워야만
+ *    바꿀 수 있었다. 언어 하나 고치려고 처음부터 다시 답하는 길밖에 없었다.
+ *
+ * 🔴 **저장 구조는 하나도 바꾸지 않았다.** 이름·역할은 `sai.identity`, 언어는 `sai.onboarding`
+ *    그대로다 — 읽고 쓰는 **화면만** 한곳으로 모았다. 홈의 온보딩 카드도 그대로 둔다(첫 설정 경로).
+ *
+ * 🔴 **「팀에만 전달돼요」를 카드 전체 설명으로 두지 않는다.** 그 말은 이름·역할에만 참이다.
+ *    내 언어는 **교정 요청의 `sourceLanguage`로 나가고**, 지역은 퇴근 시각·회의 시간 계산에
+ *    쓰인다 — 카드가 넓어졌는데 문구를 그대로 두면 **화면이 거짓말을 한다.**
+ *
+ * 🔴 **내 지역 줄을 뺐다** (2026-08-20 사용자 요청 ①). 잠깐 넣었다가 바로 지운다 —
+ *    **읽기 전용 한 줄이 세 줄(제목·값·설명)을 먹는데**, 바꿀 수도 없는 값이라 사용자가 할 일이
+ *    없었다. 계산은 그대로 브라우저 타임존으로 한다(`DualClock`·`SaiOverlay`·회의 추천).
+ *    필요해지면 「퇴근 요정」처럼 **그 값을 쓰는 화면 옆에** 붙이는 게 맞다.
+ * 🔴 **제목(`내 정보`)은 여기서 그리지 않는다** — 접기 버튼과 한 줄에 놓여야 해서 `ProfileTab`이
+ *    카드 머리에 그린다. 여기서도 그리면 제목이 두 번 나온다.
+ */
+function IdentityCard({ onNotice, bare = false, myLanguage = null, onChangeMyLanguage, onSaved }) {
   const [draft, setDraft] = useState({ displayName: '', jobTitle: '' });
   const [saved, setSaved] = useState({ displayName: '', jobTitle: '' });
 
@@ -2472,9 +2520,7 @@ function IdentityCard({ onNotice, bare = false }) {
 
   return (
     <section className={bare ? 'profile-block' : 'card'}>
-      <h2 className="card-label">팀에서 보이는 내 이름</h2>
-      <p className="meta">팀장이 팀원 목록에서 알아볼 수 있게 해요. 비워 두어도 괜찮아요.</p>
-
+      <p className="field-label">이름 · 역할</p>
       <input
         className="form-input"
         placeholder="이름 (예: 홍길동)"
@@ -2495,7 +2541,10 @@ function IdentityCard({ onNotice, bare = false }) {
           type="button"
           className="button button-primary"
           onClick={async () => {
-            setSaved(await setIdentity(draft));
+            const next = await setIdentity(draft);
+            setSaved(next);
+            // 🔴 접힘 요약이 옛 이름을 보여주지 않게 부모에게도 알린다.
+            onSaved?.(next);
             onNotice?.('저장했어요 — 다음에 팀에 참가할 때 반영돼요');
           }}
         >
@@ -2503,7 +2552,29 @@ function IdentityCard({ onNotice, bare = false }) {
         </button>
       )}
       <p className="meta">
-        이 값은 <b>팀에만</b> 전달돼요. 교정 문장이나 협업 지표에는 쓰이지 않아요.
+        이 두 가지만 <b>팀 목록</b>에 보여요. 교정 문장에는 쓰이지 않아요.
+      </p>
+
+      {/**
+        * 🔴 **끄는 선택지를 두지 않는다** — 내 언어는 비울 수 없는 값이다(비우면 교정이
+        *    `ko`로 되돌아간다 · `languagePairFrom`). 고른 것을 다시 눌러도 해제되지 않는다.
+        */}
+      <p className="field-label">내 언어</p>
+      <div className="tag-row">
+        {MY_LANGUAGES.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={myLanguage === item.id ? 'chip chip-on' : 'chip'}
+            aria-pressed={myLanguage === item.id}
+            onClick={() => onChangeMyLanguage?.(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <p className="meta">
+        내가 쓰는 언어예요. <b>상대에게 쓸</b> 언어는 아래 「내가 대화하는 사람들」에서 사람마다 정해요.
       </p>
     </section>
   );
@@ -3530,6 +3601,8 @@ function ProfileTab({
   onClear,
   profile,
   onProfileChange,
+  onboarding,
+  onChangeMyLanguage,
   recipients = [],
   onToggleTag,
   onDeleteRecipient,
@@ -3537,15 +3610,33 @@ function ProfileTab({
   onUpdateRecipient,
   onNotice,
 }) {
-  /**
-   * 🔴 1순위 접기(③). 고른 것이 하나라도 있으면 **정한 것으로 보고** 접는다 —
-   *    둘 다 있어야 접는 규칙으로 하면 하나만 고른 사람에게는 영영 접히지 않는다.
-   */
-  const situationLabel =
-    SITUATION_TEMPLATES.find((item) => item.id === profile.situationId)?.label ?? null;
   const collabLabel = COLLAB_STYLES.find((item) => item.id === profile.collabStyleId)?.label ?? null;
-  const priorityChosen = !!(situationLabel || collabLabel);
-  const [priorityOpen, setPriorityOpen] = useState(false);
+
+  /**
+   * 🔴 **접기를 「내 정보」 카드 하나로 올렸다** (2026-08-20 사용자 요청 ①③).
+   *
+   *    예전에는 **1순위 블록만** 따로 접혔다. 그래서 다 설정한 뒤에도 이름 입력칸 두 개와 언어
+   *    칩 네 개가 계속 펼쳐져 있었고, 「설정을 마친 뒤에 필요한 건 이름과 말투 정도」라는 실제
+   *    쓰임과 어긋났다.
+   * 🔴 **중첩 접기를 만들지 않는다** — 카드가 접히는데 그 안에 또 접히는 블록이 있으면 「바꾸기」가
+   *    무엇을 펼치는지 알 수 없다. 1순위의 개별 접기는 없앤다.
+   *
+   * 🔴 **판정표 — 표대로만 한다. 표에 없는 경우를 임의로 처리하지 않는다.**
+   *    | 조건 | 기본 상태 | 요약 줄 |
+   *    |---|---|---|
+   *    | 이름 있음 **AND** 말투 정함 | 접힘 | `홍길동 · 백엔드 · 직접적으로` |
+   *    | 그 밖 | **펼침** | — 설정해야 한다는 사실 자체를 숨기지 않는다 |
+   *
+   * 🔴 **「주로 쓰는 상황」은 판정에 넣지 않는다.** 선택 사항인데 이걸 조건에 넣으면, 안 고른
+   *    사람에게는 카드가 **영영 펼쳐진 채**여서 접기가 아무 일도 하지 않는다.
+   * 🔴 **직급·역할도 판정에 넣지 않는다** — 화면이 이미 「선택」이라고 쓰고 있다.
+   */
+  const [identity, setIdentityState] = useState({ displayName: '', jobTitle: '' });
+  useEffect(() => {
+    getIdentity().then(setIdentityState);
+  }, []);
+  const meChosen = !!identity.displayName && !!collabLabel;
+  const [meOpen, setMeOpen] = useState(false);
 
   return (
     <>
@@ -3569,7 +3660,29 @@ function ProfileTab({
         *    🔴 **합친 카드 자체는 유지한다** — 그게 정리의 실체였고, 제목은 장식이었다.
         */}
       <section className="card profile-me">
-        <IdentityCard onNotice={onNotice} bare />
+        <div className="card-head card-head-bare">
+          <h2 className="card-label">내 정보</h2>
+          {meChosen && (
+            <button type="button" className="link-button" onClick={() => setMeOpen((v) => !v)}>
+              {meOpen ? '접기' : '바꾸기'}
+            </button>
+          )}
+        </div>
+        {meChosen && !meOpen && (
+          <p className="card-text">
+            <b>{identity.displayName}</b>
+            {identity.jobTitle ? ` · ${identity.jobTitle}` : ''} · <b>{collabLabel}</b>
+          </p>
+        )}
+        {(!meChosen || meOpen) && (
+        <>
+        <IdentityCard
+          onNotice={onNotice}
+          bare
+          myLanguage={onboarding?.language ?? null}
+          onChangeMyLanguage={onChangeMyLanguage}
+          onSaved={setIdentityState}
+        />
 
       {/**
         * 🔴 **「내 문체」를 제거했다** (2026-08-17 사용자 제안 → 검토 후 삭제 결정).
@@ -3593,21 +3706,14 @@ function ProfileTab({
           * 🔴 **정하지 않았으면 펼친 채로 둔다** — 접어 두면 설정해야 한다는 사실 자체가 숨는다.
           *    (교정에 항상 100% 반영되는 값이라 비워 두면 손해다 — Spec 필수 2 1순위)
           */}
-        <div className="card-head card-head-bare">
-          <h3 className="card-label">1순위 — 내 상황 · 협업 성향</h3>
-          {priorityChosen && (
-            <button type="button" className="link-button" onClick={() => setPriorityOpen((v) => !v)}>
-              {priorityOpen ? '접기' : '바꾸기'}
-            </button>
-          )}
-        </div>
-        {priorityChosen && !priorityOpen && (
-          <p className="card-text">
-            <b>{situationLabel ?? '상황 미지정'}</b> · <b>{collabLabel ?? '말투 미지정'}</b>
-          </p>
-        )}
-        {(!priorityChosen || priorityOpen) && (
-        <>
+        <h3 className="card-label">1순위 — 내 상황 · 협업 성향</h3>
+        {/**
+          * 🔴 **「주로 쓰는 상황」은 지우지 않는다** (2026-08-20 사용자 확인 ② — "필요 없으면 숨겨").
+          *    확인해 보니 **교정에 실제로 실린다**: `buildProfileForRefine()`가 `situation.hint`를
+          *    만들고 `core/refine/prompt.js:321`이 그것을 **1순위 규칙**으로 넣는다(Spec 필수 2).
+          *    화면에서 빼면 이미 고른 사람의 값이 계속 프롬프트에 실리는데 **어디서도 확인할 수
+          *    없게 된다** — 지우는 대신 접기 안으로 넣는다.
+          */}
         <p className="field-label">주로 쓰는 상황</p>
         <div className="tag-row">
           {SITUATION_TEMPLATES.map((item) => (
@@ -3642,10 +3748,15 @@ function ProfileTab({
             </button>
           ))}
         </div>
-        </>
-        )}
       </div>
 
+      {/**
+        * 🔴 **2순위 블록도 접기 안에 넣는다** (2026-08-20 사용자 지적 ①).
+        *    비어 있을 때 이 블록은 **설명 두 줄뿐**이다 — 접힌 카드에서 「홍길동 · 백엔드 ·
+        *    직접적으로」 한 줄보다 **더 큰 자리**를 차지하면서 아무 정보도 주지 않았다.
+        *    쌓인 뒤에도 매일 볼 값이 아니라 가끔 확인·삭제하는 목록이다.
+        * 🔴 **지우지는 않는다** — 왜 비어 있고 어떻게 채우는지는 계속 말해야 한다(아래 원 주석).
+        */}
       {/**
         * 🔴 **비어 있으면 한 줄로 접는다** (2026-08-16 ⑨). 학습 전에는 이 블록이 「빈 목록 +
         *    긴 설명 문단」으로 **화면의 4분의 1**을 먹으면서 아무 정보도 주지 않았다.
@@ -3695,6 +3806,8 @@ function ProfileTab({
         템플릿 · 협업 성향이에요. 국가·문화권 특성은 교정에 쓰지 않아요.
       </p>
       </div>
+      )}
+      </>
       )}
       </section>
 

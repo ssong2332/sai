@@ -207,3 +207,23 @@ test('세 지원 언어 모두 사과 표현 감소를 인식한다', () => {
     );
   }
 });
+
+/**
+ * 🔴 **말투 옵션 확장 (2026-08-20 ⓑ)** — 늘리면서 깨지기 쉬운 두 가지를 잠근다.
+ */
+test('말투 id가 수신자 태그 id와 겹치지 않는다 — 「내가 쓰는 방식」과 「상대가 원하는 것」은 다른 값이다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  const { RECIPIENT_TAGS } = await import('../src/lib/recipients.js');
+  const tagIds = new Set(RECIPIENT_TAGS.map((item) => item.id));
+  for (const style of COLLAB_STYLES) {
+    assert.equal(tagIds.has(style.id), false, `말투 id가 수신자 태그와 겹친다: ${style.id}`);
+  }
+});
+
+test('말투 힌트는 모두 "The user"로 시작한다 — 상대가 아니라 나에 대한 지시여야 한다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  assert.ok(COLLAB_STYLES.length >= 5, '결론 먼저·근거를 함께가 빠졌다');
+  for (const style of COLLAB_STYLES) {
+    assert.match(style.hint, /^The user prefers /, `힌트 주어가 틀렸다: ${style.id}`);
+  }
+});

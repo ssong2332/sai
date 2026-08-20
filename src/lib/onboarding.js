@@ -48,6 +48,10 @@ export const DEFAULT_TONES = [
   { id: 'direct', label: '직접적으로' },
   { id: 'warm', label: '부드럽게' },
   { id: 'brief', label: '짧게' },
+  // 🔴 2026-08-20 ⓑ — `COLLAB_STYLES`와 **id가 같아야 한다**(테스트가 강제). 한쪽에만 더하면
+  //    프로필에서 고른 말투가 홈 요약에서 「미설정」으로 보인다.
+  { id: 'conclusion', label: '결론 먼저' },
+  { id: 'rationale', label: '근거를 함께' },
 ];
 
 const EMPTY = { language: null, partnerRegion: null, tone: null, completedAt: null };
@@ -82,6 +86,25 @@ export async function saveOnboarding({ language, partnerRegion, tone }) {
     const { setProfile } = await import('./profile.js');
     await setProfile({ collabStyleId: tone });
   }
+  return next;
+}
+
+/**
+ * **내 언어만** 바꾼다 (2026-08-20 — 프로필 탭에서 고치는 경로).
+ *
+ * 🔴 **`saveOnboarding`을 쓰지 않는다.** 그 함수는 세 값을 통째로 덮고 `completedAt`을 **지금으로
+ *    찍는다.** 언어 하나 바꾸려다 ① 아직 안 끝낸 온보딩이 「완료」로 바뀌어 첫 설정 화면이
+ *    사라지거나 ② 호출부가 톤을 같이 넘기지 않으면 **톤이 null로 지워진다.**
+ *    둘 다 화면에 아무 표시도 남기지 않는 실패다.
+ * 🔴 목록 밖 값은 `null`로 떨어뜨린다 — 이 값은 교정 요청의 `sourceLanguage`가 된다.
+ */
+export async function setMyLanguage(language) {
+  const current = await getOnboarding();
+  const next = {
+    ...current,
+    language: MY_LANGUAGES.some((item) => item.id === language) ? language : null,
+  };
+  await setLocal(STORAGE_KEYS.ONBOARDING, next);
   return next;
 }
 

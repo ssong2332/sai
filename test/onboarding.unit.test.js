@@ -131,3 +131,37 @@ test('표시 라벨은 고정 집합에서만 나오고 모르는 값은 null이
   assert.equal(labels.partnerRegion, null);
   assert.equal(labels.tone, '짧게');
 });
+
+/**
+ * 🔴 **내 언어를 프로필에서 고치는 경로** (2026-08-20 ⓨ).
+ *    여기서 `saveOnboarding`을 재사용했다면 두 가지가 조용히 망가진다 — 아래 두 테스트가 그걸
+ *    잠근다. 둘 다 화면에 아무 표시도 남기지 않는 실패라 눈으로는 못 잡는다.
+ */
+test('setMyLanguage는 톤을 지우지 않는다 — 언어만 바꾼다', async () => {
+  const { setMyLanguage } = await import('../src/lib/onboarding.js');
+  await resetOnboarding();
+  await saveOnboarding({ language: 'ko', partnerRegion: null, tone: 'brief' });
+
+  const next = await setMyLanguage('ja');
+
+  assert.equal(next.language, 'ja');
+  assert.equal(next.tone, 'brief', '톤이 null로 지워지면 안 된다');
+  assert.equal((await getOnboarding()).tone, 'brief');
+});
+
+test('setMyLanguage는 completedAt을 새로 찍지 않는다 — 첫 설정 화면을 숨기지 않는다', async () => {
+  const { setMyLanguage } = await import('../src/lib/onboarding.js');
+  await resetOnboarding();
+  assert.equal(await needsOnboarding(), true);
+
+  await setMyLanguage('en');
+
+  assert.equal(await needsOnboarding(), true, '언어만 골랐는데 온보딩이 끝난 것으로 처리되면 안 된다');
+});
+
+test('setMyLanguage는 목록 밖 값을 null로 떨어뜨린다 — sourceLanguage로 나가는 값이다', async () => {
+  const { setMyLanguage } = await import('../src/lib/onboarding.js');
+  await resetOnboarding();
+  const next = await setMyLanguage('kr');
+  assert.equal(next.language, null);
+});
