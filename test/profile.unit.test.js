@@ -262,3 +262,50 @@ test('프로필 규칙의 override가 마감·숫자·요구 행동까지 열어
   assert.match(payload.instruction, /sentence form and politeness level ONLY/);
   assert.match(payload.instruction, /NEVER weaken, delay, blur, or remove a deadline/);
 });
+
+/* ── 화행 보존 (2026-08-20 사용자 실사용 제보) ─────────────────────────── */
+
+/**
+ * 🔴 **문체가 «화행»을 바꾸면 안 된다.**
+ *    「배포하셔도 됩니다」(허가)가 말투를 켜자 `Could you proceed …?`(요청)로 뒤집혔다.
+ *    말투를 끄면 `you can proceed`로 정확했으므로 번역력이 아니라 «규칙»의 문제였다.
+ *    보존 규칙이 마감·숫자·요구 행동·부정문만 잠그고 화행은 안 잠갔던 것이 원인이다.
+ */
+test('🔴 보존 규칙이 화행을 잠근다 — 허가가 요청이 되면 안 된다', async () => {
+  const { buildRefinePayload } = await import('../src/core/refine/prompt.js');
+  const payload = buildRefinePayload({
+    text: '문제 없어서 그대로 배포하셔도 됩니다.',
+    sourceLanguage: 'ko',
+    targetLanguage: 'en',
+    userUrgency: null,
+    referenceDate: '2026-08-20',
+  });
+  assert.match(payload.instruction, /SPEECH ACT/);
+  assert.match(payload.instruction, /granting permission/);
+  // 🔴 「부정문을 잃는 것과 같은 급」이라는 표현이 이 금지의 무게를 준다 — 지우면 약해진다.
+  assert.match(payload.instruction, /failure exactly like losing a negation/);
+});
+
+/**
+ * 🔴 **힌트가 「요청이 있다」고 전제하면 안 된다.** 전제하면 모델이 지시를 이행하려고
+ *    **없는 요청을 만들어 낸다** — 위 결함의 직접 원인이었다.
+ */
+test('🔴 문장 형태를 바꾸는 말투는 «요청이 있을 때»로 조건이 걸려 있다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  for (const id of ['direct', 'warm']) {
+    const style = COLLAB_STYLES.find((item) => item.id === id);
+    assert.match(style.hint, /^If the message asks for something/, `${id}에 조건절이 없다`);
+    assert.match(style.hint, /does not ask for anything/, `${id}에 «없을 때» 규칙이 없다`);
+  }
+});
+
+test('🔴 어떤 힌트도 무조건적으로 "the request"가 있다고 말하지 않는다', async () => {
+  const { COLLAB_STYLES } = await import('../src/lib/profile.js');
+  for (const style of COLLAB_STYLES) {
+    assert.doesNotMatch(
+      style.hint,
+      /^(Phrase|Keep only|Put) the request/,
+      `${style.id}가 요청의 존재를 전제한다`,
+    );
+  }
+});

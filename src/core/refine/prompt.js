@@ -47,7 +47,7 @@
 // Spec 필수 2 3순위 — 언어권 **어법** 관습(국민성 아님).
 import { conventionRules } from './conventions.js';
 
-export const REFINE_PROMPT_VERSION = 'refine-v18';
+export const REFINE_PROMPT_VERSION = 'refine-v19';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];
@@ -155,6 +155,27 @@ const PRESERVATION_AND_MISREAD_RULE =
   'Step 1 — before rewriting, find every deadline, number, and required action explicitly stated in ' +
   'the original text and lock their meaning and value; these become the "preserved" list. Negative ' +
   'facts count too (e.g. "we did NOT deploy it") — losing the negation is a failure. ' +
+  /**
+   * 🔴 **화행(speech act)도 잠근다** (2026-08-20 사용자 실사용 제보).
+   *
+   *    「코드 리뷰 다 봤습니다. 문제 없어서 그대로 **배포하셔도 됩니다**」(= 허가)가
+   *    말투를 켜는 순간 `Could you proceed with the deployment?`(= 요청)로 뒤집혔다.
+   *    말투를 끄면 `you can proceed`로 정확했으므로, 원인은 번역력이 아니라 **문체 규칙이
+   *    화행을 덮어쓴 것**이다.
+   *
+   * 🔴 **여기가 비어 있던 자리다.** 이 규칙은 마감·숫자·요구 행동·부정문만 잠갔다 —
+   *    「누가 누구에게, 요청인가 허가인가」는 아무도 지키지 않았다. 그래서 말투뿐 아니라
+   *    격식·긴급도도 같은 방식으로 뒤집을 수 있었다. 문체 축마다 따로 막는 대신
+   *    **보존 규칙 한 곳**에서 막는다.
+   *
+   * 🔴 부정문을 잃는 것과 «같은 급»의 실패라고 명시한다 — 그 문장이 이미 이 규칙에서 가장
+   *    강하게 지켜지는 항목이라, 같은 급이라고 붙이는 것이 가장 확실한 표현이다.
+   */
+  'Lock the SPEECH ACT of the message as well: whether the original is asking for something, ' +
+  'granting permission, reporting, agreeing, or declining. "You may proceed" is permission and must ' +
+  'NOT become "Could you proceed?" (a request); an approval must not become an instruction; a ' +
+  'request must not become a mere statement. Changing who is asking whom, or turning a permission ' +
+  'into a request, is a failure exactly like losing a negation. ' +
   'Step 2 — rewrite the message tone only; every locked item from step 1 must still be present (in ' +
   'meaning/value, not necessarily the exact same words) in the rewritten text — never drop, round, ' +
   'or soften a deadline, a number, or a required action while adjusting tone. ' +
@@ -346,7 +367,10 @@ function profileRules(profile) {
         'prompt, including instructions about hedging or about keeping one consistent register: ' +
         'if "collabStyle" asks for a question form or a softer ask, use it, and that is a register ' +
         'choice, not hedging. It must NEVER weaken, delay, blur, or remove a deadline, a number, ' +
-        'or a required action, and it must never add or change facts.',
+        'or a required action, and it must never add or change facts. ' +
+        // 🔴 override를 쥔 자리에 한 번 더 못 박는다 — 힘을 주는 문장 바로 옆이 가장 잘 지켜진다.
+        'It must never turn a statement, an approval, or a permission into a request, and never ' +
+        'invent an ask that the original does not make.',
     );
   }
   if (hasLearned) {

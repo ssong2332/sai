@@ -43,40 +43,54 @@ export const SITUATION_TEMPLATES = [
  *    이쪽은 「내가 쓰는 방식」이다. id를 겹치지 않게 둔다.
  */
 export const COLLAB_STYLES = [
+  /**
+   * 🔴 **「요청이 있을 때만」이라는 조건이 빠져 있었다** (2026-08-20 사용자 실사용 제보).
+   *
+   *    첫 문구는 전부 `Phrase the request …`처럼 **메시지에 요청이 있다고 전제**했다. 그래서
+   *    허가문 「배포하셔도 됩니다」가 「Could you proceed …?」(요청)로 뒤집혔다 — 없는 요청을
+   *    모델이 만들어 낸 것이다. 말투를 끄면 `you can proceed`로 정확했다.
+   * 🔴 그래서 모든 항목이 **① 요청이 있을 때 무엇을 하는지 ② 없을 때 무엇을 «하지 않는지»**를
+   *    함께 말한다. 조건절 없이 지시만 주면 모델은 지시를 이행하려고 문장을 만들어 낸다.
+   */
   {
     id: 'direct',
     label: '직접적으로',
     hint:
-      'Phrase the request as a direct imperative statement. Do not wrap it in optional scaffolding ' +
-      'such as "I was wondering if" or "Could you possibly".',
+      'If the message asks for something, phrase that ask as a direct imperative statement and ' +
+      'drop optional scaffolding such as "I was wondering if" or "Could you possibly". If the ' +
+      'message does not ask for anything, leave its sentence type as it is — do not turn a ' +
+      'statement, an approval, or a permission into an instruction.',
   },
   {
     id: 'warm',
     label: '부드럽게',
     hint:
-      'Phrase the request as a polite question (for example "Could you ...?") rather than a bare ' +
-      'imperative, and include one brief considerate touch such as a thanks or an acknowledgement.',
+      'If the message asks for something, phrase that ask as a polite question (for example ' +
+      '"Could you ...?") rather than a bare imperative, and add one brief considerate touch such ' +
+      'as a thanks or an acknowledgement. If the message does not ask for anything, keep it as a ' +
+      'statement and soften only the wording — never turn a report, an approval, or a permission ' +
+      'into a request.',
   },
   {
     id: 'brief',
     label: '짧게',
     hint:
-      'Drop greetings, preamble, and closing pleasantries. Keep only the request, its deadline, ' +
-      'and what is required.',
+      'Drop greetings, preamble, and closing pleasantries. Keep only what the message actually ' +
+      'says — its point, any deadline, and anything it requires.',
   },
   {
     id: 'conclusion',
     label: '결론 먼저',
     hint:
-      'Put the request or the conclusion in the FIRST sentence. Any background or context comes ' +
-      'after it.',
+      'Put the main point in the FIRST sentence — whether that point is a request, a conclusion, ' +
+      'a decision, or an approval. Any background or context comes after it.',
   },
   {
     id: 'rationale',
     label: '근거를 함께',
     hint:
-      'Include the reason for the request in one short clause. Use only a reason that is present ' +
-      'in the original text — never invent one.',
+      'Include the reason in one short clause. Use only a reason that is present in the original ' +
+      'text — never invent one.',
   },
 ];
 
