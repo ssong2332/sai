@@ -234,3 +234,54 @@ test('🔴 참가 시 이름·직급이 함께 실려 나간다 — 팀장이 �
   assert.equal(sent.displayName, '박수홍');
   assert.equal(sent.jobTitle, '백엔드 리드');
 });
+
+/* ── L22-②③ 팀 나가기·계정 삭제 (2026-09-30) ─────────────────────────── */
+
+import { leaveTeamOnServer, deleteAccount } from '../src/lib/teamClient.js';
+
+function installClearableStorage(seed) {
+  const store = installStorage(seed);
+  globalThis.chrome.storage.local.clear = async () => {
+    for (const key of Object.keys(store)) delete store[key];
+  };
+  return store;
+}
+
+const respond = (status, body) => async (_url, init) => {
+  respond.lastBody = JSON.parse(init.body);
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+};
+
+test('🔴 서버에서 나가기에 성공해야 이 기기 목록에서도 뺀다', async () => {
+  const store = installStorage({ 'sai.teams': [TEAM, { teamId: 't2', name: '둘', role: 'member' }], 'sai.teams.active': 't1' });
+  signedIn(store);
+  await leaveTeamOnServer('t1', { fetchImpl: respond(200, { teamId: 't1', left: true, teamDeleted: false }) });
+  assert.deepEqual(respond.lastBody, { action: 'leave', teamId: 't1' });
+  assert.deepEqual((await listTeams()).map((t) => t.teamId), ['t2']);
+});
+
+test('🔴 서버가 막으면(팀장 이양 필요) 로컬 목록을 건드리지 않는다', async () => {
+  const store = installStorage({ 'sai.teams': [TEAM], 'sai.teams.active': 't1' });
+  signedIn(store);
+  await assert.rejects(
+    () => leaveTeamOnServer('t1', { fetchImpl: respond(409, { error: 'owner-must-transfer' }) }),
+    (e) => e.reason === TEAM_ERRORS.OWNER_MUST_TRANSFER,
+  );
+  assert.deepEqual((await listTeams()).map((t) => t.teamId), ['t1']);
+  assert.ok(teamErrorMessage(TEAM_ERRORS.OWNER_MUST_TRANSFER).includes('팀장을 넘겨'));
+});
+
+test('🔴 계정 삭제는 확인값을 실어 보내고, 성공하면 이 기기 저장소를 전부 비운다', async () => {
+  const store = installClearableStorage({ 'sai.teams': [TEAM], 'sai.snippets': ['저장 문구'] });
+  signedIn(store);
+  await deleteAccount({ fetchImpl: respond(200, { deleted: true, leftTeams: 1, deletedTeams: 0 }) });
+  assert.deepEqual(respond.lastBody, { action: 'deleteAccount', confirm: 'DELETE' });
+  assert.deepEqual(Object.keys(store), [], `남은 키: ${Object.keys(store).join(', ')}`);
+});
+
+test('🔴 계정 삭제가 거절되면 로컬을 하나도 지우지 않는다', async () => {
+  const store = installClearableStorage({ 'sai.teams': [TEAM], 'sai.snippets': ['저장 문구'] });
+  signedIn(store);
+  await assert.rejects(() => deleteAccount({ fetchImpl: respond(409, { error: 'owner-must-transfer' }) }));
+  assert.ok('sai.snippets' in store && 'sai.auth' in store);
+});

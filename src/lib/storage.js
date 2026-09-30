@@ -44,6 +44,19 @@ export async function removeLocal(key) {
   await chrome.storage.local.remove(key);
 }
 
+/**
+ * 확장 저장소를 **전부** 비운다 — 계정 삭제(L22-②, 2026-09-30) 전용.
+ * 🔴 다른 곳에서 부르지 않는다. 저장 문구·예약·결정 로그처럼 **이 기기에만 있는 본문**까지 지워진다 —
+ *    계정 삭제는 「이 기기의 저장소도 비움」이 승인된 판정이라 여기서만 쓴다.
+ */
+export async function clearAllLocal() {
+  if (!hasChromeStorage()) {
+    memoryFallback.clear();
+    return;
+  }
+  await chrome.storage.local.clear();
+}
+
 /** 저장 키 — 문자열을 여기저기 흩뿌리지 않는다. */
 export const STORAGE_KEYS = {
   /** 'dark' | 'light' — 사이드패널 테마 (2026-08-12 사용자 결정으로 v1 포함). */

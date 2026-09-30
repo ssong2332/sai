@@ -48,6 +48,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { TEAM_ACTIONS, TeamError, defaultDeps, requireUid } from './teams.js';
 import { consumeDailyQuota, QUOTA_REASONS } from './refineQuota.js';
 import { healthPayload } from './health.js';
+// L22-②③ — 팀 나가기·계정 삭제. 🔴 판정표는 account.js 헤더.
+import { leaveTeamOnServer, deleteAccount, accountStore } from './account.js';
 
 initializeApp();
 
@@ -342,6 +344,9 @@ export const refineV1 = onRequest(
  *    구조). 그래야 네트워크 없이 테스트할 수 있다.
  * 🔴 Zero Retention: 에러 로그에 요청 본문을 쓰지 않는다 — 액션 이름과 사유 코드만 남긴다.
  */
+/** L22 — `teamV1`의 계정 단위 동작. `TEAM_ACTIONS`(팀 단위)와 이름이 겹치지 않는다. */
+const ACCOUNT_ACTIONS = { leave: leaveTeamOnServer, deleteAccount };
+
 export const teamV1 = onRequest(
   {
     region: 'asia-northeast3',
@@ -364,13 +369,15 @@ export const teamV1 = onRequest(
   },
   async (req, res) => {
   const action = String(req.body?.action ?? '');
-  const handler = TEAM_ACTIONS[action];
+  // 🔴 L22 — 나가기·계정 삭제는 팀 관리와 같은 인증(`requireUid`)·같은 함수에 둔다. 새 함수를 만들면
+  //    `invoker: 'public'`·CORS·배포를 한 벌 더 관리해야 한다(CLAUDE.md 새 Functions 함정).
+  const handler = TEAM_ACTIONS[action] ?? ACCOUNT_ACTIONS[action];
   if (!handler) {
     res.status(400).json({ error: 'unknown action' });
     return;
   }
   try {
-    res.status(200).json(await handler(req, defaultDeps()));
+    res.status(200).json(await handler(req, { ...defaultDeps(), accountStore: () => accountStore() }));
   } catch (error) {
     const status = error instanceof TeamError ? error.status : 500;
     console.error(`[team:${action}] 거절: ${error?.reason ?? error?.name ?? 'error'}`);
