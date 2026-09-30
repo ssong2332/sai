@@ -14,7 +14,7 @@
 
 | ID | Task | Depends | Status |
 |---|---|---|---|
-| L01 | 👤 PR ssong2332/sai#2 병합 → `main`을 단일 기준으로 (워크트리 브랜치 의존 해소) | — | todo |
+| L01 | 👤 PR ssong2332/sai#2 병합 → `main`을 단일 기준으로 (워크트리 브랜치 의존 해소) | — | done — PR #2(`aaac2a4`)·#3(`ae49051`) 병합 (2026-09-30). 이후 작업은 `main`에서 분기 |
 | L02 | 👤 **Gemini 용량·예산 확정** — 무료 티어는 모델당 하루 20건(CLAUDE.md 실측)이라 베타도 못 버틴다. 결제 연결(유료 티어) 여부와 월 상한을 정하고 `functions/refineQuota.js` `DAILY_REFINE_LIMIT`·베타 인원을 역산. 🔴 유료 티어 여부가 **「학습에 쓰이지 않는다」 고지 가능 여부**도 가른다(Spec §0) | — | todo — **결정 대기** |
 | L03 | **Gemini를 정식 기본 provider로** — 지금은 확장이 요청마다 `provider:'gemini'`를 강제(`src/background/index.js` `TEMP_FORCE_PROVIDER`)해서 **서버 폴오버가 꺼진다**(명시 요청은 넘기지 않는 규칙). 서버 판정표(`functions/index.js` `resolveProviderAndKey`)·폴오버 사슬·로컬 프록시·회귀 러너의 기본 순서를 gemini 우선으로 **셋 다 같이** 바꾸고(CLAUDE.md 「셋의 기본값 순서」), 확장 쪽 강제를 제거. 👤 Functions 배포 필요 | L02 | todo |
 | L04 | `docs/Spec.md`·`CLAUDE.md`에 출시 전환 반영(기간·인원·캘린더 제외·Gemini·팀 기능 무료) | — | review — Spec §0 신설 + 해커톤 서술 5곳에 §0 안내, CLAUDE.md Project Overview 갱신 (2026-09-30 사용자 승인) |
@@ -25,12 +25,12 @@
 |---|---|---|---|
 | L10 | **캘린더 제거** — manifest `oauth2` 블록·`calendarClient.js` 호출 경로 제거, `https://www.googleapis.com/*` 권한은 다른 사용처가 없을 때만 제거, 회의 시간 추천은 시차 기반만 남길지 숨길지 결정. 👤 GCP 동의 화면 「데이터 액세스」에서 `calendar.readonly` 제거 → 로그인 시 「확인되지 않은 앱」 경고가 사라지는지 실브라우저 확인. 🔴 로그인은 별도 웹 클라이언트(`launchWebAuthFlow`, `src/lib/authClient.js`)라 `identity` 권한은 유지 | — | todo |
 | L11 | manifest의 `http://127.0.0.1:8787/*` 권한을 **개발 빌드 전용**으로 분리 | — | review — `REFINE_ENDPOINT`에서 권한을 파생(`src/config.js` `localProxyHostPermissions`). 빌드 실측: 기본 빌드 localhost 0건 / 로컬 전환 빌드 `http://127.0.0.1:8787/*` 1건. 테스트 3건(`test/manifestPermissions.unit.test.js`). 🔴 실확장 로드 미확인 |
-| L12 | `teamV1`·`health`의 `cors: true` → 확장 오리진만 (`functions/index.js:347,379`) | — | review — 두 함수 모두 `chrome-extension://${EXTENSION_ID}`. 테스트 3건(`test/functionsCors.unit.test.js` — `cors: true` 금지 · 전 함수 확장 오리진 · `EXTENSION_ID`가 manifest `key`에서 계산한 ID와 일치), 음성 확인(`cors: true`로 되돌리면 2건 실패) · `functions` 로드 OK. 🔴 **미배포** — 👤 `firebase deploy --only functions` 후 확장에서 팀 기능 호출 확인 필요 |
-| L13 | `health`의 `availableProviders` 하드코딩 수정 (`docs/submission/README.md` 촬영 후 할 일) | — | review — 응답 조립을 순수 함수 `functions/health.js`로 분리, 등록된 시크릿 기준으로 보고. 테스트 4건(`test/health.unit.test.js` — 키 값 미노출 포함) · `functions` 로드 OK. 🔴 「등록됨」이지 「유효함」이 아니다(9/28 OpenAI 키처럼). 🔴 **미배포** |
+| L12 | `teamV1`·`health`의 `cors: true` → 확장 오리진만 (`functions/index.js:347,379`) | — | review — 두 함수 모두 `chrome-extension://${EXTENSION_ID}`. 테스트 3건(`test/functionsCors.unit.test.js`). **배포 완료(2026-09-30)** — curl 프리플라이트 실측: `Origin: https://evil.example`에 대한 `Access-Control-Allow-Origin`이 배포 전 `https://evil.example`(허용) → 배포 후 확장 오리진(차단). 무인증 401 유지. 🔴 확장에서 팀 기능 호출 실확장 확인 미완 |
+| L13 | `health`의 `availableProviders` 하드코딩 수정 (`docs/submission/README.md` 촬영 후 할 일) | — | review — `functions/health.js` 순수 함수, 테스트 4건. **배포 완료(2026-09-30)** — `GET /health` 실측 `availableProviders` `["gemini"]` → `["openai","gemini"]`. 🔴 「등록됨」이지 「유효함」이 아니다 — `provider:"openai"`로 보고되는 것은 L03에서 정리 |
 | L14 | 👤 Firebase 웹 API 키 사용 API 제한 (Identity Toolkit·Firestore만) — `src/config.js` 주석 권고, 적용 여부 미확인 | — | todo |
 | L15 | **키 무효 감지** — 현재 failover·알림이 `quota`만 잡는다. 401(`invalid_api_key`)을 별도 사유로 분류 + 👤 로그 기반 알림(폴백률·키 오류) 설정. 🔴 로그는 카운트·사유만(Zero Retention) | L03 | todo |
 | L16 | 👤 비용 상한 — OpenAI 사용 한도 + GCP 예산 알림, `DAILY_REFINE_LIMIT`를 L02 값으로 | L02 | todo |
-| L17 | **공개 빌드에서 미완 기능 숨김** — S22 GitHub 연동(UI 없음), 포인트(사용처 없음), B2B 데모 배너(목업). 팀 기능(S46~S52 팀 용어집·초대 등)은 **무료 공개 유지**(2026-09-30 결정) — 단 L18 실확장 확인 통과가 전제 | — | todo |
+| L17 | **공개 빌드에서 미완 기능 숨김** — S22 GitHub 연동, 포인트(사용처 없음), B2B 데모 배너(목업). 🔴 2026-09-30 정정: S22는 「UI 없음」이 아니었다 — Device Flow 연결 줄만 빠졌고 수신자 폼의 「GitHub 아이디 불러오기」는 살아 있었다. B2B 데모 배너는 이미 팀 탭의 대시보드 카드(팀장·열람권자만, 데모 열 때 토스트로 고지)로 바뀌어 있어 손대지 않았다. 팀 기능(S46~S52 팀 용어집·초대 등)은 **무료 공개 유지**(2026-09-30 결정) — 단 L18 실확장 확인 통과가 전제 | — | review — `FEATURES.points=false`(카드·`+P`·적립 토스트·적립 자체 끔), `FEATURES.githubLookup=false`(수신자 폼 입력 줄 + manifest GitHub 권한 2개를 플래그에 묶음). 빌드 실측: `dist/manifest.json` GitHub 권한 0건, 번들에 「내 포인트」「GitHub 아이디」「소통 가이드 상세 열람」 0건(트리 셰이킹). 테스트 2건 추가. 🔴 실확장 미확인 |
 | L18 | **실확장 확인 13건** — S31·S32·S38·S39·S41·S45·S46·S47·S48·S49·S50·S51·S52. 통과는 유지, 실패는 수정 또는 `FEATURES`로 끔 | L10, L17 | todo |
 | L19 | 개인정보처리방침·이용약관 작성 + 공개 URL(Firebase Hosting). 수집 항목(구글 계정 식별자·사용 횟수), **OpenAI(미국) 국외 이전 고지**, 본문 미저장(`docs/ZeroRetention.md` 근거). 👤 법률 검토 권장 | L10 | todo |
 | L20 | 베타 지표 카운트 수집 경로 확인 — 폴백률·p95 지연·되돌리기·주간 재사용. 🔴 수치만, 본문 금지 | — | todo |

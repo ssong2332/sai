@@ -1,5 +1,5 @@
 import { defineManifest } from '@crxjs/vite-plugin';
-import { LOCAL_PROXY_HOST_PERMISSIONS } from './config.js';
+import { FEATURES, LOCAL_PROXY_HOST_PERMISSIONS } from './config.js';
 
 export default defineManifest({
   manifest_version: 3,
@@ -137,11 +137,15 @@ export default defineManifest({
   //    `LOCAL_PROXY_HOST_PERMISSIONS`가 알아서 붙인다(손으로 추가하지 않는다).
   host_permissions: [
     'https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/*',
-    // S22 — GitHub 공개 활동 조회. 🔴 확장이 host_permission을 가지면 CORS 제약을 받지 않는다.
-    //    GitHub API·OAuth 엔드포인트는 CORS 헤더를 주지 않으므로 이 권한이 없으면 전부 실패한다.
-    'https://api.github.com/*',
-    // S22 — Device Flow(코드 발급·토큰 교환). 🔴 `github.com`이고 `api.github.com`이 아니다.
-    'https://github.com/login/*',
+    /**
+     * S22 — GitHub 공개 활동 조회 + Device Flow. **`FEATURES.githubLookup`이 켜졌을 때만** 붙는다
+     * (2026-09-30 L17 — 공개 빌드는 이 기능을 끄므로, 쓰지 않는 권한을 싣지 않는다. 스토어 심사는
+     * 권한마다 사유를 묻는다).
+     * 🔴 확장이 host_permission을 가지면 CORS 제약을 받지 않는다. GitHub API·OAuth 엔드포인트는
+     *    CORS 헤더를 주지 않으므로, 기능을 다시 켜면 이 권한이 없을 때 전부 실패한다 — 플래그 하나로 같이 켜진다.
+     * 🔴 Device Flow는 `github.com`이고 `api.github.com`이 아니다.
+     */
+    ...(FEATURES.githubLookup ? ['https://api.github.com/*', 'https://github.com/login/*'] : []),
     // S23 — 캘린더 빈 시간 조회.
     'https://www.googleapis.com/*',
     // S31 — 구글 로그인(Identity Toolkit) · 토큰 갱신 · Firestore 동기화.

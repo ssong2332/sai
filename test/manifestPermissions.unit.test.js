@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   DEPLOYED_ENDPOINT,
+  FEATURES,
   LOCAL_PROXY_ENDPOINT,
   LOCAL_PROXY_HOST_PERMISSIONS,
   REFINE_ENDPOINT,
@@ -35,4 +36,20 @@ test('🔴 manifest에 localhost 권한을 손으로 적지 않는다 — config
     .filter((line) => /^\s*'http:\/\/(127\.0\.0\.1|localhost)/.test(line));
   assert.deepEqual(hardcoded, [], `손으로 적은 localhost 권한: ${hardcoded.join(' | ')}`);
   assert.ok(manifest.includes('...LOCAL_PROXY_HOST_PERMISSIONS'), 'manifest가 파생 권한을 펼치지 않는다');
+});
+
+test('🔴 GitHub 권한은 FEATURES.githubLookup이 켜졌을 때만 붙는다 (L17)', () => {
+  const hardcoded = manifest
+    .split('\n')
+    .filter((line) => /^\s*'https:\/\/(api\.)?github\.com/.test(line));
+  assert.deepEqual(hardcoded, [], `손으로 적은 GitHub 권한: ${hardcoded.join(' | ')}`);
+  assert.ok(
+    manifest.includes("...(FEATURES.githubLookup ? ['https://api.github.com/*', 'https://github.com/login/*'] : [])"),
+    'GitHub 권한이 플래그에 묶여 있지 않다',
+  );
+});
+
+test('🔴 공개 빌드 기본값 — 포인트·GitHub 불러오기는 꺼져 있다 (L17)', () => {
+  assert.equal(FEATURES.points, false, '포인트는 사용처가 생길 때까지 끈다(Spec §0 유료화 나중)');
+  assert.equal(FEATURES.githubLookup, false, 'GitHub 불러오기는 실확장 확인 전까지 끈다');
 });
