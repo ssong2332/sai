@@ -3,7 +3,7 @@ import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
 import { DASHBOARD_URL, FEATURES } from '../config.js';
-import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
+import { getLocal, setLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
 import {
   listPersonalGlossary,
   addPersonalGlossaryEntry,
@@ -102,7 +102,8 @@ import {
   setActiveTeam,
   createTeam,
   joinTeam,
-  leaveTeam,
+  leaveTeamOnServer,
+  deleteAccount,
   listTeamGlossary,
   saveTeamGlossaryEntry,
   removeTeamGlossaryEntry,
@@ -193,8 +194,8 @@ export default function App() {
   const [backOn, setBackOn] = useState(true);
   const [hintsOn, setHintsOn] = useState(true);
   const [snippetMode, setSnippetMode] = useState('replace');
-  /** S21 / Spec 권장 8 — 직전 대화 맥락 참고. 기본 켜짐. */
-  const [threadOn, setThreadOn] = useState(true);
+  /** S21 / Spec 권장 8 — 직전 대화 맥락 참고. 기본 꺼짐(2026-09-30, `THREAD_CONTEXT_DEFAULT`). */
+  const [threadOn, setThreadOn] = useState(THREAD_CONTEXT_DEFAULT);
   /** 설정은 탭이 아니라 헤더 톱니로 여는 오버레이다. */
   const [reasonOn, setReasonOn] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -204,7 +205,7 @@ export default function App() {
     getLocal(STORAGE_KEYS.BACK_TRANSLATION, true).then(setBackOn);
     getLocal(STORAGE_KEYS.HIGHLIGHT_HINTS, true).then(setHintsOn);
     getLocal(STORAGE_KEYS.SNIPPET_INSERT_MODE, 'replace').then(setSnippetMode);
-    getLocal(STORAGE_KEYS.THREAD_CONTEXT, true).then(setThreadOn);
+    getLocal(STORAGE_KEYS.THREAD_CONTEXT, THREAD_CONTEXT_DEFAULT).then(setThreadOn);
     /**
      * 🔴 **「변경 이유」가 설정에서 빠져 있었다** (2026-08-16 사용자 지적 ①).
      *    팝업의 다른 스위치들과 **똑같이 `chrome.storage`에 저장되는데**(`sai.refineReasoning`)
@@ -805,6 +806,8 @@ function AccountCard({ onNotice }) {
   const [session, setSession] = useState(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  /** L22-② — 계정 삭제 확인 단계. `false` → 「계정 삭제」 링크, `true` → 무엇이 지워지는지 + 최종 버튼. */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     getSession().then(setSession);
@@ -919,6 +922,56 @@ function AccountCard({ onNotice }) {
         <br />
         올라가지 <b>않는</b> 것: 저장 문구 · 예약 · <b>메시지 본문</b> — 이 기기에만 있어요
       </p>
+
+      {/**
+        * 🔴 **계정 삭제 (L22-②, 2026-09-30)** — 개인정보 삭제권의 화면 쪽. 되돌릴 수 없으므로 **2단계**다:
+        *    ① 링크 → ② 무엇이 지워지는지 읽고 최종 버튼. 서버는 `confirm: "DELETE"`로 한 번 더 막는다.
+        * 🔴 다른 팀원이 있는 팀의 팀장이면 서버가 **아무것도 지우지 않고** 거절한다 — 그 문구를 그대로 보여준다.
+        */}
+      {session && !confirmingDelete && (
+        <button type="button" className="link-button" disabled={busy} onClick={() => setConfirmingDelete(true)}>
+          계정 삭제
+        </button>
+      )}
+      {session && confirmingDelete && (
+        <div className="card card-dashed">
+          <p className="card-text">
+            <b>계정을 삭제할까요? 되돌릴 수 없어요.</b>
+          </p>
+          <p className="meta">
+            지워지는 것: 로그인 계정 · 서버의 설정·학습 통계·개인 용어집 · 사용 횟수 기록 · 팀 명부의 내
+            정보(혼자인 팀은 팀째) · <b>이 기기에 저장된 모든 것</b>(저장 문구·예약 포함)
+            <br />
+            남는 것: 다른 팀원이 있는 팀의 팀 용어집과 팀 지표(누가 냈는지 없는 합계)
+          </p>
+          <div className="github-suggest-form">
+            <button
+              type="button"
+              className="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setNote('');
+                try {
+                  await deleteAccount();
+                  setSession(null);
+                  setConfirmingDelete(false);
+                  onNotice?.('계정과 저장된 데이터를 모두 삭제했어요');
+                } catch (error) {
+                  setNote(teamErrorMessage(error?.reason, error?.detail));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? '삭제하는 중…' : '영구 삭제'}
+            </button>
+            <button type="button" className="link-button" disabled={busy} onClick={() => setConfirmingDelete(false)}>
+              취소
+            </button>
+          </div>
+        </div>
+      )}
 
       {note && <p className="meta">{note}</p>}
     </div>
@@ -3044,6 +3097,8 @@ function LinkedGlossaryScope({ onToast }) {
  */
 function TeamPanel({ team, onToast, onChanged }) {
   const [note, setNote] = useState('');
+  /** L22-③ — 팀 나가기 확인 단계. 서버 명부에서 지워지므로 한 번 묻는다. */
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
 
   return (
     <>
@@ -3056,23 +3111,42 @@ function TeamPanel({ team, onToast, onChanged }) {
           <button
             type="button"
             className="link-button"
-            onClick={async () => {
+            onClick={() => {
               setNote('');
-              try {
-                await leaveTeam(team.teamId);
-                onToast('이 기기에서 팀 연결을 끊었어요');
-                await onChanged();
-              } catch (error) {
-                setNote(teamErrorMessage(error?.reason, error?.detail));
-              }
+              setConfirmingLeave((current) => !current);
             }}
           >
-            연결 끊기
+            {confirmingLeave ? '취소' : '팀 나가기'}
           </button>
         </div>
-        {/* 🔴 "탈퇴"가 아니라 "이 기기에서 연결 끊기"다 — 서버의 팀원 기록은 남는다. */}
+        {/**
+          * 🔴 **2026-09-30 L22-③: 「이 기기에서 연결 끊기」 → 서버 명부에서 나가기.** 예전에는 로컬 목록에서만
+          *    빠지고 서버 명부(이메일·이름·직급)가 남았다. 판정은 서버가 한다(`functions/account.js`).
+          */}
+        {confirmingLeave && (
+          <div className="github-suggest-form">
+            <button
+              type="button"
+              className="button"
+              onClick={async () => {
+                setNote('');
+                try {
+                  const result = await leaveTeamOnServer(team.teamId);
+                  onToast(result.teamDeleted ? '혼자 있던 팀이라 팀을 삭제했어요' : '팀에서 나갔어요');
+                  setConfirmingLeave(false);
+                  await onChanged();
+                } catch (error) {
+                  setNote(teamErrorMessage(error?.reason, error?.detail));
+                }
+              }}
+            >
+              나가기
+            </button>
+          </div>
+        )}
         <p className="meta">
-          이 기기에서만 연결을 끊어요. 다시 들어오려면 초대 코드가 또 필요해요.
+          나가면 팀 명부에서 내 정보가 지워지고, 다시 들어오려면 초대 코드가 필요해요. 팀장은 다른 팀원이 있으면
+          먼저 팀장을 넘겨야 하고, 혼자인 팀에서 나가면 팀이 삭제돼요.
         </p>
         <p className="meta">
           팀 공용 용어는 <b>보관함 → 용어집 → 팀</b>에서 관리해요.

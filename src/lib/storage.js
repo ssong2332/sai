@@ -44,6 +44,19 @@ export async function removeLocal(key) {
   await chrome.storage.local.remove(key);
 }
 
+/**
+ * 확장 저장소를 **전부** 비운다 — 계정 삭제(L22-②, 2026-09-30) 전용.
+ * 🔴 다른 곳에서 부르지 않는다. 저장 문구·예약·결정 로그처럼 **이 기기에만 있는 본문**까지 지워진다 —
+ *    계정 삭제는 「이 기기의 저장소도 비움」이 승인된 판정이라 여기서만 쓴다.
+ */
+export async function clearAllLocal() {
+  if (!hasChromeStorage()) {
+    memoryFallback.clear();
+    return;
+  }
+  await chrome.storage.local.clear();
+}
+
 /** 저장 키 — 문자열을 여기저기 흩뿌리지 않는다. */
 export const STORAGE_KEYS = {
   /** 'dark' | 'light' — 사이드패널 테마 (2026-08-12 사용자 결정으로 v1 포함). */
@@ -170,7 +183,7 @@ export const STORAGE_KEYS = {
    */
   SNIPPET_INSERT_MODE: 'sai.snippetInsertMode',
   /**
-   * boolean — 스레드 직전 대화 맥락 참고 여부 (Spec 권장 8 · S21). 기본 true.
+   * boolean — 스레드 직전 대화 맥락 참고 여부 (Spec 권장 8 · S21). 기본값은 `THREAD_CONTEXT_DEFAULT`(아래).
    * 🔴 **여기에 저장되는 것은 on/off 한 개뿐이다.** 맥락 본문은 저장하지 않는다 — 남이 쓴
    *    메시지라 스니펫·예약(사용자가 직접 남긴 자기 글)의 예외 근거가 성립하지 않는다.
    */
@@ -224,3 +237,15 @@ export const STORAGE_KEYS = {
    *      않는다.** 지우려면 확장 컨텍스트에서 `chrome.storage.local.remove('sai.urgentTag')`.
    */
 };
+
+/**
+ * 직전 대화 참고(`STORAGE_KEYS.THREAD_CONTEXT`)의 **기본값 — 꺼짐** (2026-09-30 사용자 승인).
+ *
+ * 🔴 **왜 꺼짐인가.** 이 기능은 **상대가 쓴 메시지**를 AI 제공자에게 보낸다. 출시 provider인 Gemini
+ *    무료 티어는 입력을 제품 개선에 쓸 수 있다는 조항이 있는 것으로 알려져 있어(Spec §0, 확인 전),
+ *    본인이 켜지 않은 상태에서 남의 글을 내보내지 않는다. 켜 둔 사람(`true` 저장)은 그대로 켜져 있다.
+ * 🔴 **읽는 곳은 전부 이 상수를 쓴다** — 곳곳에 `true`/`false`를 따로 적으면 한 곳만 바뀌어
+ *    화면은 꺼짐인데 요청에는 실리는 사고가 난다. `test/threadContextDefault.unit.test.js`가 잠근다.
+ * 다시 켤지는 L02(유료 티어·약관 확인) 이후 판단한다.
+ */
+export const THREAD_CONTEXT_DEFAULT = false;

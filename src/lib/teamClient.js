@@ -16,7 +16,7 @@
 
 import { FIREBASE_PROJECT_ID, TEAM_ENDPOINT } from '../config.js';
 import { getIdToken } from './authClient.js';
-import { getLocal, setLocal, removeLocal, STORAGE_KEYS } from './storage.js';
+import { getLocal, setLocal, removeLocal, clearAllLocal, STORAGE_KEYS } from './storage.js';
 import { encodeFields, decodeFields } from './syncClient.js';
 import { filterByLanguage } from './glossary.js';
 import {
@@ -35,6 +35,9 @@ export const TEAM_ERRORS = {
   NOT_OWNER: 'not-owner',
   CANNOT_CHANGE_SELF: 'cannot-change-self',
   NO_TEAM: 'no-team',
+  // L22 — 팀 나가기·계정 삭제 (`functions/account.js` 판정표).
+  OWNER_MUST_TRANSFER: 'owner-must-transfer',
+  NOT_CONFIRMED: 'not-confirmed',
   NETWORK: 'network-failed',
   UNKNOWN: 'unknown',
 };
@@ -61,6 +64,11 @@ export function teamErrorMessage(reason, detail = '') {
     case TEAM_ERRORS.CANNOT_CHANGE_SELF:
       // 🔴 막는 이유를 말한다 — 「안 됩니다」만 쓰면 고장으로 읽힌다.
       return '팀장 본인의 권한은 끌 수 없어요 — 되돌릴 방법이 없어져요';
+    case TEAM_ERRORS.OWNER_MUST_TRANSFER:
+      // 🔴 막는 이유와 할 일을 같이 말한다 — 팀장이 사라진 팀이 남으면 아무도 관리할 수 없다.
+      return '다른 팀원이 있는 팀의 팀장이에요 — 먼저 「팀 관리」에서 팀장을 넘겨 주세요';
+    case TEAM_ERRORS.NOT_CONFIRMED:
+      return '삭제 확인이 전달되지 않았어요 — 다시 시도해 주세요';
     case TEAM_ERRORS.NETWORK:
       return '팀 서버에 연결하지 못했어요 — 네트워크를 확인해 주세요';
     default:
@@ -134,6 +142,30 @@ export async function leaveTeam(teamId = null) {
 }
 
 /* ── teamV1 (Cloud Functions) ────────────────────────────────────────── */
+
+/**
+ * 팀에서 **서버 명부까지** 나간다 (L22-③, 2026-09-30). 성공해야 이 기기 목록에서도 뺀다.
+ * 🔴 판정은 서버가 한다(`functions/account.js`): 팀원 → 내 명부 삭제 · 혼자인 팀장 → 팀째 삭제 ·
+ *    다른 팀원이 있는 팀장 → `owner-must-transfer`. 실패하면 로컬도 그대로 둔다 — 서버에 남았는데
+ *    화면에서만 사라지면 「나갔다」는 표시가 거짓말이 된다.
+ * @returns {Promise<{teamId: string, left: boolean, teamDeleted: boolean}>}
+ */
+export async function leaveTeamOnServer(teamId, { fetchImpl = globalThis.fetch } = {}) {
+  const result = await callTeamApi('leave', { teamId }, fetchImpl);
+  await leaveTeam(teamId);
+  return result;
+}
+
+/**
+ * 계정과 서버 데이터를 지우고, **이 기기의 저장소도 전부 비운다** (L22-②, 2026-09-30).
+ * 🔴 서버가 거절하면(팀장 이양 필요 등) 로컬은 건드리지 않는다.
+ * @returns {Promise<{deleted: boolean, leftTeams: number, deletedTeams: number}>}
+ */
+export async function deleteAccount({ fetchImpl = globalThis.fetch } = {}) {
+  const result = await callTeamApi('deleteAccount', { confirm: 'DELETE' }, fetchImpl);
+  await clearAllLocal();
+  return result;
+}
 
 async function callTeamApi(action, body, fetchImpl) {
   const token = await getIdToken({ fetchImpl });

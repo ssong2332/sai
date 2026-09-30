@@ -18,7 +18,7 @@ import {
   PERSONAL_TEAM_ID,
 } from '../lib/recipients.js';
 import { buildCasualToneBlock } from '../core/meme/index.js';
-import { getLocal, STORAGE_KEYS } from '../lib/storage.js';
+import { getLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
 import { getOnboarding, languagePairFrom } from '../lib/onboarding.js';
 import { detectLanguage } from '../lib/detectLanguage.js';
 
@@ -126,7 +126,7 @@ export async function requestRefine(request) {
 
   // S21 — 직전 대화 맥락 (Spec 권장 8). 🔴 꺼져 있으면 빈 배열이라 한 조각도 나가지 않는다.
   //    호출자(오버레이)가 DOM에서 모아 넘긴다 — 이 파일은 DOM을 모른다.
-  const threadContext = (await getLocal(STORAGE_KEYS.THREAD_CONTEXT, true))
+  const threadContext = (await getLocal(STORAGE_KEYS.THREAD_CONTEXT, THREAD_CONTEXT_DEFAULT))
     ? request.threadContext ?? []
     : [];
 
@@ -188,7 +188,7 @@ export async function requestRefine(request) {
  */
 export async function requestDecode(request) {
   // 🔴 맥락 토글이 꺼져 있으면 한 조각도 나가지 않는다 (Spec 권장 8 — refine과 같은 규칙).
-  const threadContext = (await getLocal(STORAGE_KEYS.THREAD_CONTEXT, true))
+  const threadContext = (await getLocal(STORAGE_KEYS.THREAD_CONTEXT, THREAD_CONTEXT_DEFAULT))
     ? request.threadContext ?? []
     : [];
 
