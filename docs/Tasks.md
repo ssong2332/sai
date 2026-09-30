@@ -32,9 +32,11 @@
 | L16 | 👤 비용 상한 — OpenAI 사용 한도 + GCP 예산 알림, `DAILY_REFINE_LIMIT`를 L02 값으로 | L02 | todo |
 | L17 | **공개 빌드에서 미완 기능 숨김** — S22 GitHub 연동, 포인트(사용처 없음), B2B 데모 배너(목업). 🔴 2026-09-30 정정: S22는 「UI 없음」이 아니었다 — Device Flow 연결 줄만 빠졌고 수신자 폼의 「GitHub 아이디 불러오기」는 살아 있었다. B2B 데모 배너는 이미 팀 탭의 대시보드 카드(팀장·열람권자만, 데모 열 때 토스트로 고지)로 바뀌어 있어 손대지 않았다. 팀 기능(S46~S52 팀 용어집·초대 등)은 **무료 공개 유지**(2026-09-30 결정) — 단 L18 실확장 확인 통과가 전제 | — | review — `FEATURES.points=false`(카드·`+P`·적립 토스트·적립 자체 끔), `FEATURES.githubLookup=false`(수신자 폼 입력 줄 + manifest GitHub 권한 2개를 플래그에 묶음). 빌드 실측: `dist/manifest.json` GitHub 권한 0건, 번들에 「내 포인트」「GitHub 아이디」「소통 가이드 상세 열람」 0건(트리 셰이킹). 테스트 2건 추가. 🔴 실확장 미확인 |
 | L18 | **실확장 확인 13건** — S31·S32·S38·S39·S41·S45·S46·S47·S48·S49·S50·S51·S52. 통과는 유지, 실패는 수정 또는 `FEATURES`로 끔 | L10, L17 | todo |
-| L19 | 개인정보처리방침·이용약관 작성 + 공개 URL(Firebase Hosting). 수집 항목(구글 계정 식별자·사용 횟수), **OpenAI(미국) 국외 이전 고지**, 본문 미저장(`docs/ZeroRetention.md` 근거). 👤 법률 검토 권장 | L10 | todo |
+| L19 | 개인정보처리방침·이용약관 작성 + 공개 URL(Firebase Hosting). 수집 항목(구글 계정 식별자·사용 횟수), **OpenAI(미국) 국외 이전 고지**, 본문 미저장(`docs/ZeroRetention.md` 근거). 👤 법률 검토 권장 | L10 | review — 초안 `dashboard/public/privacy.html`·`terms.html`(호스팅 빌드에 포함, **미배포**). 내용은 코드 기준(`firestore.rules` 필드 · `functions/teams.js` · `refineClient.js` · `storage.js` · `cache.js`). 🔴 게시 전: ① 【】 자리표시(운영자 이름·문의 이메일·시행일) ② L10 완료(문서는 캘린더 없는 기준) ③ Gemini 약관 원문 확인 → 국외 이전 표의 보유 기간·학습 사용 문구 확정 ④ 👤 법률 검토 |
 | L20 | 베타 지표 카운트 수집 경로 확인 — 폴백률·p95 지연·되돌리기·주간 재사용. 🔴 수치만, 본문 금지 | — | todo |
 | L21 | 👤 Chrome Web Store 개발자 등록 → 개인정보 관행 탭·권한 사유(`<all_urls>` 포함)·스크린샷 → **Unlisted 게시**(2단계 진입) | L10~L19 | todo |
+| L22 | 🔴 **서버 데이터 삭제 경로** (L19 작성 중 발견, 2026-09-30) — ① 「학습 내역」 개별·전체 삭제가 로컬만 지운다(`src/lib/profile.js` `removeLearnedPattern`·`clearLearnedPatterns`). Firestore `users/{uid}/learnedPatterns`는 남고, 다음 동기화(`src/lib/syncClient.js` `syncNow` — `mergeCounts`가 `Math.max`)가 **지운 항목을 되살린다**(코드 판독 기준, 실행 재현 전) ② 계정 삭제 기능 없음 — `users`·`glossary`·`refineQuota`·팀 `members`(이메일·이름·직급)가 남는다 ③ 팀 「연결 끊기」는 이 기기만 끊고 서버 명부는 남는다. 해결 전까지 처리방침은 「요청 시 삭제」로만 적는다 | — | todo |
+| L23 | 일일 사용 카운터(`refineQuota`, `{uid}_{날짜}`) 자동 파기 — 지금은 TTL이 없어 무기한 쌓인다. Firestore TTL 정책 등. 👤 콘솔 설정 필요할 수 있음 | — | todo |
 
 ## 컷 규칙 (해커톤 — 2026-08-21 종료)
 

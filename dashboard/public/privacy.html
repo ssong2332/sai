@@ -1,0 +1,243 @@
+<!doctype html>
+<!--
+  개인정보처리방침 — 초안 (2026-09-30, Tasks L19)
+  🔴 게시 전 조건: ① 【】 자리표시 전부 채우기 ② L10(캘린더 제거) 완료 — 이 문서는 캘린더를 쓰지 않는
+     출시 v1.0 기준이다 ③ 법률 검토 ④ Gemini 약관 원문 확인 후 「5. 국외 이전」의 학습 사용 문구 확정.
+  🔴 내용은 코드 기준이다(2026-09-30): firestore.rules 필드 화이트리스트, functions/teams.js,
+     src/content/refineClient.js, src/lib/storage.js. 코드가 바뀌면 이 문서도 바꾼다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SAI 개인정보처리방침</title>
+    <style>
+      :root {
+        --bg: #f3f2f2;
+        --surface: #ffffff;
+        --ink: #201e1d;
+        --muted: #5f5a57;
+        --line: #dedbd9;
+        --accent: #ff6000;
+        --good: #009b64;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #171514;
+          --surface: #201e1d;
+          --ink: #f3f2f2;
+          --muted: #b3aeaa;
+          --line: #3a3634;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.7 -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+      }
+      main { max-width: 760px; margin: 0 auto; padding: 40px 16px 80px; }
+      h1 { font-size: 28px; margin: 0 0 4px; }
+      h2 { font-size: 19px; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+      .meta { color: var(--muted); font-size: 14px; }
+      .key { background: var(--surface); border-left: 4px solid var(--good); padding: 14px 16px; border-radius: 8px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); }
+      th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+      th { background: var(--bg); }
+      .table-wrap { overflow-x: auto; }
+      .table-wrap table { min-width: 600px; }
+      td:first-child, th:first-child { white-space: nowrap; }
+      a { color: var(--accent); }
+      code { font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>SAI 개인정보처리방침</h1>
+      <p class="meta">시행일: 【시행일】 · 운영자: 【운영자 이름】</p>
+
+      <p class="key">
+        <b>한 줄 요약</b> — SAI는 교정·해석을 위해 선택한 문장을 AI 서비스(Google Gemini API)로 보내지만,
+        <b>메시지 본문을 SAI 서버나 데이터베이스에 저장하지 않습니다.</b> 서버에 남는 것은 계정 정보,
+        직접 입력한 설정·용어집, 그리고 횟수 같은 숫자뿐입니다.
+      </p>
+
+      <p>
+        【운영자 이름】(이하 「운영자」)은 크롬 확장 프로그램 「SAI — 해외 협업 메시지 다듬기」(이하
+        「서비스」)를 운영하며, 「개인정보 보호법」에 따라 이용자의 개인정보를 보호하고 관련 고충을
+        처리하기 위해 이 방침을 둡니다.
+      </p>
+
+      <h2>1. 처리하는 개인정보와 목적</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>구분</th><th>항목</th><th>목적</th><th>저장 위치</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>로그인</td>
+              <td>Google 계정 식별자, 이메일 주소, 이름(Google 프로필)</td>
+              <td>본인 확인, 서비스 오남용 방지</td>
+              <td>Firebase Authentication</td>
+            </tr>
+            <tr>
+              <td>설정</td>
+              <td>사용 언어, 주 협업 지역, 기본 톤·격식·직설성·이모지 선호</td>
+              <td>교정 결과를 이용자 설정에 맞추기</td>
+              <td>Firestore(서울 리전)</td>
+            </tr>
+            <tr>
+              <td>수정 습관 통계</td>
+              <td>수정 유형 이름, 횟수, 변경 정도(숫자). <b>문장 자체는 저장하지 않음</b></td>
+              <td>자주 고치는 방향을 교정에 반영</td>
+              <td>Firestore(서울 리전)</td>
+            </tr>
+            <tr>
+              <td>개인 용어집</td>
+              <td>이용자가 직접 등록한 용어 쌍(각 200자 이내)</td>
+              <td>용어를 일관되게 교정</td>
+              <td>Firestore(서울 리전)</td>
+            </tr>
+            <tr>
+              <td>팀 기능(선택)</td>
+              <td>소속 팀, 역할, 이메일 주소, 표시 이름·직급(입력한 경우), 참가 시각, 팀 용어집</td>
+              <td>팀 용어집 공유, 팀장의 팀원 확인</td>
+              <td>Firestore(서울 리전)</td>
+            </tr>
+            <tr>
+              <td>사용 횟수</td>
+              <td>계정 식별자, 날짜, 그날의 교정 요청 횟수</td>
+              <td>일일 사용 한도 적용(비용 폭주 방지)</td>
+              <td>Firestore(서울 리전)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        팀 대시보드에 쌓이는 협업 지표(하소연 감지·오프타임 전송 등의 <b>팀 단위 합계</b>)에는 누가
+        기록했는지 알 수 있는 식별자를 남기지 않으므로 개인정보에 해당하지 않도록 설계했습니다.
+      </p>
+
+      <h2>2. 메시지 본문은 어떻게 다뤄지나요</h2>
+      <ul>
+        <li>
+          이용자가 드래그해 교정·해석을 요청한 문장은 결과를 만들기 위해 SAI 서버(Google Cloud
+          Functions, 서울 리전)를 거쳐 <b>AI 서비스로 전송</b>됩니다.
+        </li>
+        <li>
+          SAI 서버는 이 문장을 <b>데이터베이스나 로그에 저장하지 않습니다.</b> 같은 요청을 빠르게 다시
+          처리하기 위해 <b>교정 결과</b>를 서버 메모리에 최대 6시간(기본 10분) 둘 수 있습니다. 이때
+          요청 문장은 원문으로 되돌릴 수 없는 해시값으로만 쓰이며, 서버가 내려가면 모두 사라집니다.
+        </li>
+        <li>
+          <b>직전 대화 참고</b>: 기본 설정에서는 교정의 앞뒤 맥락을 위해 같은 대화방의 직전 메시지를
+          최대 5개(2,000자 이내) 함께 보냅니다. 여기에는 <b>상대방이 쓴 메시지</b>가 포함될 수 있습니다.
+          저장하지 않는 것은 본문과 같으며, 사이드 패널 설정에서 끌 수 있습니다.
+        </li>
+        <li>
+          수신자 정보는 이름을 보내지 않습니다. 이용자가 고른 소통 태그(비공개로 둔 경우 제외)와
+          격식 수준만 교정 조건으로 보냅니다.
+        </li>
+        <li>
+          API 키·카드번호·주민등록번호 같은 민감정보는 <b>전송 전에 이용자 기기에서</b> 감지해 전송을
+          막거나 가립니다.
+        </li>
+      </ul>
+
+      <h2>3. 이용자 기기에만 저장되는 정보</h2>
+      <p>
+        다음 정보는 이용자 브라우저의 확장 저장소(<code>chrome.storage.local</code>)에만 있고 운영자에게
+        전송되지 않습니다: 저장 문구(스니펫), 예약 알림에 붙인 메시지, 결정 로그(동의한 경우),
+        수신자 목록과 태그, 화면 설정, 오늘의 사용 집계. 확장 프로그램을 삭제하면 함께 지워집니다.
+        서비스는 쿠키를 사용하지 않습니다.
+      </p>
+
+      <h2>4. 보유 기간과 파기</h2>
+      <ul>
+        <li>계정·설정·수정 습관 통계·용어집: 이용자가 삭제하거나 삭제를 요청할 때까지</li>
+        <li>팀 정보: 팀에서 나가거나 삭제를 요청할 때까지</li>
+        <li>사용 횟수: 삭제를 요청할 때까지(자동 파기 기능은 준비 중입니다)</li>
+        <li>
+          서버에 저장된 정보의 삭제는 아래 문의처로 요청하시면 지체 없이 파기합니다. 전자 기록은
+          복구할 수 없는 방법으로 삭제합니다. 【L22 완료 후: 사이드 패널에서 직접 삭제하는 방법 추가】
+        </li>
+      </ul>
+
+      <h2>5. 처리 위탁과 국외 이전</h2>
+      <p>서비스 제공을 위해 아래와 같이 개인정보 처리를 위탁하며, 일부는 국외에서 처리됩니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>받는 자</th><th>국가</th><th>이전 항목</th><th>목적</th><th>시기·방법</th><th>보유 기간</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Google LLC (Gemini API)</td>
+              <td>미국 등 Google 데이터센터 소재국</td>
+              <td>교정·해석 요청 문장, 직전 대화(켠 경우), 설정·용어집·수신자 태그</td>
+              <td>AI 교정·해석 결과 생성</td>
+              <td>요청할 때마다 암호화된 네트워크로 전송</td>
+              <td>Google 약관에 따름 【약관 원문 확인 후 기재】</td>
+            </tr>
+            <tr>
+              <td>Google LLC (Firebase Authentication)</td>
+              <td>미국 등</td>
+              <td>Google 계정 식별자, 이메일, 이름</td>
+              <td>로그인</td>
+              <td>로그인할 때 암호화된 네트워크로 전송</td>
+              <td>계정 삭제 시까지</td>
+            </tr>
+            <tr>
+              <td>Google LLC (Firestore · Cloud Functions)</td>
+              <td>대한민국(서울 리전)</td>
+              <td>1번 표의 Firestore 항목</td>
+              <td>데이터 저장·요청 처리</td>
+              <td>이용 중 수시</td>
+              <td>4번과 같음</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        【Gemini 약관 확인 후 확정】 AI 서비스 제공자가 전송된 내용을 자기 서비스 개선에 쓰는지는 이용
+        조건(무료/유료)에 따라 다를 수 있습니다. 운영자는 확인된 내용을 이 자리에 명시합니다.
+      </p>
+      <p>
+        공휴일 확인을 위해 공휴일 조회 서비스(Nager.Date)에 <b>국가 코드와 연도만</b> 보냅니다. 개인을
+        식별할 수 있는 정보는 보내지 않습니다.
+      </p>
+      <p>운영자는 위 경우 외에 개인정보를 제3자에게 제공하지 않습니다.</p>
+
+      <h2>6. 이용자의 권리</h2>
+      <p>
+        이용자는 언제든지 자신의 개인정보 열람·정정·삭제·처리정지를 요청할 수 있습니다. 문의처로
+        요청하시면 지체 없이 조치하고 결과를 알려드립니다. 서비스는 만 14세 미만 아동을 대상으로 하지
+        않습니다.
+      </p>
+
+      <h2>7. 안전성 확보 조치</h2>
+      <ul>
+        <li>데이터베이스 접근 규칙으로 본인(팀 정보는 해당 팀원)만 자기 정보를 읽고 쓸 수 있게 제한</li>
+        <li>저장할 수 있는 항목 이름과 길이를 규칙으로 제한해 메시지 본문이 저장될 경로를 차단</li>
+        <li>AI 서비스 키는 서버 비밀 저장소에만 두고 확장 프로그램에 넣지 않음</li>
+        <li>모든 전송 구간 암호화(HTTPS)</li>
+      </ul>
+
+      <h2>8. 개인정보 보호책임자와 문의처</h2>
+      <p>
+        개인정보 보호책임자: 【운영자 이름】 · 이메일: 【문의 이메일】<br />
+        개인정보 침해에 대한 신고·상담은 개인정보침해신고센터(국번없이 118), 개인정보분쟁조정위원회
+        (1833-6972)에도 하실 수 있습니다.
+      </p>
+
+      <h2>9. 방침의 변경</h2>
+      <p>
+        이 방침이 바뀌면 시행 7일 전(이용자 권리에 중요한 변경은 30일 전)에 이 페이지에 알립니다.
+      </p>
+
+      <p class="meta"><a href="./terms.html">이용약관</a></p>
+    </main>
+  </body>
+</html>
