@@ -4,7 +4,39 @@
 > Status 어휘: `todo` / `in-progress` / `review` / `done`. `done`은 실행 증거(테스트 출력·실브라우저 확인)가 있을 때만.
 > 역할: [DS] 디자이너 · [FE] 프론트엔드 · [BE-A] 백엔드 A (AI 파이프라인) · [BE-B] 백엔드 B (Firebase·대시보드·멘토링)
 
-## 컷 규칙
+## 출시 v1.0 (2026-09-30~) — 해커톤 이후
+
+> **2026-09-30 사용자 결정**: ① **1인 개발** (위 4인 역할 표는 해커톤 기록) ② **캘린더(회의 시간 추천의 FreeBusy)는 빼고 출시** — 민감 범위 `calendar.readonly`의 구글 검증 대기를 피한다 ③ 타깃은 기획안 그대로 — **한국 개발 조직의 개인 사용자** ④ **유료화는 나중** (Spec §1 팀 구독·포인트 사용처는 출시 범위 밖) ⑤ **LLM은 Gemini 유지** — OpenAI 현재 사용 불가 ⑥ **팀 기능은 당분간 무료 공개**. 근거 기록은 `docs/Spec.md` §0.
+> 👤 = 사용자만 할 수 있는 작업(콘솔·결제·병합). 단계: 0 정리 → 1 출시 차단 제거 → 2 비공개 베타(Unlisted) → 3 공개 출시.
+> 🔴 **실확장 확인 없는 기능은 공개 빌드에서 켜지 않는다** — 확인 실패 시 `src/config.js` `FEATURES`로 끈다.
+
+### 0단계 — 정리
+
+| ID | Task | Depends | Status |
+|---|---|---|---|
+| L01 | 👤 PR ssong2332/sai#2 병합 → `main`을 단일 기준으로 (워크트리 브랜치 의존 해소) | — | todo |
+| L02 | 👤 **Gemini 용량·예산 확정** — 무료 티어는 모델당 하루 20건(CLAUDE.md 실측)이라 베타도 못 버틴다. 결제 연결(유료 티어) 여부와 월 상한을 정하고 `functions/refineQuota.js` `DAILY_REFINE_LIMIT`·베타 인원을 역산. 🔴 유료 티어 여부가 **「학습에 쓰이지 않는다」 고지 가능 여부**도 가른다(Spec §0) | — | todo — **결정 대기** |
+| L03 | **Gemini를 정식 기본 provider로** — 지금은 확장이 요청마다 `provider:'gemini'`를 강제(`src/background/index.js` `TEMP_FORCE_PROVIDER`)해서 **서버 폴오버가 꺼진다**(명시 요청은 넘기지 않는 규칙). 서버 판정표(`functions/index.js` `resolveProviderAndKey`)·폴오버 사슬·로컬 프록시·회귀 러너의 기본 순서를 gemini 우선으로 **셋 다 같이** 바꾸고(CLAUDE.md 「셋의 기본값 순서」), 확장 쪽 강제를 제거. 👤 Functions 배포 필요 | L02 | todo |
+| L04 | `docs/Spec.md`·`CLAUDE.md`에 출시 전환 반영(기간·인원·캘린더 제외·Gemini·팀 기능 무료) | — | review — Spec §0 신설 + 해커톤 서술 5곳에 §0 안내, CLAUDE.md Project Overview 갱신 (2026-09-30 사용자 승인) |
+
+### 1단계 — 출시 차단 제거
+
+| ID | Task | Depends | Status |
+|---|---|---|---|
+| L10 | **캘린더 제거** — manifest `oauth2` 블록·`calendarClient.js` 호출 경로 제거, `https://www.googleapis.com/*` 권한은 다른 사용처가 없을 때만 제거, 회의 시간 추천은 시차 기반만 남길지 숨길지 결정. 👤 GCP 동의 화면 「데이터 액세스」에서 `calendar.readonly` 제거 → 로그인 시 「확인되지 않은 앱」 경고가 사라지는지 실브라우저 확인. 🔴 로그인은 별도 웹 클라이언트(`launchWebAuthFlow`, `src/lib/authClient.js`)라 `identity` 권한은 유지 | — | todo |
+| L11 | manifest의 `http://127.0.0.1:8787/*` 권한을 **개발 빌드 전용**으로 분리 | — | todo |
+| L12 | `teamV1`·`health`의 `cors: true` → 확장 오리진만 (`functions/index.js:347,379`) | — | todo |
+| L13 | `health`의 `availableProviders` 하드코딩 수정 (`docs/submission/README.md` 촬영 후 할 일) | — | todo |
+| L14 | 👤 Firebase 웹 API 키 사용 API 제한 (Identity Toolkit·Firestore만) — `src/config.js` 주석 권고, 적용 여부 미확인 | — | todo |
+| L15 | **키 무효 감지** — 현재 failover·알림이 `quota`만 잡는다. 401(`invalid_api_key`)을 별도 사유로 분류 + 👤 로그 기반 알림(폴백률·키 오류) 설정. 🔴 로그는 카운트·사유만(Zero Retention) | L03 | todo |
+| L16 | 👤 비용 상한 — OpenAI 사용 한도 + GCP 예산 알림, `DAILY_REFINE_LIMIT`를 L02 값으로 | L02 | todo |
+| L17 | **공개 빌드에서 미완 기능 숨김** — S22 GitHub 연동(UI 없음), 포인트(사용처 없음), B2B 데모 배너(목업). 팀 기능(S46~S52 팀 용어집·초대 등)은 **무료 공개 유지**(2026-09-30 결정) — 단 L18 실확장 확인 통과가 전제 | — | todo |
+| L18 | **실확장 확인 13건** — S31·S32·S38·S39·S41·S45·S46·S47·S48·S49·S50·S51·S52. 통과는 유지, 실패는 수정 또는 `FEATURES`로 끔 | L10, L17 | todo |
+| L19 | 개인정보처리방침·이용약관 작성 + 공개 URL(Firebase Hosting). 수집 항목(구글 계정 식별자·사용 횟수), **OpenAI(미국) 국외 이전 고지**, 본문 미저장(`docs/ZeroRetention.md` 근거). 👤 법률 검토 권장 | L10 | todo |
+| L20 | 베타 지표 카운트 수집 경로 확인 — 폴백률·p95 지연·되돌리기·주간 재사용. 🔴 수치만, 본문 금지 | — | todo |
+| L21 | 👤 Chrome Web Store 개발자 등록 → 개인정보 관행 탭·권한 사유(`<all_urls>` 포함)·스크린샷 → **Unlisted 게시**(2단계 진입) | L10~L19 | todo |
+
+## 컷 규칙 (해커톤 — 2026-08-21 종료)
 
 | 조건 | 행동 |
 |---|---|

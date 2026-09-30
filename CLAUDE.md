@@ -15,8 +15,10 @@
 
 ## Project Overview
 - Name: 사이 (Sai) — 글로벌 업무 메시지 AI 교정 크롬 확장
-- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore·Functions, Node 22) / OpenAI API (단일 통합 호출 `POST /v1/refine`)
-- 기간: 2026-08-12 ~ 08-21 (컷 규칙은 `docs/Tasks.md` 상단)
+- 🔴 **상태: 해커톤(2026-08-12 ~ 08-21) 종료 후, 실제 서비스 출시를 목표로 계속 개발 중 (2026-09-30~, 1인 개발).** 결정·우선순위는 `docs/Spec.md` §0, 태스크는 `docs/Tasks.md` 「출시 v1.0」(L01~). 판단 기준은 「시연이 되는가」가 아니라 **「누구나·매일·안전하게 쓸 수 있는가」**.
+- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore·Functions, Node 22) / **Google Gemini API** (단일 통합 호출 `POST /v1/refine`) — 2026-09-30부터 OpenAI 사용 불가로 Gemini 유지(Spec §0). 아래 명령 절의 "provider가 OpenAI로 바뀌었다"(2026-08-17) 기록보다 이 줄이 우선한다
+- 범위 밖(출시 v1.0): 캘린더 빈 시간(`calendar.readonly`) · 유료화. 팀 기능은 무료 공개
+- 해커톤 기간 기록: 2026-08-12 ~ 08-21 (컷 규칙은 `docs/Tasks.md`의 「컷 규칙 (해커톤)」)
 
 ## Verified Commands
 첫 성공 후 원문 그대로 기록. 변형 금지(필요 시 무엇을 왜 바꾸는지 먼저 한 줄).
