@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import {
   consumeDailyQuota,
   seoulDateKey,
+  quotaExpireAt,
   DAILY_REFINE_LIMIT,
 } from '../functions/refineQuota.js';
 
@@ -88,14 +89,39 @@ test('🔴 Zero Retention — 저장되는 필드는 카운트·메타뿐이다 
   const saved = db.store['refineQuota/u1_2026-08-17'];
   assert.deepEqual(
     Object.keys(saved).sort(),
-    ['count', 'dateKey', 'uid', 'updatedAt'],
+    ['count', 'dateKey', 'expireAt', 'uid', 'updatedAt'],
     '허용되지 않은 필드가 생겼다 — 본문이 들어갈 자리가 만들어졌는지 확인하라',
   );
   for (const [key, value] of Object.entries(saved)) {
-    if (key === 'updatedAt') continue;
+    if (key === 'updatedAt' || key === 'expireAt') {
+      assert.ok(value instanceof Date, `${key}는 시각(Date)이어야 한다`);
+      continue;
+    }
     assert.ok(
       typeof value === 'number' || String(value).length <= 64,
       `${key}가 너무 길다 — 본문이 실렸을 수 있다`,
     );
   }
+});
+
+/* ── L23 — 카운터 자동 파기 (2026-09-30) ─────────────────────────────── */
+
+test('🔴 L23 카운터에 expireAt이 붙는다 — 그날(서울) 자정 + 2일', async () => {
+  const db = fakeDb();
+  await consumeDailyQuota(db, { uid: 'u1', now: new Date('2026-08-17T01:00:00Z') });
+  const saved = db.store['refineQuota/u1_2026-08-17'];
+  assert.equal(saved.expireAt.toISOString(), '2026-08-18T15:00:00.000Z'); // 8/19 00:00 KST
+});
+
+test('🔴 L23 당일 문서는 만료되지 않는다 — 지워지면 상한이 0으로 돌아간다', () => {
+  // 서울 기준 그날의 마지막 순간(23:59:59)에도 만료 시각은 아직 미래여야 한다(하루 이상 여유).
+  const lastMoment = new Date('2026-08-17T23:59:59+09:00');
+  const expire = quotaExpireAt(seoulDateKey(lastMoment));
+  assert.ok(expire.getTime() - lastMoment.getTime() >= 24 * 60 * 60 * 1000 - 1000);
+});
+
+test('L23 서울 자정 직후(UTC로는 전날)에도 그날 기준으로 계산한다', () => {
+  const justAfterMidnight = new Date('2026-08-16T15:30:00Z'); // 8/17 00:30 KST
+  assert.equal(seoulDateKey(justAfterMidnight), '2026-08-17');
+  assert.equal(quotaExpireAt('2026-08-17').toISOString(), '2026-08-18T15:00:00.000Z');
 });

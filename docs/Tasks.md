@@ -36,7 +36,7 @@
 | L20 | 베타 지표 카운트 수집 경로 확인 — 폴백률·p95 지연·되돌리기·주간 재사용. 🔴 수치만, 본문 금지 | — | todo |
 | L21 | 👤 Chrome Web Store 개발자 등록 → 개인정보 관행 탭·권한 사유(`<all_urls>` 포함)·스크린샷 → **Unlisted 게시**(2단계 진입) | L10~L19 | todo |
 | L22 | 🔴 **서버 데이터 삭제 경로** (L19 작성 중 발견, 2026-09-30) — ① 「학습 내역」 개별·전체 삭제가 로컬만 지운다(`src/lib/profile.js` `removeLearnedPattern`·`clearLearnedPatterns`). Firestore `users/{uid}/learnedPatterns`는 남고, 다음 동기화(`src/lib/syncClient.js` `syncNow` — `mergeCounts`가 `Math.max`)가 **지운 항목을 되살린다**(코드 판독 기준, 실행 재현 전) ② 계정 삭제 기능 없음 — `users`·`glossary`·`refineQuota`·팀 `members`(이메일·이름·직급)가 남는다 ③ 팀 「연결 끊기」는 이 기기만 끊고 서버 명부는 남는다. 해결 전까지 처리방침은 「요청 시 삭제」로만 적는다 | — | in-progress — **① 완료(review)**: 삭제 대기 목록(`sai.profile.learned.deleted`, 분류 id만) + 삭제 즉시 서버 DELETE(실패·로그아웃 시 다음 동기화가 **병합 전에** 처리, 실패하면 병합 중단). 테스트 7건(`test/sync.unit.test.js`), 수정을 빼면 4건 실패 → 버그 재현 확인. 한계: 다른 기기의 로컬 값은 그 기기가 동기화하면 다시 올라간다. 🔴 실확장 미확인. **②③은 판정 대기** |
-| L23 | 일일 사용 카운터(`refineQuota`, `{uid}_{날짜}`) 자동 파기 — 지금은 TTL이 없어 무기한 쌓인다. Firestore TTL 정책 등. 👤 콘솔 설정 필요할 수 있음 | — | todo |
+| L23 | 일일 사용 카운터(`refineQuota`, `{uid}_{날짜}`) 자동 파기 — 지금은 TTL이 없어 무기한 쌓인다. Firestore TTL 정책 등. 👤 콘솔 설정 필요할 수 있음 | — | review — 카운터 문서에 `expireAt`(그날 서울 자정 + 2일) 추가(`functions/refineQuota.js` `quotaExpireAt`), TTL 정책은 `firestore.indexes.json` `fieldOverrides`의 `ttl: true`로 저장소에 둠(firebase-tools 15.24 `lib/firestore/api.js:288`이 이 키를 받는 것 확인). 테스트 3건 + Zero Retention 필드 목록 갱신. 🔴 **미배포** — 👤 `firebase deploy --only functions` + `firebase deploy --only firestore:indexes` 필요. 기존 문서(`expireAt` 없음)는 TTL 대상이 아니다 — 남은 과거 카운터는 따로 지워야 한다 |
 
 ## 컷 규칙 (해커톤 — 2026-08-21 종료)
 
