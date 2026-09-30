@@ -31,7 +31,7 @@ import {
 } from './threadContext.js';
 import { hasConsent as hasDecisionsConsent } from '../lib/decisions.js';
 import { FEATURES } from '../config.js';
-import { STORAGE_KEYS, getLocal, setLocal } from '../lib/storage.js';
+import { STORAGE_KEYS, THREAD_CONTEXT_DEFAULT, getLocal, setLocal } from '../lib/storage.js';
 import {
   listRecipients,
   updateRecipient,
@@ -218,7 +218,7 @@ export default function SaiOverlay() {
    *    무엇을 골랐는지 펼쳐 볼 수 있어야 사용자가 "이건 대화가 아닌데"를 알아채고 끌 수 있다.
    */
   const [threadContext, setThreadContext] = useState([]);
-  const [threadContextOn, setThreadContextOn] = useState(true);
+  const [threadContextOn, setThreadContextOn] = useState(THREAD_CONTEXT_DEFAULT);
   /**
    * 🔴 전송에 쓰는 것은 **ref**다. `runRefine`은 deps가 빈 `useCallback`이라 state를 읽으면
    *    팝업을 연 직후의 빈 배열이 그대로 굳는다(닫힌 클로저) — 맥락이 조용히 안 실리는 사고가
@@ -228,13 +228,14 @@ export default function SaiOverlay() {
 
   useEffect(() => {
     getLocal(STORAGE_KEYS.SNIPPET_INSERT_MODE, 'replace').then(setSnippetMode);
-    getLocal(STORAGE_KEYS.THREAD_CONTEXT, true).then(setThreadContextOn);
+    getLocal(STORAGE_KEYS.THREAD_CONTEXT, THREAD_CONTEXT_DEFAULT).then(setThreadContextOn);
 
     // 사이드패널 설정에서 껐다 켰다 하면 페이지 쪽도 즉시 따라간다(스니펫과 같은 방식).
     if (typeof chrome === 'undefined' || !chrome?.storage?.onChanged) return undefined;
     const onChanged = (changes, area) => {
       if (area !== 'local' || !changes[STORAGE_KEYS.THREAD_CONTEXT]) return;
-      setThreadContextOn(changes[STORAGE_KEYS.THREAD_CONTEXT].newValue !== false);
+      // 🔴 키가 지워지면(newValue 없음) 기본값으로 돌아간다 — 예전 `!== false`는 지워진 키를 켜짐으로 읽었다.
+      setThreadContextOn(changes[STORAGE_KEYS.THREAD_CONTEXT].newValue ?? THREAD_CONTEXT_DEFAULT);
     };
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);

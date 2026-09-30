@@ -3,7 +3,7 @@ import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
 import { DASHBOARD_URL, FEATURES } from '../config.js';
-import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
+import { getLocal, setLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
 import {
   listPersonalGlossary,
   addPersonalGlossaryEntry,
@@ -193,8 +193,8 @@ export default function App() {
   const [backOn, setBackOn] = useState(true);
   const [hintsOn, setHintsOn] = useState(true);
   const [snippetMode, setSnippetMode] = useState('replace');
-  /** S21 / Spec 권장 8 — 직전 대화 맥락 참고. 기본 켜짐. */
-  const [threadOn, setThreadOn] = useState(true);
+  /** S21 / Spec 권장 8 — 직전 대화 맥락 참고. 기본 꺼짐(2026-09-30, `THREAD_CONTEXT_DEFAULT`). */
+  const [threadOn, setThreadOn] = useState(THREAD_CONTEXT_DEFAULT);
   /** 설정은 탭이 아니라 헤더 톱니로 여는 오버레이다. */
   const [reasonOn, setReasonOn] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -204,7 +204,7 @@ export default function App() {
     getLocal(STORAGE_KEYS.BACK_TRANSLATION, true).then(setBackOn);
     getLocal(STORAGE_KEYS.HIGHLIGHT_HINTS, true).then(setHintsOn);
     getLocal(STORAGE_KEYS.SNIPPET_INSERT_MODE, 'replace').then(setSnippetMode);
-    getLocal(STORAGE_KEYS.THREAD_CONTEXT, true).then(setThreadOn);
+    getLocal(STORAGE_KEYS.THREAD_CONTEXT, THREAD_CONTEXT_DEFAULT).then(setThreadOn);
     /**
      * 🔴 **「변경 이유」가 설정에서 빠져 있었다** (2026-08-16 사용자 지적 ①).
      *    팝업의 다른 스위치들과 **똑같이 `chrome.storage`에 저장되는데**(`sai.refineReasoning`)
