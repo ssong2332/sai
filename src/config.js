@@ -91,7 +91,8 @@ export const GITHUB_EVENT_PAGES = 3;
  *    공개 식별자다. 실제 보호는 **Firestore 보안 규칙**(`firestore.rules`)이 한다 — 규칙이
  *    `request.auth.uid`로 소유자를 확인하고 **쓸 수 있는 필드를 화이트리스트**로 묶는다.
  * 🔴 **`GOOGLE_WEB_CLIENT_ID`는 manifest의 `oauth2.client_id`와 다른 클라이언트다.**
- *    - manifest 쪽: 유형 **Chrome 확장 프로그램** — `getAuthToken`(캘린더, 크롬 전용)
+ *    - manifest 쪽: 유형 **Chrome 확장 프로그램** — `getAuthToken`(캘린더, 크롬 전용).
+ *      🔴 2026-09-30부터 `FEATURES.calendar=false`라 공개 빌드 manifest에는 이 블록이 없다(L10).
  *    - 여기: 유형 **웹 애플리케이션** — `launchWebAuthFlow`(로그인, 크롬·엣지 둘 다)
  *    같은 값을 넣으면 조용히 실패한다. 리디렉션 URI로
  *    `https://ogbcccaaojphhgobeeidpafokjieckdf.chromiumapp.org/`가 등록돼 있어야 한다.
@@ -157,6 +158,16 @@ export const FEATURES = {
    *    다시 켤 조건: 실확장 확인 + 처리방침에 제3자 공개 정보 조회 항목 추가.
    */
   githubLookup: false,
+  /**
+   * 🔴 **캘린더 빈 시간(FreeBusy) — 첫 출시에서 뺀다** (2026-09-30 사용자 결정, Spec §0 · Tasks L10).
+   *    `calendar.readonly`는 구글의 **민감 범위**라 OAuth 앱 검증을 통과하기 전에는 「확인되지 않은 앱」
+   *    경고와 사용자 수 상한이 붙는다. 검증 대기를 출시 경로에서 뺀다.
+   *    끄면: 회의 시간 추천의 「내 일정 빼고 보기」가 사라지고(추천 자체는 시차 기준으로 그대로 동작),
+   *    manifest의 `oauth2` 블록과 `https://www.googleapis.com/*` 권한도 빠진다(`src/manifest.js`).
+   *    「일정 만들기」 링크는 남는다 — 구글/아웃룩의 새 일정 화면을 URL로 열 뿐 API·권한이 없다.
+   *    다시 켤 조건: 구글 OAuth 검증 통과 + 처리방침에 캘린더 항목 추가.
+   */
+  calendar: false,
 };
 
 /**

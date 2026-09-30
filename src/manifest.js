@@ -108,7 +108,11 @@ export default defineManifest({
   // 🔴 'alarms'·'notifications'는 예약 알림용이다(Spec 필수 6). 우리가 대신 보내지는 못하므로
   //    (`src/lib/reservations.js` 조사 결론) **시간이 되면 사용자에게 알려주는 것**까지가 우리 몫이다.
   /**
-   * Google OAuth (S23 캘린더 · S31 로그인) — `chrome.identity.getAuthToken`이 이 블록을 읽는다.
+   * Google OAuth (S23 캘린더) — `chrome.identity.getAuthToken`이 이 블록을 읽는다.
+   *
+   * 🔴 **`FEATURES.calendar`가 켜졌을 때만 들어간다** (2026-09-30 L10 — 캘린더 빼고 출시, Spec §0).
+   *    로그인(S31)은 이 블록을 쓰지 않는다 — `launchWebAuthFlow` + 웹 클라이언트(`src/config.js`
+   *    `GOOGLE_WEB_CLIENT_ID`)라, 빼도 로그인은 그대로다.
    *
    * 🔴 **`client_id`는 비밀이 아니다.** 확장 번들은 누구나 뜯어보므로 애초에 숨길 수 없는 값이고,
    *    Chrome 확장 유형 OAuth 클라이언트는 **시크릿을 발급하지 않는다** — 크롬이 확장 ID로 신원을
@@ -118,11 +122,15 @@ export default defineManifest({
    * 🔴 **읽기 전용 범위만 요청한다.** 캘린더에 일정을 쓰지 않는다 — 우리가 하는 일은 빈 시간을
    *    읽는 것뿐이다(Spec 권장 12).
    */
-  oauth2: {
-    client_id: '995477529646-ac3v8145tbbufalascroh9l6gq5iaid8.apps.googleusercontent.com',
-    scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-  },
-  // 🔴 'identity'는 위 `oauth2` 블록을 쓰기 위한 권한이다 (S23·S31).
+  ...(FEATURES.calendar
+    ? {
+        oauth2: {
+          client_id: '995477529646-ac3v8145tbbufalascroh9l6gq5iaid8.apps.googleusercontent.com',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        },
+      }
+    : {}),
+  // 🔴 'identity'는 **로그인**(`launchWebAuthFlow`, S31)에 필요하다 — 캘린더를 꺼도 뺄 수 없다.
   permissions: [
     'sidePanel',
     'storage',
@@ -146,8 +154,9 @@ export default defineManifest({
      * 🔴 Device Flow는 `github.com`이고 `api.github.com`이 아니다.
      */
     ...(FEATURES.githubLookup ? ['https://api.github.com/*', 'https://github.com/login/*'] : []),
-    // S23 — 캘린더 빈 시간 조회.
-    'https://www.googleapis.com/*',
+    // S23 — 캘린더 빈 시간 조회. 🔴 `FEATURES.calendar`가 켜졌을 때만(L10). 다른 사용처는 없다
+    //    (`src/lib/calendarClient.js`의 FreeBusy뿐 — 2026-09-30 grep 확인).
+    ...(FEATURES.calendar ? ['https://www.googleapis.com/*'] : []),
     // S31 — 구글 로그인(Identity Toolkit) · 토큰 갱신 · Firestore 동기화.
     // 🔴 세 도메인이 전부 다르다. 하나라도 빠지면 그 단계에서만 조용히 실패한다.
     'https://identitytoolkit.googleapis.com/*',
