@@ -67,6 +67,21 @@ export function seoulDateKey(now = new Date()) {
 }
 
 /**
+ * 카운터 문서가 지워져도 되는 시각 — **그날(서울) 자정 + 2일** (L23, 2026-09-30).
+ *
+ * 🔴 **Firestore TTL 정책이 이 필드(`expireAt`)를 본다.** 필드만 있고 정책이 없으면 아무것도 지워지지
+ *    않는다 — 정책은 콘솔/gcloud에서 한 번 켠다(`docs/Tasks.md` L23).
+ * 🔴 **당일 문서는 절대 지워지면 안 된다** — 지워지면 상한이 0으로 돌아간다. 그래서 하루가 끝난 뒤에도
+ *    하루를 더 둔다(TTL 삭제는 만료 후 즉시가 아니라 보통 24시간 안에 일어난다).
+ */
+export const QUOTA_RETENTION_DAYS = 2;
+
+export function quotaExpireAt(dateKey) {
+  const startOfDaySeoul = new Date(`${dateKey}T00:00:00+09:00`);
+  return new Date(startOfDaySeoul.getTime() + QUOTA_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+}
+
+/**
  * 오늘 사용량을 1 늘리고, 상한을 넘으면 늘리지 않고 거절한다.
  *
  * @param {object} db Firestore 인스턴스 (Admin SDK — 규칙을 우회하므로 서버 전용).
@@ -87,7 +102,11 @@ export async function consumeDailyQuota(db, { uid, limit = DAILY_REFINE_LIMIT, n
     if (used >= limit) return { ok: false, used, limit };
 
     // 🔴 `set(..., {merge:true})`다. `update()`는 문서가 없으면 던진다 — 그날 첫 요청이 전부 실패한다.
-    tx.set(ref, { uid, dateKey, count: used + 1, updatedAt: new Date() }, { merge: true });
+    tx.set(
+      ref,
+      { uid, dateKey, count: used + 1, updatedAt: new Date(), expireAt: quotaExpireAt(dateKey) },
+      { merge: true },
+    );
     return { ok: true, used: used + 1, limit };
   });
 }

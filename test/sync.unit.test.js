@@ -219,3 +219,134 @@ test('모든 실패 사유에 사람이 읽을 문구가 있다', () => {
     assert.ok(!message.includes('undefined'));
   }
 });
+
+/* ── L22 — 학습 내역 삭제가 서버에도 반영된다 (2026-09-30) ───────────────── */
+
+import { flushLearnedDeletions } from '../src/lib/syncClient.js';
+import { removeLearnedPattern, clearLearnedPatterns, getLearnedDeletions } from '../src/lib/profile.js';
+
+/** 학습 패턴 컬렉션만 흉내 내는 상태 있는 가짜 Firestore. */
+function fakeFirestore(initial, { failDelete = false } = {}) {
+  const docs = new Map(Object.entries(initial));
+  const impl = fakeFetch((url, init) => {
+    const one = url.match(/learnedPatterns\/([^?]+)/);
+    const method = init.method ?? 'GET';
+    if (one && method === 'DELETE') {
+      if (failDelete) return { status: 500, body: {} };
+      docs.delete(decodeURIComponent(one[1]));
+      return { body: {} };
+    }
+    if (one && method === 'PATCH') {
+      const decoded = decodeFields(JSON.parse(init.body).fields);
+      docs.set(decoded.kind, decoded.count);
+      return { body: {} };
+    }
+    if (url.endsWith('/learnedPatterns') && method === 'GET') {
+      return {
+        body: {
+          documents: [...docs].map(([kind, count]) => ({
+            name: `projects/p/databases/(default)/documents/users/uid-1/learnedPatterns/${encodeURIComponent(kind)}`,
+            fields: encodeFields({ kind, count }),
+          })),
+        },
+      };
+    }
+    return { body: {} };
+  });
+  impl.docs = docs;
+  return impl;
+}
+
+async function resetLearned() {
+  await removeLocal(STORAGE_KEYS.LEARNED_PATTERNS);
+  await removeLocal(STORAGE_KEYS.LEARNED_DELETIONS);
+  await removeLocal(STORAGE_KEYS.ONBOARDING);
+}
+
+test('🔴 L22 개별 삭제한 항목이 다음 동기화에서 되살아나지 않는다 — 서버 문서도 지워진다', async () => {
+  await resetLearned();
+  await signedIn();
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 5, 'more-direct': 2 });
+  await removeLearnedPattern('fewer-apologies');
+
+  const remote = fakeFirestore({ 'fewer-apologies': 5, 'more-direct': 2 });
+  await syncNow({ fetchImpl: remote });
+
+  assert.equal((await getLocal(STORAGE_KEYS.LEARNED_PATTERNS, {}))['fewer-apologies'], undefined, '로컬에 되살아났다');
+  assert.equal(remote.docs.has('fewer-apologies'), false, '서버 문서가 남았다');
+  assert.equal(remote.docs.get('more-direct'), 2, '지우지 않은 항목까지 건드렸다');
+  assert.deepEqual(await getLearnedDeletions(), { all: false, kinds: [] }, '대기 목록이 비워지지 않았다');
+});
+
+test('🔴 L22 삭제는 병합보다 먼저 일어난다 — DELETE가 목록 GET보다 앞선다', async () => {
+  await resetLearned();
+  await signedIn();
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 1 });
+  await removeLearnedPattern('fewer-apologies');
+
+  const remote = fakeFirestore({ 'fewer-apologies': 9 });
+  await syncNow({ fetchImpl: remote });
+  const order = remote.calls.map((c) => `${c.init.method ?? 'GET'} ${c.url.includes('learnedPatterns') ? 'lp' : 'user'}`);
+  assert.ok(order.includes('DELETE lp'), `DELETE를 보내지 않았다: ${order.join(', ')}`);
+  assert.ok(order.indexOf('DELETE lp') < order.indexOf('GET lp'), `순서가 틀렸다: ${order.join(', ')}`);
+});
+
+test('🔴 L22 전체 삭제는 로컬에 없던(다른 기기에서 올린) 서버 항목까지 지운다', async () => {
+  await resetLearned();
+  await signedIn();
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 1 });
+  await clearLearnedPatterns();
+
+  const remote = fakeFirestore({ 'fewer-apologies': 1, 'from-other-device': 4 });
+  await syncNow({ fetchImpl: remote });
+  assert.equal(remote.docs.size, 0, `서버에 남았다: ${[...remote.docs.keys()].join(', ')}`);
+  assert.deepEqual(await getLocal(STORAGE_KEYS.LEARNED_PATTERNS, {}), {});
+});
+
+test('🔴 L22 서버 삭제가 실패하면 병합하지 않고 멈춘다 — 대기 목록은 남는다', async () => {
+  await resetLearned();
+  await signedIn();
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 1 });
+  await removeLearnedPattern('fewer-apologies');
+
+  const remote = fakeFirestore({ 'fewer-apologies': 9 }, { failDelete: true });
+  await assert.rejects(() => syncNow({ fetchImpl: remote }));
+  assert.equal((await getLocal(STORAGE_KEYS.LEARNED_PATTERNS, {}))['fewer-apologies'], undefined, '실패했는데 병합해서 되살렸다');
+  assert.deepEqual((await getLearnedDeletions()).kinds, ['fewer-apologies']);
+});
+
+test('L22 로그인 전에 지우면 요청 없이 대기 목록에만 남는다', async () => {
+  await resetLearned();
+  await removeLocal(STORAGE_KEYS.AUTH);
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 1 });
+  await removeLearnedPattern('fewer-apologies');
+
+  const impl = fakeFetch(() => ({ body: {} }));
+  await assert.rejects(
+    () => flushLearnedDeletions({ fetchImpl: impl }),
+    (e) => e.reason === SYNC_ERRORS.NOT_SIGNED_IN,
+  );
+  assert.equal(impl.calls.length, 0);
+  assert.deepEqual((await getLearnedDeletions()).kinds, ['fewer-apologies']);
+});
+
+test('L22 지운 뒤 새로 쌓인 같은 항목은 새 값으로 올라간다 — 옛 서버 값이 이기지 않는다', async () => {
+  await resetLearned();
+  await signedIn();
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 7 });
+  await removeLearnedPattern('fewer-apologies');
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 1 }); // 삭제 후 새로 1회
+
+  const remote = fakeFirestore({ 'fewer-apologies': 7 });
+  await syncNow({ fetchImpl: remote });
+  assert.equal((await getLocal(STORAGE_KEYS.LEARNED_PATTERNS, {}))['fewer-apologies'], 1);
+  assert.equal(remote.docs.get('fewer-apologies'), 1);
+});
+
+test('L22 대기 목록이 비었으면 flush는 요청을 보내지 않는다', async () => {
+  await resetLearned();
+  await signedIn();
+  const impl = fakeFetch(() => ({ body: {} }));
+  assert.deepEqual(await flushLearnedDeletions({ fetchImpl: impl }), { deleted: 0 });
+  assert.equal(impl.calls.length, 0);
+});

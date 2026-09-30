@@ -18,6 +18,7 @@
 import { FIREBASE_PROJECT_ID } from '../config.js';
 import { getIdToken } from './authClient.js';
 import { getLocal, setLocal, STORAGE_KEYS } from './storage.js';
+import { getLearnedDeletions } from './profile.js';
 
 const ROOT = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
@@ -171,6 +172,51 @@ export function mergeCounts(local, remote) {
 /* ── 공개 API ───────────────────────────────────────────────────────── */
 
 /**
+ * 서버에 남은 학습 항목을 지운다 (L22, 2026-09-30 — 권장 11 「학습 내역 삭제」의 서버 쪽).
+ *
+ * | 대기 목록 | 동작 |
+ * |---|---|
+ * | 비어 있음 | 요청 없음 |
+ * | `kinds` | 그 문서들만 DELETE (404는 이미 없음 — 성공으로 본다) |
+ * | `all` | 원격 목록을 읽어 전부 DELETE |
+ *
+ * 🔴 **처리한 것만 대기 목록에서 뺀다.** 처리하는 사이 새로 지운 항목이 들어올 수 있다.
+ * 🔴 실패하면 대기 목록을 그대로 두고 던진다 — 다음 시도에서 다시 지운다.
+ * @returns {Promise<{deleted: number}>}
+ */
+export async function flushLearnedDeletions({ fetchImpl = globalThis.fetch } = {}) {
+  const pending = await getLearnedDeletions();
+  if (!pending.all && pending.kinds.length === 0) return { deleted: 0 };
+
+  const token = await requireToken(fetchImpl);
+  const session = await getLocal(STORAGE_KEYS.AUTH, null);
+  const uid = session?.uid;
+  if (!uid) throw new SyncError(SYNC_ERRORS.NOT_SIGNED_IN);
+
+  let targets = pending.kinds;
+  if (pending.all) {
+    const remoteList = await request(`/users/${uid}/learnedPatterns`, { token, fetchImpl });
+    targets = (remoteList?.documents ?? [])
+      .map((doc) => (doc.name ? decodeURIComponent(doc.name.split('/').pop()) : decodeFields(doc.fields).kind))
+      .filter((kind) => typeof kind === 'string' && kind !== '');
+  }
+  for (const kind of targets) {
+    await request(`/users/${uid}/learnedPatterns/${encodeURIComponent(kind)}`, {
+      method: 'DELETE',
+      token,
+      fetchImpl,
+    });
+  }
+
+  const latest = await getLearnedDeletions();
+  await setLocal(STORAGE_KEYS.LEARNED_DELETIONS, {
+    all: pending.all ? false : latest.all,
+    kinds: latest.kinds.filter((kind) => !pending.kinds.includes(kind)),
+  });
+  return { deleted: targets.length };
+}
+
+/**
  * 양방향 동기화 한 번.
  *
  * 🔴 **가져와서 병합한 뒤 올린다.** 올리기만 하면 다른 기기에서 쌓인 것을 덮어쓰고, 가져오기만
@@ -184,6 +230,12 @@ export async function syncNow({ fetchImpl = globalThis.fetch } = {}) {
   const session = await getLocal(STORAGE_KEYS.AUTH, null);
   const uid = session?.uid;
   if (!uid) throw new SyncError(SYNC_ERRORS.NOT_SIGNED_IN);
+
+  /**
+   * 0) 🔴 **지운 학습 항목부터 서버에서 지운다** (L22). 병합보다 먼저여야 한다 — 뒤에 하면
+   *    `mergeCounts`(최댓값)가 원격 값으로 되살린다. 실패하면 여기서 멈춘다(병합하지 않는다).
+   */
+  await flushLearnedDeletions({ fetchImpl });
 
   /* 1) 온보딩 — 원격을 먼저 읽고, 로컬에 없는 값만 채운 뒤 합쳐서 올린다. */
   const remoteUser = await request(`/users/${uid}`, { token, fetchImpl });

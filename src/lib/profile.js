@@ -169,19 +169,34 @@ export async function recordEdit(aiText, userText) {
   return outcome;
 }
 
-/** 권장 11 — 개별 삭제. @returns {Promise<boolean>} 실제로 지워졌으면 true. */
+/** 서버 삭제 대기 목록. 🔴 분류 id만 담는다 — 본문 없음. */
+export async function getLearnedDeletions() {
+  const stored = await getLocal(STORAGE_KEYS.LEARNED_DELETIONS, null);
+  return { all: stored?.all === true, kinds: Array.isArray(stored?.kinds) ? stored.kinds : [] };
+}
+
+/**
+ * 권장 11 — 개별 삭제. @returns {Promise<boolean>} 실제로 지워졌으면 true.
+ * 🔴 **서버 삭제 대기에도 올린다** (L22, 2026-09-30). 로컬만 지우면 다음 동기화가 원격 값으로
+ *    되살린다. 실제 서버 삭제는 `syncClient.js`의 `flushLearnedDeletions`가 한다.
+ */
 export async function removeLearnedPattern(categoryId) {
   const counts = await getLearnedCounts();
   if (!(categoryId in counts)) return false;
   const next = { ...counts };
   delete next[categoryId];
   await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, next);
+  const pending = await getLearnedDeletions();
+  if (!pending.all && !pending.kinds.includes(categoryId)) {
+    await setLocal(STORAGE_KEYS.LEARNED_DELETIONS, { all: false, kinds: [...pending.kinds, categoryId] });
+  }
   return true;
 }
 
-/** 권장 11 — 전체 삭제. */
+/** 권장 11 — 전체 삭제. 🔴 서버에 있는 것까지 전부 지우도록 `all`을 세운다 (L22). */
 export async function clearLearnedPatterns() {
   await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, {});
+  await setLocal(STORAGE_KEYS.LEARNED_DELETIONS, { all: true, kinds: [] });
 }
 
 /**

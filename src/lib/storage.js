@@ -60,6 +60,12 @@ export const STORAGE_KEYS = {
    */
   LEARNED_PATTERNS: 'sai.profile.learned',
   /**
+   * `{all: boolean, kinds: string[]}` — 서버에서도 지워야 할 학습 항목 (L22, 2026-09-30).
+   * 🔴 **동기화가 병합 전에 이걸 먼저 처리한다.** 없으면 로컬에서 지운 항목을 다음 동기화가 원격 값으로
+   *    되살린다(`mergeCounts`가 최댓값). 들어가는 것은 분류 id뿐이다 — 본문 없음.
+   */
+  LEARNED_DELETIONS: 'sai.profile.learned.deleted',
+  /**
    * 수신자 목록 (Spec 필수 9 · S17). 🔴 **숫자 점수는 어떤 형태로도 들어가지 않는다** (G1/G2) —
    * 사람에 대한 정보는 고정 집합의 서술형 태그 id뿐이다.
    */
