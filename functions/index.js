@@ -47,6 +47,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 // 🔴 `requireUid`는 teams.js와 **같은 함수**다 — 토큰 검증을 두 벌 두면 한쪽만 고쳐져 뚫린다.
 import { TEAM_ACTIONS, TeamError, defaultDeps, requireUid } from './teams.js';
 import { consumeDailyQuota, QUOTA_REASONS } from './refineQuota.js';
+import { healthPayload } from './health.js';
 
 initializeApp();
 
@@ -386,13 +387,13 @@ export const teamV1 = onRequest(
 export const health = onRequest(
   { region: 'asia-northeast3', secrets: BOUND_SECRETS, cors: [`chrome-extension://${EXTENSION_ID}`] },
   (_req, res) => {
-    const selected = resolveProviderAndKey(undefined);
-    res.status(200).json({
-      ok: true,
-      provider: selected?.provider ?? null,
-      // 🔴 실제 코드 지원 여부가 아니라 "이 배포에 시크릿이 등록된 provider"만 보고한다.
-      availableProviders: ['gemini'],
-      configured: selected !== null,
-    });
+    // 🔴 판정·조립은 `health.js`(순수 함수)에 있다 — 키 값을 넘기지만 응답에는 이름만 나간다.
+    //    2026-09-30 L13: 예전 `availableProviders: ['gemini']` 하드코딩을 등록된 시크릿 기준으로 바꿨다.
+    res.status(200).json(
+      healthPayload({
+        selected: resolveProviderAndKey(undefined),
+        keys: { openai: safeSecret(openaiKey), gemini: safeSecret(geminiKey) },
+      }),
+    );
   },
 );

@@ -26,7 +26,7 @@
 | L10 | **캘린더 제거** — manifest `oauth2` 블록·`calendarClient.js` 호출 경로 제거, `https://www.googleapis.com/*` 권한은 다른 사용처가 없을 때만 제거, 회의 시간 추천은 시차 기반만 남길지 숨길지 결정. 👤 GCP 동의 화면 「데이터 액세스」에서 `calendar.readonly` 제거 → 로그인 시 「확인되지 않은 앱」 경고가 사라지는지 실브라우저 확인. 🔴 로그인은 별도 웹 클라이언트(`launchWebAuthFlow`, `src/lib/authClient.js`)라 `identity` 권한은 유지 | — | todo |
 | L11 | manifest의 `http://127.0.0.1:8787/*` 권한을 **개발 빌드 전용**으로 분리 | — | review — `REFINE_ENDPOINT`에서 권한을 파생(`src/config.js` `localProxyHostPermissions`). 빌드 실측: 기본 빌드 localhost 0건 / 로컬 전환 빌드 `http://127.0.0.1:8787/*` 1건. 테스트 3건(`test/manifestPermissions.unit.test.js`). 🔴 실확장 로드 미확인 |
 | L12 | `teamV1`·`health`의 `cors: true` → 확장 오리진만 (`functions/index.js:347,379`) | — | review — 두 함수 모두 `chrome-extension://${EXTENSION_ID}`. 테스트 3건(`test/functionsCors.unit.test.js` — `cors: true` 금지 · 전 함수 확장 오리진 · `EXTENSION_ID`가 manifest `key`에서 계산한 ID와 일치), 음성 확인(`cors: true`로 되돌리면 2건 실패) · `functions` 로드 OK. 🔴 **미배포** — 👤 `firebase deploy --only functions` 후 확장에서 팀 기능 호출 확인 필요 |
-| L13 | `health`의 `availableProviders` 하드코딩 수정 (`docs/submission/README.md` 촬영 후 할 일) | — | todo |
+| L13 | `health`의 `availableProviders` 하드코딩 수정 (`docs/submission/README.md` 촬영 후 할 일) | — | review — 응답 조립을 순수 함수 `functions/health.js`로 분리, 등록된 시크릿 기준으로 보고. 테스트 4건(`test/health.unit.test.js` — 키 값 미노출 포함) · `functions` 로드 OK. 🔴 「등록됨」이지 「유효함」이 아니다(9/28 OpenAI 키처럼). 🔴 **미배포** |
 | L14 | 👤 Firebase 웹 API 키 사용 API 제한 (Identity Toolkit·Firestore만) — `src/config.js` 주석 권고, 적용 여부 미확인 | — | todo |
 | L15 | **키 무효 감지** — 현재 failover·알림이 `quota`만 잡는다. 401(`invalid_api_key`)을 별도 사유로 분류 + 👤 로그 기반 알림(폴백률·키 오류) 설정. 🔴 로그는 카운트·사유만(Zero Retention) | L03 | todo |
 | L16 | 👤 비용 상한 — OpenAI 사용 한도 + GCP 예산 알림, `DAILY_REFINE_LIMIT`를 L02 값으로 | L02 | todo |
