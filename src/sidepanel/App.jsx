@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
-import { DASHBOARD_URL } from '../config.js';
+import { DASHBOARD_URL, FEATURES } from '../config.js';
 import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
 import {
   listPersonalGlossary,
@@ -1440,6 +1440,8 @@ function MeetingCard({ onAwarded, onToast }) {
 
   /** 초안을 복사한 뒤에만 불린다. 조건에 안 맞으면 조용히 아무 일도 하지 않는다. */
   const awardIfYielded = async (slot) => {
+    // 🔴 공개 빌드는 포인트를 끈다(`FEATURES.points`, L17) — 적립도 토스트도 없다.
+    if (!FEATURES.points) return;
     if (!slot || slot.yieldPoints <= 0) return;
     if (awarded.has(slot.startUtcISO)) return;
     const result = await awardPoints(POINT_REASONS.MEETING_YIELD);
@@ -1600,7 +1602,7 @@ function MeetingCard({ onAwarded, onToast }) {
                       </span>
                       <span className={`slot-note slot-note-${note.tone}`}>
                         {note.label}
-                        {slot.yieldPoints > 0 && <b> +{slot.yieldPoints}P</b>}
+                        {FEATURES.points && slot.yieldPoints > 0 && <b> +{slot.yieldPoints}P</b>}
                       </span>
                     </button>
                   );
@@ -1937,17 +1939,20 @@ function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
       {/* S23 / Spec 권장 12 — 상시 노출 회의 시간 추천. */}
       <MeetingCard onAwarded={refreshPoints} onToast={onToast} />
 
-      <section className="card">
-        <div className="card-head">
-          <h2 className="card-label">내 포인트</h2>
-          <span className="points">🪙 {points.balance}P</span>
-        </div>
-        <p className="card-text">
-          {POINTS.detail}
-          <br />
-          {POINTS.usage}
-        </p>
-      </section>
+      {/* 🔴 공개 빌드는 포인트를 끈다(`FEATURES.points`, L17) — 「사용할 수 있어요」는 없는 기능이다. */}
+      {FEATURES.points && (
+        <section className="card">
+          <div className="card-head">
+            <h2 className="card-label">내 포인트</h2>
+            <span className="points">🪙 {points.balance}P</span>
+          </div>
+          <p className="card-text">
+            {POINTS.detail}
+            <br />
+            {POINTS.usage}
+          </p>
+        </section>
+      )}
 
       {/**
         * 🔴 **팀 대시보드는 「팀」 탭으로 옮겼다** (2026-08-16). 홈에 두면 팀을 「팀」 탭에서
@@ -4113,6 +4118,9 @@ function RecipientForm({ initial, personalTeams, activeTeamId, submitLabel, onSu
         *    통째로 틀린다** — 그 기능은 타임존이 정확하다는 전제 위에 있다.
         *    그래서 location은 **힌트로만** 보여주고 지역은 사용자가 목록에서 고른다.
         */}
+      {/* 🔴 공개 빌드는 GitHub 불러오기를 끈다(`FEATURES.githubLookup`, L17). 제안·힌트는 이 조회로만
+          생기므로 입력 줄만 숨기면 나머지도 나타나지 않는다. */}
+      {FEATURES.githubLookup && (
       <div className="github-suggest-form">
         <input
           className="form-input"
@@ -4132,6 +4140,7 @@ function RecipientForm({ initial, personalTeams, activeTeamId, submitLabel, onSu
           {looking ? '찾는 중…' : '불러오기'}
         </button>
       </div>
+      )}
       {hint && <p className="meta">{hint}</p>}
 
       <input

@@ -30,6 +30,7 @@ import { listPersonalGlossary } from '../lib/glossary.js';
 import DualClock from './DualClock.jsx';
 import { recordFeedback, FEEDBACK_KINDS } from '../lib/feedback.js';
 import { awardPoints, POINT_REASONS } from '../lib/points.js';
+import { FEATURES } from '../config.js';
 
 /** 로딩 중 순환 문구 — 실제로 이 호출이 함께 판정하는 축을 그대로 나열한다(과장 없음). */
 const REFINE_LOADING_MESSAGES = [
@@ -474,9 +475,11 @@ export default function RefinePopup({
     setFeedbackGiven(true);
     const outcome = await recordFeedback(kind);
     if (!outcome.ok) return;
-    // Spec §1 — "1초 피드백 참여 시 포인트 획득".
-    const award = await awardPoints(POINT_REASONS.FEEDBACK);
-    if (award.ok) setFeedbackAward(` +${award.amount}P`);
+    // Spec §1 — "1초 피드백 참여 시 포인트 획득". 🔴 공개 빌드는 포인트를 끈다(`FEATURES.points`, L17).
+    if (FEATURES.points) {
+      const award = await awardPoints(POINT_REASONS.FEEDBACK);
+      if (award.ok) setFeedbackAward(` +${award.amount}P`);
+    }
     // 👎면 곧바로 다시 만든다. 새 결과가 오면 위 effect가 피드백 상태를 초기화한다.
     if (kind === FEEDBACK_KINDS.DOWN) onRegenerate?.();
   };
