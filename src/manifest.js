@@ -1,4 +1,5 @@
 import { defineManifest } from '@crxjs/vite-plugin';
+import { LOCAL_PROXY_HOST_PERMISSIONS } from './config.js';
 
 export default defineManifest({
   manifest_version: 3,
@@ -131,9 +132,9 @@ export default defineManifest({
     'notifications',
     'identity',
   ],
-  // 🔴 MV3 서비스 워커는 권한 없는 오리진으로 fetch할 수 없다. `src/config.js`의
-  //    REFINE_ENDPOINT와 반드시 함께 바꾼다. 로컬 프록시로 되돌릴 때는
-  //    'http://127.0.0.1:8787/*'를 추가한다.
+  // 🔴 MV3 서비스 워커는 권한 없는 오리진으로 fetch할 수 없다. 배포 함수 도메인을 바꾸면
+  //    `src/config.js`의 DEPLOYED_ENDPOINT와 반드시 함께 바꾼다. 로컬 프록시 권한은 아래
+  //    `LOCAL_PROXY_HOST_PERMISSIONS`가 알아서 붙인다(손으로 추가하지 않는다).
   host_permissions: [
     'https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/*',
     // S22 — GitHub 공개 활동 조회. 🔴 확장이 host_permission을 가지면 CORS 제약을 받지 않는다.
@@ -149,17 +150,13 @@ export default defineManifest({
     'https://securetoken.googleapis.com/*',
     'https://firestore.googleapis.com/*',
     /**
-     * 로컬 프록시 (`npm run proxy`) — 2026-08-19 사용자 요청 「함께 고쳐」.
+     * 로컬 프록시 (`npm run proxy`) — **`REFINE_ENDPOINT`가 로컬을 가리킬 때만** 한 줄 붙는다.
      *
-     * 🔴 **왜 미리 넣어 두는가.** `src/config.js`의 `REFINE_ENDPOINT`를 로컬로 바꿔도
-     *    이 권한이 없으면 **MV3 서비스 워커가 fetch 자체를 못 해 전부 조용히 실패**한다.
-     *    두 파일 중 하나만 고치는 사고가 실제로 나기 쉬운 자리라(주석으로 경고까지 달려
-     *    있었다), 권한을 미리 열어 **엔드포인트 한 줄만 바꾸면 되게** 만든다.
-     * 🔴 **권한이 있다고 그리로 부르지는 않는다** — 기본값은 배포된 함수다(`config.js`).
-     *    이 권한은 `127.0.0.1`(내 기기 안)로만 열려 있어 남의 서버로 나갈 수 없다.
-     * 🔴 포트는 `config.js`의 `LOCAL_PROXY_ENDPOINT`와 **같아야 한다**(8787).
-     *    다른 포트로 프록시를 띄우면(`SAI_PROXY_PORT`) 여기도 함께 고쳐야 한다.
+     * 🔴 **2026-09-30 L11**: 2026-08-19부터 `http://127.0.0.1:8787/*`를 항상 넣어 두었는데,
+     *    그러면 공개 빌드에도 쓰지 않는 로컬 권한이 실린다. 이제 `src/config.js`가 엔드포인트에서
+     *    권한을 파생한다 — 엔드포인트 한 줄만 바꾸면 되는 성질(2026-08-19의 목적)은 그대로다.
+     * 🔴 `test/manifestPermissions.unit.test.js`가 공개 빌드에 localhost가 없음을 잠근다.
      */
-    'http://127.0.0.1:8787/*',
+    ...LOCAL_PROXY_HOST_PERMISSIONS,
   ],
 });

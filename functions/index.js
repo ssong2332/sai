@@ -47,6 +47,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 // 🔴 `requireUid`는 teams.js와 **같은 함수**다 — 토큰 검증을 두 벌 두면 한쪽만 고쳐져 뚫린다.
 import { TEAM_ACTIONS, TeamError, defaultDeps, requireUid } from './teams.js';
 import { consumeDailyQuota, QUOTA_REASONS } from './refineQuota.js';
+import { healthPayload } from './health.js';
 
 initializeApp();
 
@@ -344,7 +345,10 @@ export const refineV1 = onRequest(
 export const teamV1 = onRequest(
   {
     region: 'asia-northeast3',
-    cors: true,
+    // 🔴 2026-09-30 L12 — `true`(전체 허용)에서 확장 오리진으로 좁혔다. 부르는 곳은 확장의
+    //    `src/lib/teamClient.js`뿐이다(대시보드는 Functions를 부르지 않는다). refineV1과 같은 이유로
+    //    **이건 보안 장치가 아니다** — 실제 방어선은 핸들러 안의 `requireUid`다.
+    cors: [`chrome-extension://${EXTENSION_ID}`],
     /**
      * 🔴 **없으면 확장이 함수에 도달조차 못 한다** (2026-08-15 배포 직후 실측: 구글이 낸
      *    HTML 403/401이 돌아왔다 — 우리 JSON이 아니었다). 2세대 함수는 기본이 「인증된
@@ -375,14 +379,21 @@ export const teamV1 = onRequest(
   },
 );
 
-/** 배포·시크릿 상태를 눈으로 확인하는 용도. 키 값은 절대 노출하지 않는다. */
-export const health = onRequest({ region: 'asia-northeast3', secrets: BOUND_SECRETS, cors: true }, (_req, res) => {
-  const selected = resolveProviderAndKey(undefined);
-  res.status(200).json({
-    ok: true,
-    provider: selected?.provider ?? null,
-    // 🔴 실제 코드 지원 여부가 아니라 "이 배포에 시크릿이 등록된 provider"만 보고한다.
-    availableProviders: ['gemini'],
-    configured: selected !== null,
-  });
-});
+/**
+ * 배포·시크릿 상태를 눈으로 확인하는 용도. 키 값은 절대 노출하지 않는다.
+ * 🔴 2026-09-30 L12 — CORS를 `true`에서 확장 오리진으로 좁혔다. 확인은 curl로 하며(CORS 무관),
+ *    다른 웹사이트의 JS가 어느 provider 시크릿이 등록됐는지 읽어 갈 이유가 없다.
+ */
+export const health = onRequest(
+  { region: 'asia-northeast3', secrets: BOUND_SECRETS, cors: [`chrome-extension://${EXTENSION_ID}`] },
+  (_req, res) => {
+    // 🔴 판정·조립은 `health.js`(순수 함수)에 있다 — 키 값을 넘기지만 응답에는 이름만 나간다.
+    //    2026-09-30 L13: 예전 `availableProviders: ['gemini']` 하드코딩을 등록된 시크릿 기준으로 바꿨다.
+    res.status(200).json(
+      healthPayload({
+        selected: resolveProviderAndKey(undefined),
+        keys: { openai: safeSecret(openaiKey), gemini: safeSecret(geminiKey) },
+      }),
+    );
+  },
+);
