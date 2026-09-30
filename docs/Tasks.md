@@ -24,7 +24,7 @@
 | ID | Task | Depends | Status |
 |---|---|---|---|
 | L10 | **캘린더 제거** — manifest `oauth2` 블록·`calendarClient.js` 호출 경로 제거, `https://www.googleapis.com/*` 권한은 다른 사용처가 없을 때만 제거, 회의 시간 추천은 시차 기반만 남길지 숨길지 결정. 👤 GCP 동의 화면 「데이터 액세스」에서 `calendar.readonly` 제거 → 로그인 시 「확인되지 않은 앱」 경고가 사라지는지 실브라우저 확인. 🔴 로그인은 별도 웹 클라이언트(`launchWebAuthFlow`, `src/lib/authClient.js`)라 `identity` 권한은 유지 | — | todo |
-| L11 | manifest의 `http://127.0.0.1:8787/*` 권한을 **개발 빌드 전용**으로 분리 | — | todo |
+| L11 | manifest의 `http://127.0.0.1:8787/*` 권한을 **개발 빌드 전용**으로 분리 | — | review — `REFINE_ENDPOINT`에서 권한을 파생(`src/config.js` `localProxyHostPermissions`). 빌드 실측: 기본 빌드 localhost 0건 / 로컬 전환 빌드 `http://127.0.0.1:8787/*` 1건. 테스트 3건(`test/manifestPermissions.unit.test.js`). 🔴 실확장 로드 미확인 |
 | L12 | `teamV1`·`health`의 `cors: true` → 확장 오리진만 (`functions/index.js:347,379`) | — | todo |
 | L13 | `health`의 `availableProviders` 하드코딩 수정 (`docs/submission/README.md` 촬영 후 할 일) | — | todo |
 | L14 | 👤 Firebase 웹 API 키 사용 API 제한 (Identity Toolkit·Firestore만) — `src/config.js` 주석 권고, 적용 여부 미확인 | — | todo |

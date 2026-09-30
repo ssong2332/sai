@@ -25,22 +25,36 @@ export const TEAM_ENDPOINT =
 export const LOCAL_PROXY_ENDPOINT = 'http://127.0.0.1:8787/v1/refine';
 
 /**
- * 🔴 **이제 이 한 줄만 바꾸면 된다** (2026-08-19). 예전에는 여기와 `src/manifest.js`의
- *    `host_permissions`를 **함께** 고쳐야 했고, 하나만 고치면 MV3 서비스 워커가 권한 없는
- *    오리진으로 fetch하지 못해 **조용히 전부 실패**했다. 그 함정을 없애려고 manifest에
- *    `http://127.0.0.1:8787/*`를 **미리 넣어 두었다** — 권한이 있다고 그리로 부르지는 않는다.
+ * 🔴 **이 한 줄만 바꾸면 된다** (2026-08-19 도입 · 2026-09-30 L11로 방식 변경). 예전에는 여기와
+ *    `src/manifest.js`의 `host_permissions`를 **함께** 고쳐야 했고, 하나만 고치면 MV3 서비스 워커가
+ *    권한 없는 오리진으로 fetch하지 못해 **조용히 전부 실패**했다. 2026-08-19에는 manifest에
+ *    localhost 권한을 **항상** 넣어 그 함정을 막았지만, 그러면 **공개 빌드에도** 쓰지 않는 로컬 권한이
+ *    실린다(스토어 심사에서 사유를 댈 수 없는 권한). 이제는 아래 `LOCAL_PROXY_HOST_PERMISSIONS`가
+ *    **이 값에서 권한을 파생**한다 — 로컬을 가리킬 때만 권한이 붙는다.
  *
  * | 쓰려는 것 | 이 값 | 준비 |
  * |---|---|---|
- * | 배포된 함수 (**기본**) | `DEPLOYED_ENDPOINT` | 없음 |
- * | 로컬 프록시 | `LOCAL_PROXY_ENDPOINT` | `npm run proxy` 켜 두기 · 빌드 다시 |
+ * | 배포된 함수 (**기본 · 공개 빌드**) | `DEPLOYED_ENDPOINT` | 없음 — localhost 권한 없음 |
+ * | 로컬 프록시 | `LOCAL_PROXY_ENDPOINT` | `npm run proxy` 켜 두기 · 빌드 다시 (권한은 자동) |
  *
  * 🔴 로컬로 바꾸면 **인증이 없다**(프록시는 localhost 전용이라 토큰을 안 본다). 시연·개발용이며
  *    그 상태로 남에게 배포하면 그 사람 화면에서는 전부 실패한다(그 기기에 프록시가 없다).
- * 🔴 프록시를 다른 포트로 띄우면(`SAI_PROXY_PORT`) `LOCAL_PROXY_ENDPOINT`와 manifest의 권한을
- *    **둘 다** 그 포트로 고쳐야 한다.
+ * 🔴 프록시를 다른 포트로 띄우면(`SAI_PROXY_PORT`) `LOCAL_PROXY_ENDPOINT`만 그 포트로 고친다 —
+ *    권한은 그 주소의 오리진에서 파생되므로 manifest는 손대지 않는다.
  */
 export const REFINE_ENDPOINT = DEPLOYED_ENDPOINT;
+
+/**
+ * 로컬 프록시용 `host_permissions` — `REFINE_ENDPOINT`가 로컬 프록시일 때만 한 줄, 아니면 빈 배열.
+ * `src/manifest.js`가 펼쳐 넣는다 (L11 — 공개 빌드에서 localhost 권한 제거).
+ * 🔴 manifest는 빌드 시점에 Node에서 이 파일을 읽는다 — 이 파일 최상단에 `chrome`·`window`를
+ *    건드리는 코드를 두지 않는다.
+ */
+export function localProxyHostPermissions(endpoint) {
+  return endpoint === LOCAL_PROXY_ENDPOINT ? [`${new URL(LOCAL_PROXY_ENDPOINT).origin}/*`] : [];
+}
+
+export const LOCAL_PROXY_HOST_PERMISSIONS = localProxyHostPermissions(REFINE_ENDPOINT);
 
 /** 프록시가 응답하지 않을 때까지 기다리는 시간. 코어 자체 타임아웃(20초)보다 넉넉히 잡는다. */
 export const REFINE_TIMEOUT_MS = 30_000;
