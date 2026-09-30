@@ -53,3 +53,15 @@ test('🔴 공개 빌드 기본값 — 포인트·GitHub 불러오기는 꺼져 
   assert.equal(FEATURES.points, false, '포인트는 사용처가 생길 때까지 끈다(Spec §0 유료화 나중)');
   assert.equal(FEATURES.githubLookup, false, 'GitHub 불러오기는 실확장 확인 전까지 끈다');
 });
+
+test('🔴 캘린더 — oauth2 블록과 www.googleapis.com 권한은 FEATURES.calendar에 묶여 있다 (L10)', () => {
+  assert.equal(FEATURES.calendar, false, '캘린더는 구글 OAuth 검증 전까지 끈다(Spec §0)');
+  const hardcoded = manifest.split('\n').filter((line) => /^\s*'https:\/\/www\.googleapis\.com\/\*'/.test(line));
+  assert.deepEqual(hardcoded, [], '캘린더 권한이 손으로 적혀 있다');
+  assert.ok(manifest.includes("...(FEATURES.calendar ? ['https://www.googleapis.com/*'] : [])"));
+  assert.match(manifest, /\.\.\.\(FEATURES\.calendar\s*\?\s*\{\s*oauth2:/, 'oauth2 블록이 플래그에 묶여 있지 않다');
+});
+
+test('🔴 로그인에 필요한 identity 권한은 캘린더와 무관하게 남는다 (L10)', () => {
+  assert.match(manifest, /'identity',/);
+});

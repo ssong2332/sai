@@ -1348,7 +1348,9 @@ function MeetingCard({ onAwarded, onToast }) {
   const [calendarNote, setCalendarNote] = useState('');
 
   // 🔴 `interactive: false` — 패널을 열자마자 구글 동의 창이 튀어나오지 않게 한다.
+  // 🔴 공개 빌드는 캘린더를 끈다(`FEATURES.calendar`, L10) — manifest에 `oauth2`가 없어 묻지도 않는다.
   useEffect(() => {
+    if (!FEATURES.calendar) return;
     isCalendarLinked().then(setCalendarLinked);
   }, []);
 
@@ -1572,15 +1574,21 @@ function MeetingCard({ onAwarded, onToast }) {
             *    나머지는 **상태가 기본값이 아닐 때만** 나온다.
             */}
           <p className="meta">
-            업무시간(09~18시) 겹침 기준 ·{' '}
-            <button
-              type="button"
-              className="link-button link-inline"
-              onClick={calendarLinked && busy ? dropCalendar : loadCalendar}
-            >
-              {calendarLinked && busy ? '내 일정 다시 포함' : '내 일정 빼고 보기'}
-            </button>
-            {busyResult ? ` · ${busyNotice(busyResult)}` : ''}
+            업무시간(09~18시) 겹침 기준
+            {/* 🔴 공개 빌드는 캘린더를 끈다(`FEATURES.calendar`, L10) — 스위치와 확인 문구가 함께 사라진다. */}
+            {FEATURES.calendar && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  className="link-button link-inline"
+                  onClick={calendarLinked && busy ? dropCalendar : loadCalendar}
+                >
+                  {calendarLinked && busy ? '내 일정 다시 포함' : '내 일정 빼고 보기'}
+                </button>
+                {busyResult ? ` · ${busyNotice(busyResult)}` : ''}
+              </>
+            )}
           </p>
           {calendarNote && <p className="meta">{calendarNote}</p>}
 
