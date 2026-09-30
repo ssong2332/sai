@@ -56,7 +56,7 @@ import {
   isAuthConfigured,
   authErrorMessage,
 } from '../lib/authClient.js';
-import { syncNow, syncErrorMessage } from '../lib/syncClient.js';
+import { syncNow, syncErrorMessage, flushLearnedDeletions, SYNC_ERRORS } from '../lib/syncClient.js';
 // S22 / Spec audit 3 — GitHub 공개 활동에서 소통 태그 제안.
 import { analyzePublicActivity } from '../core/github/index.js';
 import {
@@ -452,16 +452,30 @@ export default function App() {
     setToast('수신자 정보를 바꿨어요');
   };
 
+  /**
+   * 🔴 **서버 쪽도 바로 지운다** (L22, 2026-09-30). 예전에는 로컬만 지워서 다음 동기화가 원격 값으로
+   *    되살렸다. 로그인 전이거나 실패하면 대기 목록에 남아 **다음 동기화가 병합 전에** 지운다 —
+   *    그래서 여기서의 실패는 삭제 실패가 아니다. 화면에는 그 차이만 말한다.
+   */
+  const deleteOnServer = async () => {
+    try {
+      await flushLearnedDeletions();
+      return '';
+    } catch (error) {
+      return error?.reason === SYNC_ERRORS.NOT_SIGNED_IN ? '' : ' — 서버 기록은 다음 동기화 때 지워요';
+    }
+  };
+
   const deleteLearned = async (id) => {
     await removeLearnedPattern(id);
     await refreshLearned();
-    setToast('학습 내역 1건을 삭제했어요');
+    setToast(`학습 내역 1건을 삭제했어요${await deleteOnServer()}`);
   };
 
   const clearLearned = async () => {
     await clearLearnedPatterns();
     await refreshLearned();
-    setToast('학습 내역을 모두 삭제했어요');
+    setToast(`학습 내역을 모두 삭제했어요${await deleteOnServer()}`);
   };
 
   const changeProfile = async (patch) => {
