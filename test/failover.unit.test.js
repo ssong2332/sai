@@ -71,11 +71,11 @@ test('🔴 캐시 수명 상한 6시간 — 두 서버 모두', () => {
  *    그 증상이 「로컬에선 되는데 배포하면 다르다」다 — 그래서 두 서버가 그 파일을 **임포트하는지**
  *    까지 잠근다.
  */
-test('🔴 폴오버 사슬 순서 — openai → gemini → openai/gpt-4.1', async () => {
+test('🔴 폴오버 사슬 순서 — gemini → openai → openai/gpt-4.1 (2026-10-01 L03)', async () => {
   const { FAILOVER_CHAIN } = await import('../src/core/refine/failover.js');
   assert.deepEqual(FAILOVER_CHAIN, [
-    { provider: 'openai', model: null },
     { provider: 'gemini', model: null },
+    { provider: 'openai', model: null },
     { provider: 'openai', model: 'gpt-4.1' },
   ]);
 });
@@ -90,17 +90,17 @@ test('🔴 gpt-5 계열은 사슬에 없다 — temperature 0을 거부해 결�
 test('🔴 이미 쓴 단계는 다시 시도하지 않는다 — 같은 통에서 또 퍼내지 않게', async () => {
   const { remainingChain } = await import('../src/core/refine/failover.js');
 
-  const afterPrimary = remainingChain({ provider: 'openai', model: null });
+  const afterPrimary = remainingChain({ provider: 'gemini', model: null });
   assert.deepEqual(afterPrimary, [
-    { provider: 'gemini', model: null },
+    { provider: 'openai', model: null },
     { provider: 'openai', model: 'gpt-4.1' },
   ]);
 
   // 🔴 provider가 같아도 «모델»이 다르면 다른 단계다 — 이걸 놓치면 gpt-4.1이 통째로 건너뛰어진다.
   const afterGpt41 = remainingChain({ provider: 'openai', model: 'gpt-4.1' });
   assert.deepEqual(afterGpt41, [
-    { provider: 'openai', model: null },
     { provider: 'gemini', model: null },
+    { provider: 'openai', model: null },
   ]);
 });
 
