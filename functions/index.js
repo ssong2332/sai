@@ -49,6 +49,8 @@ import { TEAM_ACTIONS, TeamError, defaultDeps, requireUid } from './teams.js';
 import { consumeDailyQuota, QUOTA_REASONS } from './refineQuota.js';
 import { healthPayload } from './health.js';
 // L22-②③ — 팀 나가기·계정 삭제. 🔴 판정표는 account.js 헤더.
+// L20 — 베타 지표(날짜별 합계, 본문·uid 없음). 🔴 판정표는 betaMetrics.js 헤더.
+import { recordRequest, recordDailyUser, recordClientMetric } from './betaMetrics.js';
 import { leaveTeamOnServer, deleteAccount, accountStore } from './account.js';
 
 initializeApp();
@@ -173,6 +175,18 @@ async function runWithFailover(mode, modeName, selected, body) {
   return { ...result, providerUsed: used.provider, modelUsed: used.model };
 }
 
+/**
+ * 지표 기록 — 🔴 **실패해도 교정을 막지 않는다**(L20). 지표는 관찰용이지 기능의 전제가 아니다.
+ *    로그에는 오류 코드만 남긴다(본문 없음).
+ */
+async function safeMetric(write) {
+  try {
+    await write();
+  } catch (error) {
+    console.error(`[metrics] 기록 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+  }
+}
+
 /** 시크릿이 등록돼 있지 않으면 접근 자체가 던진다 — 그걸 null로 흡수한다. */
 function safeSecret(secret) {
   try {
@@ -210,6 +224,8 @@ export const refineV1 = onRequest(
      * 🔴 목업으로 대신 답하지 않는다 — 확장이 401을 보고 「로그인이 필요해요」를 띄운다.
      *    여기서 그럴듯한 결과를 돌려주면 **로그인이 안 된 것을 아무도 모른 채** 넘어간다.
      */
+    // L20 — 응답 시간은 **요청을 받은 순간부터** 잰다(사용자가 기다린 시간에 가깝게).
+    const receivedAt = Date.now();
     let uid;
     try {
       uid = await requireUid(req, teamDeps);
@@ -231,6 +247,8 @@ export const refineV1 = onRequest(
         res.status(429).json({ error: QUOTA_REASONS.OVER_LIMIT, limit: quota.limit });
         return;
       }
+      // L20 — 그날 첫 요청이면 일일 사용자·재방문을 센다. 🔴 uid는 판정에만 쓰고 지표에 남지 않는다.
+      if (quota.used === 1) await safeMetric(() => recordDailyUser(getFirestore(), uid));
     } catch (error) {
       // 🔴 카운터 장애로 교정을 멈추지 않는다 — 상한은 비용 방어선이지 기능의 전제가 아니다.
       //    다만 조용히 넘어가면 안 되므로 로그에 남긴다(본문은 없다).
@@ -324,15 +342,33 @@ export const refineV1 = onRequest(
 
     const modeName = MODES[req.body?.mode] ? req.body.mode : 'refine';
     const started = Date.now();
+    let result;
     try {
-      res.status(200).json(await runWithFailover(MODES[modeName], modeName, selected, req.body));
+      result = await runWithFailover(MODES[modeName], modeName, selected, req.body);
     } catch (error) {
       // 🔴 에러 메시지에 본문이 섞이지 않게 우리 문구만 내보낸다.
       console.error(
         `[${modeName}] 요청 거절: ${error?.name ?? 'error'} (${Date.now() - started}ms)`,
       );
+      await safeMetric(() =>
+        recordRequest(getFirestore(), { mode: modeName, rejected: true, latencyMs: Date.now() - receivedAt }),
+      );
       res.status(400).json({ error: error?.message ?? 'bad request' });
+      return;
     }
+    /**
+     * L20 — 응답 **전에** 기록한다. 2세대 함수는 응답 뒤 작업을 끝까지 돌려준다는 보장이 없다.
+     * 🔴 넘기는 것은 모드·성공 여부·사유 코드·시간뿐이다 — `result`의 본문은 넘기지 않는다.
+     */
+    await safeMetric(() =>
+      recordRequest(getFirestore(), {
+        mode: modeName,
+        fallback: result?.fallback === true,
+        fallbackReason: result?.fallbackReason,
+        latencyMs: Date.now() - receivedAt,
+      }),
+    );
+    res.status(200).json(result);
   },
 );
 
@@ -346,8 +382,8 @@ export const refineV1 = onRequest(
  *    구조). 그래야 네트워크 없이 테스트할 수 있다.
  * 🔴 Zero Retention: 에러 로그에 요청 본문을 쓰지 않는다 — 액션 이름과 사유 코드만 남긴다.
  */
-/** L22 — `teamV1`의 계정 단위 동작. `TEAM_ACTIONS`(팀 단위)와 이름이 겹치지 않는다. */
-const ACCOUNT_ACTIONS = { leave: leaveTeamOnServer, deleteAccount };
+/** L22 — `teamV1`의 계정 단위 동작. `TEAM_ACTIONS`(팀 단위)와 이름이 겹치지 않는다. L20 — `metric`(적용·되돌리기 합계). */
+const ACCOUNT_ACTIONS = { leave: leaveTeamOnServer, deleteAccount, metric: recordClientMetric };
 
 export const teamV1 = onRequest(
   {

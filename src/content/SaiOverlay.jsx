@@ -20,6 +20,7 @@ import { addSnippet, listSnippets, markSnippetUsed, MAX_SNIPPETS } from '../lib/
 import { addReservation } from '../lib/reservations.js';
 // 🔴 홈 「오늘의 사이」의 실카운트. 목업 상수를 대체한다 — 카운트만 저장한다(Spec 필수 5).
 import { bumpUsage, USAGE_KINDS } from '../lib/usage.js';
+import { reportMetric, METRIC_KINDS } from '../lib/metricsClient.js';
 // Spec §3 F-10/F-26 — 팀 건강도의 입력. 🔴 카운트만 쌓는다(본문·개인 식별자 없음).
 import { recordFrictionEvent, FRICTION_EVENTS, NO_TEAM_BUCKET } from '../lib/friction.js';
 // 🔴 대화 상대 **후보만** 뽑는다 — 등록은 사용자가 누를 때만(`detectPeople.js` 헤더).
@@ -1362,6 +1363,8 @@ export default function SaiOverlay() {
     if (outcome.ok) {
       setStage(null);
       setAnchor(null);
+      // L20 — 입력창에 직접 넣은 횟수(되돌리기 비율의 분모). 클립보드 경로는 되돌릴 수 없어 세지 않는다.
+      reportMetric(METRIC_KINDS.APPLIED);
       /**
        * S24 / Spec 부가 1 — 5초 원복. 🔴 되돌릴 수 있는 경로에서만 버튼을 준다
        *    (`applyText`가 `undo`를 실어 보낸 경우) — 못 하는 일을 버튼으로 내밀지 않는다.
@@ -1397,6 +1400,8 @@ export default function SaiOverlay() {
              */
             const restored = undoRef.current?.() !== false;
             undoRef.current = null;
+            // L20 — 되돌리기를 **누른 것**을 센다(성공 여부와 무관 — 결과가 마음에 안 들었다는 신호다).
+            reportMetric(METRIC_KINDS.UNDONE);
             setToast(restored ? '되돌렸어요' : '되돌리지 못했어요 — 입력창을 직접 확인해 주세요');
           }}
         >

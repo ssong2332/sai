@@ -67,14 +67,16 @@ export function seoulDateKey(now = new Date()) {
 }
 
 /**
- * 카운터 문서가 지워져도 되는 시각 — **그날(서울) 자정 + 2일** (L23, 2026-09-30).
+ * 카운터 문서가 지워져도 되는 시각 — **그날(서울) 자정 + 8일** (L23 2026-09-30 도입 · L20 2026-10-01 2→8일).
  *
  * 🔴 **Firestore TTL 정책이 이 필드(`expireAt`)를 본다.** 필드만 있고 정책이 없으면 아무것도 지워지지
  *    않는다 — 정책은 콘솔/gcloud에서 한 번 켠다(`docs/Tasks.md` L23).
- * 🔴 **당일 문서는 절대 지워지면 안 된다** — 지워지면 상한이 0으로 돌아간다. 그래서 하루가 끝난 뒤에도
- *    하루를 더 둔다(TTL 삭제는 만료 후 즉시가 아니라 보통 24시간 안에 일어난다).
+ * 🔴 **당일 문서는 절대 지워지면 안 된다** — 지워지면 상한이 0으로 돌아간다.
+ * 🔴 **8일인 이유(L20)**: 재방문 판정(`betaMetrics.js` `RETURNING_WINDOW_DAYS` = 7)이 직전 7일의 이 문서를
+ *    읽는다. 그날 + 7일이 지나기 전에 지워지면 재방문자를 신규로 센다. 보존 기간을 더 늘리지 않는다 —
+ *    uid가 든 문서이므로 판정에 필요한 만큼만 둔다. `test/betaMetrics.unit.test.js`가 두 값의 관계를 잠근다.
  */
-export const QUOTA_RETENTION_DAYS = 2;
+export const QUOTA_RETENTION_DAYS = 8;
 
 export function quotaExpireAt(dateKey) {
   const startOfDaySeoul = new Date(`${dateKey}T00:00:00+09:00`);
