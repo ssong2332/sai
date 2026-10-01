@@ -12,12 +12,12 @@
  *    카운트·수치·플래그뿐이다(아래 logger 참조).
  * 🔴 이 서버를 공개 인터넷에 노출하지 않는다. 인증이 없고 CORS가 열려 있다 — localhost 전용이다.
  *
- * 실행:  npm run proxy          (.env의 OPENAI_API_KEY 사용 — 없으면 GEMINI_API_KEY)
- *        npm run proxy -- --provider gemini --port 8787
+ * 실행:  npm run proxy          (.env의 GEMINI_API_KEY 사용 — 없으면 OPENAI_API_KEY)
+ *        npm run proxy -- --provider openai --port 8787
  *
  * 🔴 **provider 기본값은 배포본과 같아야 한다.** `functions/index.js`의 판정표가 미지정 요청을
- *    openai → gemini 순으로 고르므로 여기도 같은 순서다(2026-08-17 변경, 그전에는 gemini가
- *    먼저였다). 한쪽만 바꾸면 **"로컬에선 되는데 배포하면 다르다"**가 시작된다.
+ *    gemini → openai 순으로 고르므로 여기도 같은 순서다(2026-10-01 L03 변경. 2026-08-17~09-30에는
+ *    openai가 먼저였다). 한쪽만 바꾸면 **"로컬에선 되는데 배포하면 다르다"**가 시작된다.
  */
 
 import { createServer } from 'node:http';
@@ -40,7 +40,8 @@ const flag = (name, fallback) => {
 };
 
 const port = Number(flag('--port', process.env.SAI_PROXY_PORT ?? 8787));
-const providerName = flag('--provider', process.env.OPENAI_API_KEY ? 'openai' : 'gemini');
+// 🔴 2026-10-01 L03 — gemini 먼저(배포본·회귀 러너와 같은 순서, `test/providerDefaults.unit.test.js`).
+const providerName = flag('--provider', process.env.GEMINI_API_KEY ? 'gemini' : 'openai');
 const model = flag('--model', undefined);
 
 const provider = PROVIDERS[providerName];
@@ -65,7 +66,7 @@ if (!apiKey) {
  *
  * 🔴 **한도(`quota`)일 때«만» 넘긴다.** 네트워크 오류·응답 형식 오류로는 넘기지 않는다 —
  *    그건 두 번 불러도 같은 이유로 실패하고, 조용한 이중 호출은 한도만 더 태운다.
- * 🔴 **사슬 끝까지** 내려간다 (2026-08-20). openai → gemini → openai/gpt-4.1.
+ * 🔴 **사슬 끝까지** 내려간다 (2026-08-20). gemini → openai → openai/gpt-4.1 (2026-10-01 L03 순서).
  *    근거는 «한도가 모델별로 따로»라는 실측이다 — `src/core/refine/failover.js` 헤더 참조.
  *    사슬을 다 쓰고도 실패하면 원래대로 폴백 응답을 낸다.
  * 🔴 **어느 쪽이 답했는지 응답에 남긴다**(`providerUsed`) — 모델이 바뀌면 문체가 달라지는데

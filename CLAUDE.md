@@ -48,9 +48,11 @@
 > 작업하면 그 워크트리 루트에 `.env`가 있어야 `npm run proxy`·vite가 값을 읽는다.
 | `/v1/refine` 실 API 20건 | `npm run test:refine:live` (키 필요, 없으면 exit 2) | 미실행 |
 
-> 🔴 **2026-08-17 provider가 OpenAI(`gpt-4o`)로 바뀌었다** — 로컬 프록시·회귀 러너·배포본 셋 다
-> 기본값이 openai다. Gemini는 `OPENAI_API_KEY`가 없을 때만 자동 선택된다(`--provider gemini`로 명시 가능).
+> 🔴 **2026-10-01 L03 — 기본 provider는 Gemini다** — 로컬 프록시·회귀 러너·배포본 셋 다 `GEMINI_API_KEY`가
+> 있으면 gemini, 없을 때만 openai(`--provider openai`로 명시 가능). 폴오버 사슬은 gemini → openai → openai/gpt-4.1.
+> (2026-08-17~09-30에는 openai가 먼저였다.) 확장은 provider를 요청에 싣지 않는다 — 실으면 폴오버가 꺼진다.
 > **셋의 기본값 순서는 항상 같아야 한다** — 하나만 바꾸면 "로컬에선 되는데 배포하면 다르다"가 시작된다.
+> `test/providerDefaults.unit.test.js`가 잠근다.
 
 > 🔴 **OpenAI 한도는 「하루 N건」이 아니라 「분당 토큰(TPM)」이다**(2026-08-17 실측, 헤더
 > `x-ratelimit-*`): **TPM 10,000 · 요청 묶음 50(약 5시간마다 초기화)**. 교정 1건이 약 1,800토큰이라

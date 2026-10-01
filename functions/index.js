@@ -106,14 +106,16 @@ const replyCache = new ReplyCacheStore({ ttlMs: cacheTtlMs });
  * | `'openai'` | 없음 | — | **null** (다른 걸로 대체하지 않는다) |
  * | `'gemini'` | — | 있음 | gemini |
  * | `'gemini'` | — | 없음 | **null** |
- * | 미지정·기타 | 있음 | — | openai ← Spec §6-3 기준 provider |
- * | 미지정·기타 | 없음 | 있음 | gemini |
+ * | 미지정·기타 | — | 있음 | **gemini** ← Spec §0 기준 provider (2026-10-01 L03) |
+ * | 미지정·기타 | 있음 | 없음 | openai |
  * | 미지정·기타 | 없음 | 없음 | **null** |
  *
  * 🔴 **명시 요청은 대체하지 않는다.** `provider: 'openai'`로 부른 쪽은 그 결과를 기준으로
  *    판단하는 중인데, 조용히 gemini로 바꿔 답하면 **어느 모델의 출력인지 모르는 채로
  *    품질을 논하게 된다**(역번역 문제를 Gemini에서 4번 오진한 것이 정확히 이 계열이다).
- * 🔴 미지정일 때만 openai → gemini 순으로 내려간다. 기본값이 Spec의 기준 provider다.
+ * 🔴 미지정일 때만 gemini → openai 순으로 내려간다. 기본값이 Spec의 기준 provider다
+ *    (2026-10-01 L03 — 그전에는 openai가 먼저였고, 무효 키를 먼저 골랐다).
+ * 🔴 **순서는 `core/refine/failover.js`의 사슬 1번과 같아야 한다** — `test/providerDefaults.unit.test.js`.
  * 🔴 **없는 키로 부르지 않는다** — 지어낸 키를 보내면 401을 받고 그게 폴백 사유를 흐린다.
  */
 function resolveProviderAndKey(requested) {
@@ -123,8 +125,8 @@ function resolveProviderAndKey(requested) {
   if (requested === 'openai') return openai ? { provider: 'openai', apiKey: openai } : null;
   if (requested === 'gemini') return gemini ? { provider: 'gemini', apiKey: gemini } : null;
 
-  if (openai) return { provider: 'openai', apiKey: openai };
-  return gemini ? { provider: 'gemini', apiKey: gemini } : null;
+  if (gemini) return { provider: 'gemini', apiKey: gemini };
+  return openai ? { provider: 'openai', apiKey: openai } : null;
 }
 
 /**
@@ -136,10 +138,10 @@ function resolveProviderAndKey(requested) {
  *    논하게 된다**(위 판정표의 원칙과 같다). 미지정일 때만 넘긴다.
  * 🔴 **한도일 때만.** 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패하고, 조용한 이중
  *    호출은 한도만 더 태운다.
- * 🔴 **사슬 끝까지.** 2026-08-20부터 한 번이 아니라 `FAILOVER_CHAIN`(openai → gemini →
- *    openai/gpt-4.1)을 순서대로 내려간다. 근거는 **한도가 모델별로 따로**라는 실측이다 —
+ * 🔴 **사슬 끝까지.** 2026-08-20부터 한 번이 아니라 `FAILOVER_CHAIN`(2026-10-01 L03 순서: gemini →
+ *    openai → openai/gpt-4.1)을 순서대로 내려간다. 근거는 **한도가 모델별로 따로**라는 실측이다 —
  *    `core/refine/failover.js` 헤더 참조. 사슬을 다 쓰고도 실패하면 폴백 응답을 낸다.
- * 🔴 어느 쪽이 답했는지 `providerUsed`·`modelUsed`로 남긴다 — 1·3단계가 **둘 다 openai**라
+ * 🔴 어느 쪽이 답했는지 `providerUsed`·`modelUsed`로 남긴다 — 2·3단계가 **둘 다 openai**라
  *    provider만으로는 구분되지 않는다. 문체가 달라진 이유를 나중에 추적할 수 있어야 한다.
  * 🔴 코어(`refine/decode/...`)는 고치지 않았다. 실패를 던지지 않고 `{fallback, fallbackReason}`
  *    으로 흡수하므로, **결과만 보고** 판단하면 네 모드에 한 번에 적용된다.

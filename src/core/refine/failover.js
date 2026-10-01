@@ -27,15 +27,21 @@
  * `model: null`은 「그 provider의 기본 모델」이라는 뜻이다 — 모델명을 박아 두면 provider의
  * 기본이 바뀌었을 때 여기만 옛 이름으로 남는다.
  *
- * | 순서 | provider | 모델 | 하루 한도(무료, 2026-08-20 실측) |
+ * 🔴 **2026-10-01 L03 — gemini가 1번이다** (Spec §0 「Main LLM: Gemini」). 그전 순서는 openai → gemini →
+ *    openai/gpt-4.1이었고, 배포된 OpenAI 키가 무효(2026-09-28 401)인데도 서버가 openai를 먼저 골라
+ *    확장이 요청마다 gemini를 강제해야 했다 — 강제(명시 요청)는 폴오버를 끈다.
+ *    OpenAI 단계는 **남긴다** — 키가 복구되면 예비로 저절로 쓰이고, 무효인 동안은 401(`quota`가 아님)로
+ *    한 번 실패하고 거기서 멈춘다(아래 「넘어가는 조건」 ①).
+ *
+ * | 순서 | provider | 모델 | 하루 한도(무료, 실측) |
  * |---|---|---|---|
- * | 1 | openai | 기본 (`gpt-4o`) | 50 |
- * | 2 | gemini | 기본 | 20 |
- * | 3 | openai | `gpt-4.1` | 50 (**1번과 별도 통**) |
+ * | 1 | gemini | 기본 | 20 (2026-08-13) — 🔴 출시는 유료 티어(Tasks L02) |
+ * | 2 | openai | 기본 (`gpt-4o`) | 50 (2026-08-20) — 키 무효 중(2026-09-28~) |
+ * | 3 | openai | `gpt-4.1` | 50 (**2번과 별도 통**) |
  */
 export const FAILOVER_CHAIN = [
-  { provider: 'openai', model: null },
   { provider: 'gemini', model: null },
+  { provider: 'openai', model: null },
   { provider: 'openai', model: 'gpt-4.1' },
 ];
 

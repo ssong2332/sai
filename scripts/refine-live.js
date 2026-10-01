@@ -3,11 +3,11 @@
  * `/v1/refine` 실 API 통합 러너 — 선별 20건(`test/refine.cases.js`)을 실제 LLM 호출로 돌린다.
  *
  * 사용:
- *   OPENAI_API_KEY=... node scripts/refine-live.js                 # 기본 (Spec §6-3 기준 경로)
- *   GEMINI_API_KEY=... node scripts/refine-live.js --provider gemini   # 대체 provider
+ *   GEMINI_API_KEY=... node scripts/refine-live.js                 # 기본 (Spec §0 기준 경로)
+ *   OPENAI_API_KEY=... node scripts/refine-live.js --provider openai   # 대체 provider
  *   [--bypass-cache] [--model <이름>]
  *
- * 🔴 provider 기본값 — **OpenAI를 먼저 본다**(2026-08-17 변경, 그전에는 Gemini가 먼저였다).
+ * 🔴 provider 기본값 — **Gemini를 먼저 본다**(2026-10-01 L03 변경. 2026-08-17~09-30에는 OpenAI가 먼저였다).
  *    `functions/index.js`의 판정표·`server/refine-proxy.js`와 **같은 순서**여야 한다.
  *    셋 중 하나만 바꾸면 "로컬에선 되는데 배포하면 다르다"가 시작된다 — 실제로 Gemini
  *    시절 역번역 문제를 그 계열로 4번 오진했다.
@@ -27,8 +27,9 @@ const flag = (name) => {
 
 const bypassCache = args.includes('--bypass-cache');
 const model = flag('--model');
+// 🔴 2026-10-01 L03 — gemini 먼저(배포본·프록시와 같은 순서, `test/providerDefaults.unit.test.js`).
 const providerName =
-  flag('--provider') ?? (process.env.OPENAI_API_KEY ? 'openai' : 'gemini');
+  flag('--provider') ?? (process.env.GEMINI_API_KEY ? 'gemini' : 'openai');
 
 const provider = PROVIDERS[providerName];
 if (!provider) {

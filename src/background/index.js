@@ -191,16 +191,12 @@ export class BackendError extends Error {
 }
 
 /**
- * 🔴 **Gemini 강제 (2026-09-28 도입 · 2026-09-30 「Gemini 유지」로 확정, Spec §0)** — 배포된
- *    `OPENAI_API_KEY` 시크릿이 무효(OpenAI가 401 `invalid_api_key`로 즉시 거절 — `functions:log`
- *    실측)인데, 서버는 OpenAI 시크릿이 등록돼 있으면 그쪽을 먼저 고르고, **자동 failover는
- *    `quota` 사유일 때만 넘어가므로**(`functions/index.js`의 `runWithFailover`) 키 무효는 잡지 못한다.
- * 🔴 **이 상수는 정식 해법이 아니다.** 요청에 provider를 명시하면 서버 폴오버가 꺼진다(명시 요청은
- *    넘기지 않는 규칙). 정식 해법은 서버·프록시·회귀 러너의 기본 순서를 gemini 우선으로 함께
- *    바꾸는 것 — `docs/Tasks.md` **L03**. 그게 배포되면 이 상수를 지운다.
- * 🔴 Gemini 무료 티어는 **모델당 하루 20건**(CLAUDE.md 실측) — 용량·예산은 `docs/Tasks.md` **L02**.
+ * 🔴 **provider를 요청에 싣지 않는다** (2026-10-01 L03). 2026-09-28~10-01에는 provider 필드에 gemini를
+ *    넣어 매 요청에 강제했다 — 서버가 무효인 OpenAI 키를 먼저 골랐기 때문이다. 그런데 **명시 요청은 서버
+ *    폴오버를 끈다**(`functions/index.js` `runWithFailover`). 이제 서버 기본값이 gemini라
+ *    (`resolveProviderAndKey` · `core/refine/failover.js` 사슬 1번) 강제할 이유가 없고, 빼야 한도일 때
+ *    예비 단계로 넘어간다. `test/providerDefaults.unit.test.js`가 다시 들어오지 않게 잠근다.
  */
-const TEMP_FORCE_PROVIDER = 'gemini';
 
 async function callBackend(request) {
   const controller = new AbortController();
@@ -224,7 +220,7 @@ async function callBackend(request) {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ provider: TEMP_FORCE_PROVIDER, ...request }),
+      body: JSON.stringify(request),
       signal: controller.signal,
     });
     if (!response.ok) throw new BackendError(response.status);

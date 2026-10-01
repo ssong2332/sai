@@ -9,8 +9,8 @@
  *    예전에는 `['gemini']`로 하드코딩돼 있어 OpenAI 시크릿을 등록해도 빠져 보였다.
  */
 
-/** 판정 순서와 같게 둔다 — `index.js` `resolveProviderAndKey`의 미지정 기본 순서. */
-const PROVIDER_ORDER = ['openai', 'gemini'];
+/** 판정 순서와 같게 둔다 — `index.js` `resolveProviderAndKey`의 미지정 기본 순서(2026-10-01 L03: gemini 먼저). */
+const PROVIDER_ORDER = ['gemini', 'openai'];
 
 /**
  * @param {{ selected: { provider: string } | null, keys: Record<string, string | null> }} input

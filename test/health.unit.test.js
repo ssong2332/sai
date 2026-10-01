@@ -14,7 +14,7 @@ const GEMINI = 'gemini-test-value-should-never-leak';
 
 test('🔴 두 시크릿이 다 있으면 둘 다 보고한다 — 예전 하드코딩은 openai를 빠뜨렸다', () => {
   const body = healthPayload({ selected: { provider: 'openai' }, keys: { openai: OPENAI, gemini: GEMINI } });
-  assert.deepEqual(body, { ok: true, provider: 'openai', availableProviders: ['openai', 'gemini'], configured: true });
+  assert.deepEqual(body, { ok: true, provider: 'openai', availableProviders: ['gemini', 'openai'], configured: true });
 });
 
 test('gemini만 있으면 gemini만', () => {
