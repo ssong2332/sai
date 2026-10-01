@@ -2,6 +2,7 @@ import { REFINE_MESSAGE, mockRefine, mockDecode } from '../content/refineClient.
 import { REFINE_ENDPOINT, REFINE_TIMEOUT_MS } from '../config.js';
 // 🔴 2026-08-17 — `/v1/refine`이 인증을 요구한다. 토큰이 없으면 서버가 401을 준다.
 import { getIdToken } from '../lib/authClient.js';
+import { METRIC_MESSAGE, sendClientMetric } from '../lib/metricsClient.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from '../core/refine/fallback.js';
 
 // 툴바 아이콘 클릭 → 사이드 패널 열기 (Spec §1 UI 삼원화 — Side Panel 진입점)
@@ -114,6 +115,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     chrome.tabs.create({ url: chrome.runtime.getURL(DECISIONS_PAGE) });
     sendResponse({ ok: true });
     return false;
+  }
+
+  // L20 — 콘텐츠 스크립트가 보낸 적용·되돌리기 횟수를 서버 합계로 넘긴다(본문 없음, 실패는 무시).
+  if (message?.type === METRIC_MESSAGE) {
+    sendClientMetric(message.kind).then(sendResponse);
+    return true;
   }
 
   if (message?.type === 'decisions:takePending') {
