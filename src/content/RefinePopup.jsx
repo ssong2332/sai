@@ -31,6 +31,7 @@ import DualClock from './DualClock.jsx';
 import { recordFeedback, FEEDBACK_KINDS } from '../lib/feedback.js';
 import { awardPoints, POINT_REASONS } from '../lib/points.js';
 import { FEATURES } from '../config.js';
+import { URGENT_PREFIX, withUrgentPrefix } from './urgentTag.js';
 
 /** 로딩 중 순환 문구 — 실제로 이 호출이 함께 판정하는 축을 그대로 나열한다(과장 없음). */
 const REFINE_LOADING_MESSAGES = [
@@ -397,12 +398,9 @@ export default function RefinePopup({
     setUrgentOn(true);
   }, [result]);
 
-  const URGENT_PREFIX = '[🚨 URGENT] ';
+  // 🔴 태그 규칙은 `urgentTag.js` 한 곳 — 오버레이의 학습 판정이 같은 규칙으로 태그를 뗀다(2026-10-02).
   const urgentApplied = isCritical && urgentOn;
-  const textToApply =
-    urgentApplied && !finalText.startsWith(URGENT_PREFIX)
-      ? `${URGENT_PREFIX}${finalText}`
-      : finalText;
+  const textToApply = urgentApplied ? withUrgentPrefix(finalText) : finalText;
 
 
   // Spec 필수 3 — 역번역 토글 상태는 chrome.storage.local에 남는다. (로직 완성은 S06)
