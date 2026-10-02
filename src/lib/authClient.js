@@ -101,6 +101,23 @@ export function extractIdToken(callbackUrl) {
   return params.get('id_token');
 }
 
+/**
+ * 사용자가 스스로 멈춘 로그인인가 (L26, 2026-10-02).
+ *
+ * | `chrome.runtime.lastError` 문구 | 판정 |
+ * |---|---|
+ * | 「The user did not approve access」·「…closed…」·「…cancel…」 | 사용자 취소 — 기록하지 않는다 |
+ * | 「Only one web auth flow is allowed at a time」 | 창이 이미 열려 있는데 또 누름 — 기록하지 않는다 |
+ * | 그 밖 (페이지를 못 불러옴 등) | 진짜 실패 — `console.warn`으로 남긴다 |
+ *
+ * 🔴 chrome://extensions는 `console.warn`도 「오류」 목록에 쌓는다. 사용자가 창을 닫은 것까지 빨간 「오류」
+ *    버튼이 되면, 출시 후 사용자에게 고장처럼 보인다(2026-10-02 실확장 확인 중 발견).
+ * 🔴 기록만 안 할 뿐 거절(`AUTH_ERRORS.CANCELLED`)은 그대로 던진다 — 화면 안내는 바뀌지 않는다.
+ */
+export function isUserCancelledAuth(message) {
+  return /did not approve|cancel|closed|only one web auth flow/i.test(String(message ?? ''));
+}
+
 function launchAuthFlow({ identityImpl, interactive = true }) {
   const identity = identityImpl ?? globalThis.chrome?.identity;
   if (!identity?.launchWebAuthFlow) {
@@ -121,7 +138,7 @@ function launchAuthFlow({ identityImpl, interactive = true }) {
       const failure = globalThis.chrome?.runtime?.lastError;
       if (failure || !callbackUrl) {
         const raw = failure?.message ?? 'no callback';
-        console.warn('[사이] 로그인 흐름 실패:', raw);
+        if (!isUserCancelledAuth(raw)) console.warn('[사이] 로그인 흐름 실패:', raw);
         reject(new AuthError(AUTH_ERRORS.CANCELLED, raw));
         return;
       }
