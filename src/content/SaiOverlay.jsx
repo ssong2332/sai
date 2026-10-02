@@ -21,6 +21,7 @@ import { addReservation } from '../lib/reservations.js';
 // 🔴 홈 「오늘의 사이」의 실카운트. 목업 상수를 대체한다 — 카운트만 저장한다(Spec 필수 5).
 import { bumpUsage, USAGE_KINDS } from '../lib/usage.js';
 import { reportMetric, METRIC_KINDS } from '../lib/metricsClient.js';
+import { editedTextForLearning } from './urgentTag.js';
 // Spec §3 F-10/F-26 — 팀 건강도의 입력. 🔴 카운트만 쌓는다(본문·개인 식별자 없음).
 import { recordFrictionEvent, FRICTION_EVENTS, NO_TEAM_BUCKET } from '../lib/friction.js';
 // 🔴 대화 상대 **후보만** 뽑는다 — 등록은 사용자가 누를 때만(`detectPeople.js` 헤더).
@@ -1329,8 +1330,9 @@ export default function SaiOverlay() {
     // 🔴 S13 — 사용자가 AI 교정문을 고쳐서 적용했을 때만 학습한다. `recordEdit`은 분류 결과
     //    (카테고리 id + 편집 거리 수치)만 저장하고 두 문장은 저장하지 않는다 (Spec 필수 5).
     //    학습이 적용을 막으면 안 되므로 여기서 await하지 않고, 적용이 끝난 뒤에 결과만 읽는다.
-    const learning =
-      aiText && aiText !== text ? recordEdit(aiText, text).catch(() => null) : null;
+    // 🔴 2026-10-02 — `[🚨 URGENT]` 태그만 붙은 문장은 «고친 것»이 아니다. 태그를 떼고 비교한다(`urgentTag.js`).
+    const edited = editedTextForLearning(aiText, text);
+    const learning = edited ? recordEdit(aiText, edited).catch(() => null) : null;
 
     const outcome = await applyText({
       target: targetRef.current,
