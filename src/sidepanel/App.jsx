@@ -104,6 +104,8 @@ import {
   joinTeam,
   leaveTeamOnServer,
   deleteAccount,
+  restoreTeamsFromServer,
+  blockedTeamsText,
   listTeamGlossary,
   saveTeamGlossaryEntry,
   removeTeamGlossaryEntry,
@@ -958,7 +960,13 @@ function AccountCard({ onNotice }) {
                   setConfirmingDelete(false);
                   onNotice?.('계정과 저장된 데이터를 모두 삭제했어요');
                 } catch (error) {
-                  setNote(teamErrorMessage(error?.reason, error?.detail));
+                  // 🔴 2026-10-02 — 어느 팀이 막는지 말하고, 그 팀이 화면에 없을 때 되살리는 길을 알려 준다.
+                  const blocked = (error?.blockedTeams ?? []).length > 0;
+                  setNote(
+                    teamErrorMessage(error?.reason, error?.detail) +
+                      blockedTeamsText(error) +
+                      (blocked ? ' — 팀 탭에 그 팀이 없으면 「내 팀 다시 불러오기」를 눌러 주세요' : ''),
+                  );
                 } finally {
                   setBusy(false);
                 }
@@ -2421,6 +2429,31 @@ function TeamTab({ onToast }) {
           onToast={onToast}
         />
       )}
+
+      {/**
+        * 🔴 **내 팀 다시 불러오기** (2026-10-02 실확장 확인 중 발견). 팀 목록은 이 기기에만 있어서
+        *    확장을 다시 설치하거나 기기를 바꾸면 팀이 사라진 것처럼 보였고, 그 팀의 팀장이면 넘길
+        *    화면이 없어 **계정 삭제까지 막혔다.** 서버 명부에서 내 소속만 되살린다(초대 코드 없음).
+        */}
+      <button
+        type="button"
+        className="link-button"
+        onClick={async () => {
+          try {
+            const result = await restoreTeamsFromServer();
+            onToast(
+              result.restored > 0
+                ? `서버에서 팀 ${result.restored}개를 다시 불러왔어요`
+                : '새로 불러올 팀이 없어요 — 이 기기에 모두 있어요',
+            );
+            await reload();
+          } catch (error) {
+            onToast(teamErrorMessage(error?.reason, error?.detail));
+          }
+        }}
+      >
+        내 팀 다시 불러오기
+      </button>
     </>
   );
 }

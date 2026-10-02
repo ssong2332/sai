@@ -43,11 +43,22 @@ export const TEAM_ERRORS = {
 };
 
 export class TeamClientError extends Error {
-  constructor(reason, detail = '') {
+  constructor(reason, detail = '', blockedTeams = []) {
     super(`team:${reason}${detail ? ` (${detail})` : ''}`);
     this.reason = reason;
     this.detail = detail;
+    /** `owner-must-transfer`일 때 막고 있는 팀 `{teamId, name}` — 서버가 준 것만 (2026-10-02). */
+    this.blockedTeams = blockedTeams;
   }
+}
+
+/**
+ * 거절 안내에 붙일 팀 이름 — 「어느 팀인지」를 말해야 사용자가 넘길 수 있다 (2026-10-02).
+ * @returns {string} 예: ` (팀: 해커톤, 디자인)` — 없으면 빈 문자열.
+ */
+export function blockedTeamsText(error) {
+  const names = (error?.blockedTeams ?? []).map((team) => team.name || '이름 없는 팀');
+  return names.length > 0 ? ` (팀: ${names.join(', ')})` : '';
 }
 
 export function teamErrorMessage(reason, detail = '') {
@@ -157,6 +168,35 @@ export async function leaveTeamOnServer(teamId, { fetchImpl = globalThis.fetch }
 }
 
 /**
+ * **서버 명부 기준으로 내 팀 목록을 되살린다** (2026-10-02 실확장 확인 중 발견).
+ * 🔴 팀 목록은 이 기기에만 있어서, 확장을 다시 설치하거나 기기를 바꾸면 팀이 사라진 것처럼 보였다 —
+ *    그 팀의 팀장이면 넘길 화면도 없어 계정 삭제까지 막혔다.
+ * 🔴 **서버에 있는 팀은 서버 값으로 맞추고, 로컬에만 있는 팀은 지우지 않는다** — 네트워크·권한 문제로
+ *    응답이 비었을 때 목록을 날리면 사용자가 초대 코드 없이 팀을 잃는다.
+ * @returns {Promise<{restored: number, total: number}>} restored = 이 기기에 없던 팀 수.
+ */
+export async function restoreTeamsFromServer({ fetchImpl = globalThis.fetch } = {}) {
+  const result = await callTeamApi('myTeams', {}, fetchImpl);
+  const serverTeams = (result?.teams ?? []).filter((team) => typeof team?.teamId === 'string');
+  const local = await listTeams();
+  const localIds = new Set(local.map((team) => team.teamId));
+  const merged = [
+    ...local.map((team) => serverTeams.find((s) => s.teamId === team.teamId) ?? team),
+    ...serverTeams.filter((team) => !localIds.has(team.teamId)),
+  ].map((team) => ({
+    teamId: team.teamId,
+    name: team.name ?? '이름 없는 팀',
+    role: team.role === 'owner' ? 'owner' : 'member',
+    canViewDashboard: team.canViewDashboard === true,
+  }));
+  await setLocal(STORAGE_KEYS.TEAMS, merged);
+  if (!(await getLocal(STORAGE_KEYS.ACTIVE_TEAM, null)) && merged[0]) {
+    await setLocal(STORAGE_KEYS.ACTIVE_TEAM, merged[0].teamId);
+  }
+  return { restored: merged.length - local.length, total: merged.length };
+}
+
+/**
  * 계정과 서버 데이터를 지우고, **이 기기의 저장소도 전부 비운다** (L22-②, 2026-09-30).
  * 🔴 서버가 거절하면(팀장 이양 필요 등) 로컬은 건드리지 않는다.
  * @returns {Promise<{deleted: boolean, leftTeams: number, deletedTeams: number}>}
@@ -188,7 +228,8 @@ async function callTeamApi(action, body, fetchImpl) {
     const reason = Object.values(TEAM_ERRORS).includes(payload?.error)
       ? payload.error
       : TEAM_ERRORS.UNKNOWN;
-    throw new TeamClientError(reason, String(response.status));
+    const blockedTeams = Array.isArray(payload?.blockedTeams) ? payload.blockedTeams : [];
+    throw new TeamClientError(reason, String(response.status), blockedTeams);
   }
   return payload;
 }

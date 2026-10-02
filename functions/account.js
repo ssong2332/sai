@@ -25,6 +25,17 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { TeamError, requireUid } from './teams.js';
 
+/**
+ * 거절(409)에 **막고 있는 팀**을 싣는다 (2026-10-02 실확장 확인 중 발견).
+ * 🔴 내 팀 목록은 기기에만 있어서, 확장을 다시 설치하면 「팀장을 넘겨 주세요」라는데 **어느 팀인지
+ *    화면에 없었다** — 사용자가 계정을 영영 못 지운다. 팀 id·이름만 싣는다(초대 코드·팀원 정보 없음).
+ */
+function ownerMustTransfer(blocked) {
+  const error = new TeamError(409, 'owner-must-transfer');
+  error.extra = { blockedTeams: blocked.map(({ teamId, name }) => ({ teamId, name: name ?? null })) };
+  return error;
+}
+
 /** 한 배치에 넣는 삭제 수 — Firestore 배치 상한(500) 아래로 둔다. */
 const DELETE_BATCH = 400;
 
@@ -61,8 +72,9 @@ export async function leaveTeamOnServer(req, deps) {
   if (teamId === '') throw new TeamError(400, 'no-team');
 
   const store = deps.accountStore();
-  const kind = planLeave(await store.membership(teamId, uid));
-  if (kind === 'blocked') throw new TeamError(409, 'owner-must-transfer');
+  const membership = await store.membership(teamId, uid);
+  const kind = planLeave(membership);
+  if (kind === 'blocked') throw ownerMustTransfer([membership]);
   if (kind === 'delete-team') {
     await store.deleteTeam(teamId);
     return { teamId, left: true, teamDeleted: true };
@@ -81,8 +93,11 @@ export async function deleteAccount(req, deps) {
   if (req.body?.confirm !== 'DELETE') throw new TeamError(400, 'not-confirmed');
 
   const store = deps.accountStore();
-  const plan = planAccountDeletion(await store.memberships(uid));
-  if (plan.blocked.length > 0) throw new TeamError(409, 'owner-must-transfer');
+  const memberships = await store.memberships(uid);
+  const plan = planAccountDeletion(memberships);
+  if (plan.blocked.length > 0) {
+    throw ownerMustTransfer(memberships.filter((m) => plan.blocked.includes(m.teamId)));
+  }
 
   for (const teamId of plan.leaveTeams) await store.deleteMember(teamId, uid);
   for (const teamId of plan.deleteTeams) await store.deleteTeam(teamId);
@@ -90,6 +105,25 @@ export async function deleteAccount(req, deps) {
   await store.deleteAuthUser(uid); // 🔴 마지막 — 먼저 지우면 실패 시 재시도할 토큰이 없다.
 
   return { deleted: true, leftTeams: plan.leaveTeams.length, deletedTeams: plan.deleteTeams.length };
+}
+
+/**
+ * `teamV1` `action: "myTeams"` — **서버 명부 기준 내 소속 팀** (2026-10-02).
+ * 🔴 기기를 바꾸거나 확장을 다시 설치하면 로컬 팀 목록이 비어 팀 화면·팀장 이양·계정 삭제가 막혔다.
+ *    이걸로 목록을 되살린다. 🔴 초대 코드·팀원 명단은 싣지 않는다 — 내 소속·역할·이름뿐.
+ * @returns {Promise<{teams: Array<{teamId, name, role, canViewDashboard}>}>}
+ */
+export async function listMyTeams(req, deps) {
+  const uid = await requireUid(req, deps);
+  const memberships = await deps.accountStore().memberships(uid);
+  return {
+    teams: memberships.map((m) => ({
+      teamId: m.teamId,
+      name: m.name ?? null,
+      role: m.isOwner ? 'owner' : 'member',
+      canViewDashboard: m.isOwner || m.canViewDashboard === true,
+    })),
+  };
 }
 
 /**
@@ -109,7 +143,9 @@ export function accountStore(db = getFirestore(), auth = getAuth()) {
     ]);
     return {
       teamId,
+      name: team.exists ? (team.get('name') ?? null) : null,
       isOwner: memberSnap.get('role') === 'owner' || (team.exists && team.get('ownerUid') === uid),
+      canViewDashboard: memberSnap.get('canViewDashboard') === true,
       memberCount: members.size,
     };
   }
