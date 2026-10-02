@@ -21,6 +21,7 @@ import {
   getIdToken,
   getSession,
   signOut,
+  isUserCancelledAuth,
 } from '../src/lib/authClient.js';
 import { getLocal, setLocal, STORAGE_KEYS } from '../src/lib/storage.js';
 
@@ -156,4 +157,49 @@ test('모든 실패 사유에 사람이 읽을 문구가 있다', () => {
     assert.ok(message.length > 0, `${reason}에 문구가 없다`);
     assert.ok(!message.includes('undefined'));
   }
+});
+
+/* ── L26 — 사용자 취소는 확장 「오류」로 쌓지 않는다 (2026-10-02) ─────────────── */
+
+test('L26 판정표 — 사용자 취소·중복 창은 취소로, 그 밖은 실패로', () => {
+  assert.equal(isUserCancelledAuth('The user did not approve access.'), true);
+  assert.equal(isUserCancelledAuth('Only one web auth flow is allowed at a time.'), true);
+  assert.equal(isUserCancelledAuth('User closed the window'), true);
+  assert.equal(isUserCancelledAuth('Authorization page could not be loaded.'), false);
+  assert.equal(isUserCancelledAuth(undefined), false);
+});
+
+/** `launchWebAuthFlow`가 `lastError`를 남기고 실패하는 상황을 만든다. */
+async function signInFailingWith(message) {
+  const previousChrome = globalThis.chrome;
+  const previousWarn = console.warn;
+  const warned = [];
+  console.warn = (...args) => warned.push(args.join(' '));
+  globalThis.chrome = { ...(previousChrome ?? {}), runtime: { lastError: { message } } };
+  const identityImpl = {
+    getRedirectURL: () => 'https://example.chromiumapp.org/',
+    launchWebAuthFlow: (_options, callback) => callback(undefined),
+  };
+  let caught = null;
+  try {
+    await signIn({ identityImpl, fetchImpl: async () => ({ ok: false, json: async () => ({}) }) });
+  } catch (error) {
+    caught = error;
+  } finally {
+    console.warn = previousWarn;
+    globalThis.chrome = previousChrome;
+  }
+  return { caught, warned };
+}
+
+test('🔴 L26 사용자가 창을 닫으면 경고를 남기지 않는다 — 거절은 그대로 던진다', async () => {
+  const { caught, warned } = await signInFailingWith('The user did not approve access.');
+  assert.equal(caught?.reason, AUTH_ERRORS.CANCELLED);
+  assert.deepEqual(warned, []);
+});
+
+test('🔴 L26 진짜 실패는 여전히 경고로 남는다', async () => {
+  const { caught, warned } = await signInFailingWith('Authorization page could not be loaded.');
+  assert.equal(caught?.reason, AUTH_ERRORS.CANCELLED);
+  assert.equal(warned.length, 1);
 });
