@@ -285,3 +285,39 @@ test('🔴 계정 삭제가 거절되면 로컬을 하나도 지우지 않는다
   await assert.rejects(() => deleteAccount({ fetchImpl: respond(409, { error: 'owner-must-transfer' }) }));
   assert.ok('sai.snippets' in store && 'sai.auth' in store);
 });
+
+/* ── 2026-10-02 — 내 팀 다시 불러오기 · 막는 팀 이름 ─────────────────────── */
+
+import { restoreTeamsFromServer, blockedTeamsText } from '../src/lib/teamClient.js';
+
+test('🔴 서버 명부로 팀 목록을 되살린다 — 로컬에만 있는 팀은 지우지 않는다', async () => {
+  const store = installStorage({ 'sai.teams': [{ teamId: 'local-only', name: '로컬', role: 'member' }] });
+  signedIn(store);
+  const result = await restoreTeamsFromServer({
+    fetchImpl: respond(200, { teams: [{ teamId: 'h1', name: '해커톤', role: 'owner', canViewDashboard: true }] }),
+  });
+  assert.deepEqual(respond.lastBody, { action: 'myTeams' });
+  assert.deepEqual(result, { restored: 1, total: 2 });
+  assert.deepEqual((await listTeams()).map((t) => t.teamId).sort(), ['h1', 'local-only']);
+});
+
+test('서버 값이 로컬 스냅샷을 고친다 — 역할이 바뀌었으면 서버를 따른다', async () => {
+  const store = installStorage({ 'sai.teams': [{ teamId: 'h1', name: '옛이름', role: 'member' }], 'sai.teams.active': 'h1' });
+  signedIn(store);
+  await restoreTeamsFromServer({ fetchImpl: respond(200, { teams: [{ teamId: 'h1', name: '해커톤', role: 'owner', canViewDashboard: true }] }) });
+  assert.deepEqual(await listTeams(), [{ teamId: 'h1', name: '해커톤', role: 'owner', canViewDashboard: true }]);
+});
+
+test('🔴 거절 오류에 막는 팀 이름이 담기고, 안내 문구에 붙는다', async () => {
+  const store = installClearableStorage({ 'sai.teams': [] });
+  signedIn(store);
+  let caught = null;
+  try {
+    await deleteAccount({ fetchImpl: respond(409, { error: 'owner-must-transfer', blockedTeams: [{ teamId: 'h1', name: '해커톤' }] }) });
+  } catch (error) {
+    caught = error;
+  }
+  assert.equal(caught?.reason, TEAM_ERRORS.OWNER_MUST_TRANSFER);
+  assert.equal(blockedTeamsText(caught), ' (팀: 해커톤)');
+  assert.equal(blockedTeamsText(null), '');
+});

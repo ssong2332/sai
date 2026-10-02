@@ -209,8 +209,8 @@ test('어댑터 — 소속을 찾고 팀장 여부·인원을 판정한다', asy
   const store = accountStore(fakeAdminDb(SEED), { deleteUser: async () => {} });
   const found = (await store.memberships('u1')).sort((a, b) => a.teamId.localeCompare(b.teamId));
   assert.deepEqual(found, [
-    { teamId: 'mine', isOwner: true, memberCount: 1 },
-    { teamId: 'shared', isOwner: false, memberCount: 2 },
+    { teamId: 'mine', name: '내 팀', isOwner: true, canViewDashboard: false, memberCount: 1 },
+    { teamId: 'shared', name: '같이 쓰는 팀', isOwner: false, canViewDashboard: false, memberCount: 2 },
   ]);
 });
 
@@ -248,4 +248,47 @@ test('어댑터 — 다른 Auth 오류는 삼키지 않는다', async () => {
   const boom = Object.assign(new Error('x'), { code: 'auth/internal-error' });
   const store = accountStore(fakeAdminDb({}), { deleteUser: async () => { throw boom; } });
   await assert.rejects(() => store.deleteAuthUser('u1'));
+});
+
+/* ── 2026-10-02 — 막는 팀 알려 주기 · 내 팀 다시 불러오기 ─────────────────── */
+
+import { listMyTeams } from '../functions/account.js';
+
+test('🔴 계정 삭제 거절에 막고 있는 팀 id·이름이 실린다 — 어느 팀인지 알아야 넘길 수 있다', async () => {
+  const store = fakeStore([
+    { teamId: 'a', name: '팀A', isOwner: false, memberCount: 3 },
+    { teamId: 'c', name: '해커톤', isOwner: true, memberCount: 2 },
+  ]);
+  await assert.rejects(
+    () => deleteAccount(req({ confirm: 'DELETE' }), deps(store)),
+    (e) => e.status === 409 && JSON.stringify(e.extra) === JSON.stringify({ blockedTeams: [{ teamId: 'c', name: '해커톤' }] }),
+  );
+  assert.deepEqual(store.calls, []);
+});
+
+test('팀 나가기 거절에도 그 팀이 실린다', async () => {
+  const store = fakeStore([{ teamId: 't1', name: '테스트팀', isOwner: true, memberCount: 2 }]);
+  await assert.rejects(
+    () => leaveTeamOnServer(req({ teamId: 't1' }), deps(store)),
+    (e) => e.extra?.blockedTeams?.[0]?.name === '테스트팀',
+  );
+});
+
+test('🔴 myTeams — 내 소속·역할·이름만, 초대 코드·팀원 정보는 없다', async () => {
+  const store = accountStore(fakeAdminDb({ ...SEED, 'teams/mine': { ownerUid: 'u1', name: '내 팀', inviteCode: 'SECRET1' } }), {
+    deleteUser: async () => {},
+  });
+  const result = await listMyTeams(req({}), { verifyIdToken: async () => ({ uid: 'u1' }), accountStore: () => store });
+  const sorted = result.teams.sort((a, b) => a.teamId.localeCompare(b.teamId));
+  assert.deepEqual(sorted, [
+    { teamId: 'mine', name: '내 팀', role: 'owner', canViewDashboard: true },
+    { teamId: 'shared', name: '같이 쓰는 팀', role: 'member', canViewDashboard: false },
+  ]);
+  const text = JSON.stringify(result);
+  assert.equal(text.includes('SECRET1'), false, '초대 코드가 새어 나갔다');
+  assert.equal(text.includes('@'), false, '이메일이 새어 나갔다');
+});
+
+test('myTeams — 로그인하지 않으면 401', async () => {
+  await assert.rejects(() => listMyTeams(req({}, ''), deps(fakeStore([]))), (e) => e.status === 401);
 });

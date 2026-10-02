@@ -51,7 +51,7 @@ import { healthPayload } from './health.js';
 // L22-②③ — 팀 나가기·계정 삭제. 🔴 판정표는 account.js 헤더.
 // L20 — 베타 지표(날짜별 합계, 본문·uid 없음). 🔴 판정표는 betaMetrics.js 헤더.
 import { recordRequest, recordDailyUser, recordClientMetric } from './betaMetrics.js';
-import { leaveTeamOnServer, deleteAccount, accountStore } from './account.js';
+import { leaveTeamOnServer, deleteAccount, listMyTeams, accountStore } from './account.js';
 
 initializeApp();
 
@@ -383,7 +383,7 @@ export const refineV1 = onRequest(
  * 🔴 Zero Retention: 에러 로그에 요청 본문을 쓰지 않는다 — 액션 이름과 사유 코드만 남긴다.
  */
 /** L22 — `teamV1`의 계정 단위 동작. `TEAM_ACTIONS`(팀 단위)와 이름이 겹치지 않는다. L20 — `metric`(적용·되돌리기 합계). */
-const ACCOUNT_ACTIONS = { leave: leaveTeamOnServer, deleteAccount, metric: recordClientMetric };
+const ACCOUNT_ACTIONS = { leave: leaveTeamOnServer, deleteAccount, myTeams: listMyTeams, metric: recordClientMetric };
 
 export const teamV1 = onRequest(
   {
@@ -419,7 +419,8 @@ export const teamV1 = onRequest(
   } catch (error) {
     const status = error instanceof TeamError ? error.status : 500;
     console.error(`[team:${action}] 거절: ${error?.reason ?? error?.name ?? 'error'}`);
-    res.status(status).json({ error: error?.reason ?? 'failed' });
+    // 🔴 `extra`는 판정에 필요한 최소 정보뿐이다(예: 막고 있는 팀 id·이름) — 본문·초대 코드 없음.
+    res.status(status).json({ error: error?.reason ?? 'failed', ...(error?.extra ?? {}) });
   }
   },
 );
