@@ -34,7 +34,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { refine, MemoryCacheStore as RefineCacheStore } from './core/refine/index.js';
 // 🔴 폴오버 사슬은 `src/core/refine/failover.js` 한 곳에만 있다 — sync-core가 복사한다.
-import { remainingChain, sameStep, stepLabel } from './core/refine/failover.js';
+import { remainingChain, sameStep, shouldFailOver, stepLabel } from './core/refine/failover.js';
 import { decode, MemoryCacheStore as DecodeCacheStore } from './core/decode/index.js';
 import {
   summarizeDecisions,
@@ -138,7 +138,7 @@ function resolveProviderAndKey(requested) {
  * 🔴 **명시 요청은 넘기지 않는다.** `req.body.provider`를 적어 보낸 쪽은 그 모델의 출력을
  *    기준으로 판단하는 중이다 — 조용히 바꿔 답하면 **어느 모델의 출력인지 모르는 채 품질을
  *    논하게 된다**(위 판정표의 원칙과 같다). 미지정일 때만 넘긴다.
- * 🔴 **한도일 때만.** 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패하고, 조용한 이중
+ * 🔴 **한도·키 무효일 때만**(auth는 2026-10-12 L15 추가 — 401은 한도를 쓰지 않는다). 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패하고, 조용한 이중
  *    호출은 한도만 더 태운다.
  * 🔴 **사슬 끝까지.** 2026-08-20부터 한 번이 아니라 `FAILOVER_CHAIN`(2026-10-01 L03 순서: gemini →
  *    openai → openai/gpt-4.1)을 순서대로 내려간다. 근거는 **한도가 모델별로 따로**라는 실측이다 —
@@ -154,14 +154,14 @@ async function runWithFailover(mode, modeName, selected, body) {
   if (body?.provider) return result; // 명시 요청 — 대체하지 않는다
 
   for (const step of remainingChain(used)) {
-    // 🔴 여기서 매번 다시 본다 — 사슬 중간 단계가 quota 아닌 이유로 실패하면 거기서 멈춘다.
-    if (!result?.fallback || result.fallbackReason !== 'quota') break;
+    // 🔴 여기서 매번 다시 본다 — 사슬 중간 단계가 quota·auth 아닌 이유로 실패하면 거기서 멈춘다.
+    if (!shouldFailOver(result)) break;
 
     const creds = resolveProviderAndKey(step.provider);
     if (!creds) continue; // 그 provider의 키가 없다 — 건너뛴다(멈추지 않는다)
 
     const next = { ...creds, model: step.model ?? undefined };
-    console.log(`[${modeName}] ${stepLabel(used)} 한도 — ${stepLabel(step)}로 다시 시도합니다.`);
+    console.log(`[${modeName}] ${stepLabel(used)} ${result.fallbackReason} — ${stepLabel(step)}로 다시 시도합니다.`);
     result = await mode.run(next);
     used = { provider: step.provider, model: step.model ?? null };
   }

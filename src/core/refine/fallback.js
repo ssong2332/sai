@@ -15,6 +15,12 @@ export const FALLBACK_REASONS = {
   ERROR: 'error',
   /** 응답이 왔지만 계약(JSON 6필드)을 만족하지 못함. */
   INVALID: 'invalid',
+  /**
+   * 키 무효 — OpenAI 401 `invalid_api_key` · Gemini 400 `API_KEY_INVALID` (2026-10-12 L15 실측).
+   * 🔴 화면 문구는 ERROR와 같다(NOTICES에 없으면 ERROR로 내려간다) — 사용자가 할 수 있는 게 없다.
+   *    구분은 운영자용: 로그·지표에서 「일시 장애」와 「키 교체 필요」를 가른다.
+   */
+  AUTH: 'auth',
 };
 
 const NOTICES = {

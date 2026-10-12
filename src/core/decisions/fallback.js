@@ -12,6 +12,7 @@ export const DECISIONS_FALLBACK_REASONS = {
   QUOTA: 'quota',
   ERROR: 'error',
   INVALID: 'invalid',
+  AUTH: 'auth', // 키 무효(L15) — 문구는 ERROR로 내려간다
 };
 
 const NOTICES = {
