@@ -6,7 +6,7 @@
  * | 지표 | 어디서 세나 | 필드 |
  * |---|---|---|
  * | 요청 수(모드별) | `refineV1` 응답 직전 | `requests.{refine·decode·decisions·reply}` |
- * | 결과 | 같은 곳 | `outcome.ok` · `outcome.{quota·error·invalid}` · `outcome.rejected`(400) |
+ * | 결과 | 같은 곳 | `outcome.ok` · `outcome.{quota·error·invalid·auth}` · `outcome.rejected`(400) |
  * | 응답 시간 | 같은 곳 — 요청 수신~응답 | `latency.{le1000·le2000·le3000·le5000·le10000·gt10000}` |
  * | 일일 사용자 · 재방문 | 그날 첫 요청(`refineQuota` 카운트가 1) | `users.active` · `users.returning`(직전 7일에 사용 기록) |
  * | 적용 · 되돌리기 | 확장 → `teamV1` `metric` 동작 | `client.applied` · `client.undone` |
@@ -24,7 +24,7 @@ import { seoulDateKey } from './refineQuota.js';
 
 const COLLECTION = 'betaMetrics';
 const MODES = ['refine', 'decode', 'decisions', 'reply'];
-const FALLBACK_REASONS = ['quota', 'error', 'invalid'];
+const FALLBACK_REASONS = ['quota', 'error', 'invalid', 'auth']; // auth = 키 무효(L15, 2026-10-12)
 /** 응답 시간 구간 상한(ms). p95는 구간 누적으로 근사한다 — 원시 값을 남기지 않는다. */
 export const LATENCY_BUCKETS_MS = [1000, 2000, 3000, 5000, 10000];
 /** 재방문 판정 창 — 「주간 재사용」(Tasks L20). `refineQuota` 보존 기간(QUOTA_RETENTION_DAYS)이 이보다 길어야 한다. */

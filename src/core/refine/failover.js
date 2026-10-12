@@ -17,10 +17,20 @@
  *    결과가 나와야 캐시·시연 재현성이 성립한다).
  *
  * 🔴 **넘어가는 조건은 좁다** — `runWithFailover` 쪽 판정표를 그대로 지킨다:
- *      ① 사유가 `quota`일 때만 (네트워크·형식 오류는 두 번 불러도 같은 이유로 실패한다)
+ *      ① 사유가 `quota` 또는 `auth`일 때만 (네트워크·형식 오류는 두 번 불러도 같은 이유로 실패한다)
  *      ② 요청이 provider를 **명시하지 않았을 때만**
  *      ③ 표에 남은 단계까지만
+ *    `auth`(키 무효)는 2026-10-12 L15에서 추가(사용자 결정) — 키는 provider마다 따로라 다음 단계는
+ *    살아 있을 수 있고, 401·키 무효 400은 한도를 쓰지 않으므로 넘겨도 비용이 없다.
  */
+
+/** 다음 단계로 넘기는 사유. 🔴 두 서버가 이 함수만 본다 — 각자 문자열을 비교하지 않는다. */
+export const FAILOVER_REASONS = ['quota', 'auth'];
+
+/** 이 결과면 사슬의 다음 단계로 넘어가는가. 성공(`fallback` 아님)이면 넘기지 않는다. */
+export function shouldFailOver(result) {
+  return result?.fallback === true && FAILOVER_REASONS.includes(result.fallbackReason);
+}
 
 /**
  * 갈아탈 순서. **위에서부터** 쓴다.

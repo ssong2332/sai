@@ -31,7 +31,7 @@ import { reply, MemoryCacheStore as ReplyCacheStore } from '../src/core/reply/in
 // 🔴 폴오버 사슬은 `src/core/refine/failover.js` 한 곳에만 있다 — Functions도 같은 파일을 쓴다
 //    (sync-core가 복사한다). 두 서버에 표를 각각 적으면 어긋나고, 그 증상이
 //    「로컬에선 되는데 배포하면 다르다」로 나온다.
-import { remainingChain, sameStep, stepLabel } from '../src/core/refine/failover.js';
+import { remainingChain, sameStep, shouldFailOver, stepLabel } from '../src/core/refine/failover.js';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -221,7 +221,7 @@ const MODES = {
 const primaryCreds = { apiKey, provider: providerName };
 
 /**
- * 한도에 걸렸을 때만 사슬의 다음 단계로 넘어간다 (2026-08-19 ⓓ → 2026-08-20 사슬로 확장).
+ * 한도(quota)·키 무효(auth)일 때만 사슬의 다음 단계로 넘어간다 (2026-08-19 ⓓ → 08-20 사슬 → 10-12 L15 auth 추가).
  *
  * 🔴 **코어를 고치지 않았다.** 네 모드의 `refine/decode/decisions/reply`는 실패를 던지지 않고
  *    `{fallback: true, fallbackReason}` 응답으로 흡수한다 — 그 «결과»만 보고 판단하면
@@ -241,13 +241,13 @@ async function runWithFailover(mode, request) {
   let result = await mode.run(request, primaryCreds);
 
   for (const step of remainingChain(used)) {
-    // 🔴 매 단계마다 다시 본다 — 중간 단계가 quota 아닌 이유로 실패하면 거기서 멈춘다.
-    if (!result?.fallback || result.fallbackReason !== 'quota') break;
+    // 🔴 매 단계마다 다시 본다 — 중간 단계가 quota·auth 아닌 이유로 실패하면 거기서 멈춘다.
+    if (!shouldFailOver(result)) break;
 
     const creds = keyFor(step.provider);
     if (!creds) continue; // 그 provider의 키가 없다 — 건너뛴다(멈추지 않는다)
 
-    console.log(`[${mode.name}] ${stepLabel(used)} 한도 — ${stepLabel(step)}로 다시 시도합니다.`);
+    console.log(`[${mode.name}] ${stepLabel(used)} ${result.fallbackReason} — ${stepLabel(step)}로 다시 시도합니다.`);
     result = await mode.run(request, { ...creds, model: step.model ?? undefined });
     used = { provider: step.provider, model: step.model ?? null };
   }
@@ -344,7 +344,7 @@ server.listen(port, '127.0.0.1', () => {
       .filter((step) => keyFor(step.provider))
       .map(stepLabel),
   ];
-  console.log(`  폴오버 사슬=${chain.join(' → ')} (한도일 때만 다음으로 넘어감)`);
+  console.log(`  폴오버 사슬=${chain.join(' → ')} (한도·키 무효일 때만 다음으로 넘어감)`);
   console.log(`  캐시 수명=${(cacheTtlMs ?? 10 * 60 * 1000) / 60000}분`);
   console.log(`  POST /v1/refine · GET /health`);
   console.log('  🔴 localhost 전용 — 인증이 없으므로 외부에 노출하지 마세요.');

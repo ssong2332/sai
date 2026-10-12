@@ -89,14 +89,18 @@ export async function callGemini(
 
   if (!response.ok) {
     let errorCode;
+    let detailReason;
     try {
       const body = await response.json();
       errorCode = body?.error?.status ?? body?.error?.code;
+      // 🔴 키 무효는 400 INVALID_ARGUMENT로 오고 상세 사유에만 `API_KEY_INVALID`가 있다(2026-10-12 실측).
+      const details = Array.isArray(body?.error?.details) ? body.error.details : [];
+      detailReason = details.find((d) => typeof d?.reason === 'string')?.reason;
     } catch {
       errorCode = undefined;
     }
     throw new RefineCallError(
-      classifyHttpFailure(response.status, errorCode),
+      classifyHttpFailure(response.status, errorCode, detailReason),
       `http ${response.status}`,
     );
   }
