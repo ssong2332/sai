@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { detectLanguage, DETECTABLE_LANGUAGES } from '../src/lib/detectLanguage.js';
+import { detectLanguage, DETECTABLE_LANGUAGES, minSelectionLength } from '../src/lib/detectLanguage.js';
 
 test('한글이 있으면 ko', () => {
   assert.equal(detectLanguage('배포 계획을 확인해 주세요'), 'ko');
@@ -53,4 +53,29 @@ test('🔴 판정 결과는 항상 지원 목록 안에 있다', () => {
       `목록 밖 값이 나왔다: ${detectLanguage(sample)}`,
     );
   }
+});
+
+/* ── 최소 선택 길이 (2026-10-14 A안) ─────────────────────────────────────── */
+
+test('🔴 짧은 중국어도 버튼이 뜬다 — 「我星系」(3자)가 5자 기준에 걸려 조용히 무시되던 문제', () => {
+  const text = '我星系';
+  assert.ok(text.length >= minSelectionLength(text), '3자 중국어가 기준 미달');
+});
+
+test('최소 선택 길이 판정표 — 한자·가나 2, 그 밖 5', () => {
+  const rows = [
+    ['发布', 2], //    중국어 2자 → 통과 기준 2
+    ['確認', 2], //    가나 없는 일본어 한자 → zh로 판정되지만 기준은 같다
+    ['はい', 2], //    가나 → ja
+    ['fixed', 5], //   영어 단어 하나 → 기존 값 유지
+    ['확인해요', 5], // 한국어 → 기존 값 유지
+    ['배포 發布', 5], // 🔴 한글이 섞이면 ko — 한자 섞인 한국어를 2로 낮추지 않는다
+  ];
+  for (const [text, expected] of rows) {
+    assert.equal(minSelectionLength(text), expected, text);
+  }
+});
+
+test('한 글자 한자는 여전히 무시한다 — 단어 하나 집을 때마다 버튼이 뜨지 않게', () => {
+  assert.ok('我'.length < minSelectionLength('我'));
 });

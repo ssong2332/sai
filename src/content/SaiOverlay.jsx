@@ -44,6 +44,8 @@ import {
 } from '../lib/recipients.js';
 // 🔴 로컬 저장소만 읽는다(네트워크 없음) — 팝업이 뜨는 순간 팀 목록을 기다리게 하지 않는다.
 import { listTeams, getTeam } from '../lib/teamClient.js';
+// 🔴 최소 선택 길이는 문자 종류별이다 — 한자·가나 2자, 그 밖 5자(`detectLanguage.js` 판정표).
+import { minSelectionLength, MIN_SELECTION_LENGTH, MIN_SELECTION_LENGTH_CJK } from '../lib/detectLanguage.js';
 
 /**
  * 드래그 선택 → 플로팅 버튼 → 교정 팝업 (S05).
@@ -52,9 +54,6 @@ import { listTeams, getTeam } from '../lib/teamClient.js';
  *    호스트 페이지의 스크롤 컨테이너·transform에 끌려다니지 않는다.
  * 🔴 Zero Retention (Spec 필수 5): 선택한 원문을 `console`이나 storage에 쓰지 않는다.
  */
-
-/** 너무 짧은 선택은 무시한다 — 단어 하나를 집을 때마다 버튼이 뜨면 방해만 된다. */
-const MIN_SELECTION_LENGTH = 5;
 
 const BUTTON_SIZE = 42; // .sai-fab 실제 크기와 맞춘다(클램프 계산용)
 /** 플로팅 버튼의 실제 너비(로고 + 액션 버튼들) — 오른쪽 잘림 방지용 clamp에 쓴다.
@@ -383,7 +382,7 @@ export default function SaiOverlay() {
 
       const picked = readSelection();
 
-      if (!picked || picked.text.length < MIN_SELECTION_LENGTH) {
+      if (!picked || picked.text.length < minSelectionLength(picked.text)) {
         // 🔴 선택이 없어도 **입력창에 커서가 있으면** 저장 문구를 꺼내 쓸 수 있게 버튼을 띄운다
         //    (2026-08-13 사용자 요청). 단 저장된 문구가 하나도 없으면 띄우지 않는다 — 모든
         //    사이트의 모든 입력창에서 쓸모없는 버튼이 뜨는 건 방해일 뿐이다.
@@ -1183,7 +1182,9 @@ export default function SaiOverlay() {
     if (!selectedText) {
       // 🔴 페이지 하단 토스트는 호스트 페이지 배경에 묻혀 잘 안 보였다(2026-08-13 실측).
       //    버튼 옆에 붙여 **시선이 있는 자리**에서 알린다.
-      setFabHint(`다듬을 문장을 드래그해 주세요 (${MIN_SELECTION_LENGTH}자 이상)`);
+      setFabHint(
+        `다듬을 문장을 드래그해 주세요 (${MIN_SELECTION_LENGTH}자 이상 · 중국어·일본어 ${MIN_SELECTION_LENGTH_CJK}자 이상)`,
+      );
       return;
     }
 
