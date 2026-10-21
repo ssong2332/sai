@@ -40,8 +40,22 @@ export function resolveProvider(name = SPEC_PROVIDER) {
   return provider;
 }
 
-/** HTTP 상태·오류 코드 → 폴백 사유 판정표. provider 공통. */
-export function classifyHttpFailure(status, errorCode) {
+/**
+ * HTTP 상태·오류 코드 → 폴백 사유 판정표. provider 공통.
+ *
+ * | 조건 | 사유 | 근거 |
+ * |---|---|---|
+ * | 429 · `insufficient_quota` · `rate_limit_exceeded` · `RESOURCE_EXHAUSTED` | quota | 2026-08-13·08-17 실측 |
+ * | 401 · `invalid_api_key` | auth | OpenAI 가짜 키 실측(2026-10-12 L15) |
+ * | 상세 사유 `API_KEY_INVALID` | auth | Gemini 가짜 키 실측 — **400** `INVALID_ARGUMENT`로 온다(2026-10-12) |
+ * | 403 | auth | 🔴 추정(미실측) — 키 정지·API 미사용 설정. 어느 쪽이든 키·콘솔을 손봐야 한다 |
+ * | 그 밖 | error | 400 `INVALID_ARGUMENT`만으로는 auth가 아니다 — 요청 형식 문제일 수 있다 |
+ *
+ * @param {number} status
+ * @param {string} [errorCode] provider의 오류 코드(OpenAI `code`·`type`, Gemini `status`).
+ * @param {string} [detailReason] Gemini `error.details[].reason`.
+ */
+export function classifyHttpFailure(status, errorCode, detailReason) {
   if (
     status === 429 ||
     errorCode === 'insufficient_quota' ||
@@ -49,6 +63,14 @@ export function classifyHttpFailure(status, errorCode) {
     errorCode === 'RESOURCE_EXHAUSTED'
   ) {
     return FALLBACK_REASONS.QUOTA;
+  }
+  if (
+    status === 401 ||
+    status === 403 ||
+    errorCode === 'invalid_api_key' ||
+    detailReason === 'API_KEY_INVALID'
+  ) {
+    return FALLBACK_REASONS.AUTH;
   }
   return FALLBACK_REASONS.ERROR;
 }

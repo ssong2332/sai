@@ -352,6 +352,57 @@ test('gemini 429(RESOURCE_EXHAUSTED)는 quota 폴백으로 분류된다', async 
   assert.equal(result.fallbackReason, FALLBACK_REASONS.QUOTA);
 });
 
+/* ── L15 키 무효 (2026-10-12) — 응답 본문은 가짜 키로 실호출한 실측 모양 그대로 ─────────── */
+
+/** 실패 응답 본문을 그대로 돌려주는 fetch 스텁. */
+function stubErrorBody(status, errorBody) {
+  return async () => ({ ok: false, status, json: async () => errorBody });
+}
+
+const GEMINI_KEY_INVALID = {
+  error: {
+    code: 400,
+    message: 'API key not valid. Please pass a valid API key.',
+    status: 'INVALID_ARGUMENT',
+    details: [
+      { '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'API_KEY_INVALID', domain: 'googleapis.com' },
+    ],
+  },
+};
+
+test('🔴 gemini 키 무효(400 + API_KEY_INVALID)는 auth로 분류된다 — 일시 장애(error)와 섞이지 않는다', async () => {
+  const fetchImpl = stubErrorBody(400, GEMINI_KEY_INVALID);
+  const result = await refine(BASE_REQUEST, { apiKey: 'k', provider: 'gemini', cache: new MemoryCacheStore(), fetchImpl });
+
+  assert.equal(result.fallback, true);
+  assert.equal(result.fallbackReason, FALLBACK_REASONS.AUTH);
+  // 화면 문구는 ERROR와 같다 — 사용자가 할 수 있는 게 없다.
+  assert.match(result.fallbackNotice, /AI 서버에 연결하지 못해/);
+});
+
+test('🔴 gemini 400 INVALID_ARGUMENT만으로는 auth가 아니다 — 요청 형식 문제일 수 있다', async () => {
+  const fetchImpl = stubErrorBody(400, { error: { code: 400, status: 'INVALID_ARGUMENT', details: [] } });
+  const result = await refine(BASE_REQUEST, { apiKey: 'k', provider: 'gemini', cache: new MemoryCacheStore(), fetchImpl });
+
+  assert.equal(result.fallbackReason, FALLBACK_REASONS.ERROR);
+});
+
+test('🔴 openai 401 invalid_api_key는 auth로 분류된다', async () => {
+  const fetchImpl = stubErrorBody(401, {
+    error: { message: 'Incorrect API key provided', type: 'invalid_request_error', code: 'invalid_api_key', param: null },
+  });
+  const result = await refine(BASE_REQUEST, deps(fetchImpl));
+
+  assert.equal(result.fallback, true);
+  assert.equal(result.fallbackReason, FALLBACK_REASONS.AUTH);
+});
+
+test('키가 아예 없으면 auth가 아니라 error다 — 배포 설정 누락은 키 교체와 다른 일이다', async () => {
+  const result = await refine(BASE_REQUEST, { ...deps(stubFetch(goodRaw())), apiKey: '' });
+
+  assert.equal(result.fallbackReason, FALLBACK_REASONS.ERROR);
+});
+
 test('gemini 안전필터 차단은 invalid 폴백으로 분류된다 — 빈 결과로 오인하지 않는다', async () => {
   const fetchImpl = stubGeminiFetch(null, { body: { promptFeedback: { blockReason: 'SAFETY' }, candidates: [] } });
   const result = await refine(BASE_REQUEST, { apiKey: 'k', provider: 'gemini', cache: new MemoryCacheStore(), fetchImpl });

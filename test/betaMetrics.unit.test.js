@@ -72,6 +72,11 @@ test('요청 결과 판정표 — 성공·폴백 사유·거절', () => {
     requestFieldPaths({ mode: 'decode', fallback: true, fallbackReason: 'quota', latencyMs: 500 }),
     ['requests.decode', 'outcome.quota', 'latency.le1000'],
   );
+  // 키 무효는 일시 장애(error)와 따로 센다 — L15
+  assert.deepEqual(
+    requestFieldPaths({ mode: 'refine', fallback: true, fallbackReason: 'auth', latencyMs: 500 }),
+    ['requests.refine', 'outcome.auth', 'latency.le1000'],
+  );
   assert.deepEqual(requestFieldPaths({ mode: 'reply', rejected: true, latencyMs: 20000 }), [
     'requests.reply',
     'outcome.rejected',

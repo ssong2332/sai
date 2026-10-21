@@ -16,13 +16,15 @@ function shouldFailover({ explicitProvider, fallback, fallbackReason, hasBackup 
   if (explicitProvider) return false;
   if (!hasBackup) return false;
   if (!fallback) return false;
-  return fallbackReason === 'quota';
+  return fallbackReason === 'quota' || fallbackReason === 'auth';
 }
 
 test('🔴 폴오버 판정표 — 표에 없는 경우를 임의로 처리하지 않는다', () => {
   const rows = [
     // [명시 provider, fallback, 사유, 예비 있음] → 넘기는가
     [false, true, 'quota', true, true], //  한도 + 예비 있음 → 넘긴다
+    [false, true, 'auth', true, true], //   키 무효 + 예비 있음 → 넘긴다 (L15, 2026-10-12 — 키는 provider마다 따로)
+    [true, true, 'auth', true, false], //   키 무효라도 명시 요청이면 바꾸지 않는다
     [false, true, 'error', true, false], // 네트워크 오류 → 두 번 불러도 같다
     [false, true, 'invalid', true, false], // 형식 오류 → 같은 이유로 또 실패한다
     [false, false, null, true, false], //   성공 → 부를 이유가 없다
@@ -38,11 +40,25 @@ test('🔴 폴오버 판정표 — 표에 없는 경우를 임의로 처리하�
   }
 });
 
-test('🔴 네 코어가 모두 같은 사유 문자열 `quota`를 쓴다 — 하나라도 다르면 폴오버가 조용히 죽는다', () => {
+test('🔴 네 코어가 모두 같은 사유 문자열 `quota`·`auth`를 쓴다 — 하나라도 다르면 폴오버가 조용히 죽는다', () => {
   for (const core of ['refine', 'decode', 'decisions', 'reply']) {
     const source = readFileSync(new URL(`../src/core/${core}/fallback.js`, import.meta.url), 'utf8');
     assert.match(source, /QUOTA:\s*'quota'/, `${core}의 QUOTA 값이 다르다`);
+    assert.match(source, /AUTH:\s*'auth'/, `${core}의 AUTH 값이 다르다`);
   }
+});
+
+test('🔴 실제 판정 함수 `shouldFailOver`가 위 표와 같다', async () => {
+  const { shouldFailOver } = await import('../src/core/refine/failover.js');
+  for (const reason of ['quota', 'auth', 'error', 'invalid', undefined]) {
+    assert.equal(
+      shouldFailOver({ fallback: true, fallbackReason: reason }),
+      shouldFailover({ explicitProvider: false, fallback: true, fallbackReason: reason, hasBackup: true }),
+      `사유 ${reason}`,
+    );
+  }
+  assert.equal(shouldFailOver({ fallback: false, fallbackReason: 'quota' }), false, '성공인데 넘긴다');
+  assert.equal(shouldFailOver(null), false);
 });
 
 test('🔴 두 서버가 모두 폴오버를 갖고 있다 — 한쪽만 고치면 "로컬에선 되는데 배포하면 다르다"', () => {
@@ -50,7 +66,9 @@ test('🔴 두 서버가 모두 폴오버를 갖고 있다 — 한쪽만 고치�
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.match(source, /runWithFailover/, `${file}에 폴오버가 없다`);
     assert.match(source, /providerUsed/, `${file}이 어느 provider가 답했는지 남기지 않는다`);
-    assert.match(source, /fallbackReason !== 'quota'/, `${file}이 한도 이외에도 넘긴다`);
+    // 🔴 사유 비교는 `failover.js`의 `shouldFailOver` 한 곳에서만 — 서버가 문자열을 각자 비교하면 어긋난다.
+    assert.match(source, /if \(!shouldFailOver\(result\)\) break;/, `${file}이 공용 판정을 쓰지 않는다`);
+    assert.doesNotMatch(source, /fallbackReason !== '/, `${file}이 사유를 직접 비교한다`);
   }
 });
 
