@@ -53,3 +53,25 @@ export function detectLanguage(text) {
   if (HAN.test(value)) return 'zh';
   return 'en';
 }
+
+/**
+ * 버튼을 띄울 최소 선택 길이 (2026-10-14 사용자 결정 A안).
+ *
+ * 🔴 **왜 언어마다 다른가.** 원래는 모든 언어에 5자였다. 영어 5자는 단어 하나(`fixed`)지만
+ *    중국어 5자는 짧은 문장(`我们明天发布`)이라 같은 숫자가 중국어에 훨씬 엄격했다 —
+ *    「我星系」(3자)를 선택하면 버튼이 **아무 안내 없이** 안 떠서 「중국어는 안 된다」로 보였다.
+ *
+ * | 판정(`detectLanguage`) | 최소 | 근거 |
+ * |---|---|---|
+ * | `zh` · `ja` | 2 | 한자·가나는 한 글자에 뜻이 많다. 1자는 단어 하나를 집는 경우라 여전히 무시 |
+ * | 그 밖 (`ko` · `en`) | 5 | 기존 값 유지 — 단어 하나를 집을 때마다 버튼이 뜨면 방해만 된다 |
+ *
+ * 🔴 한글이 섞이면 `ko`라 5자다(한자 섞인 한국어 문장을 2자로 낮추지 않는다).
+ */
+export const MIN_SELECTION_LENGTH = 5;
+export const MIN_SELECTION_LENGTH_CJK = 2;
+
+export function minSelectionLength(text) {
+  const language = detectLanguage(text);
+  return language === 'zh' || language === 'ja' ? MIN_SELECTION_LENGTH_CJK : MIN_SELECTION_LENGTH;
+}

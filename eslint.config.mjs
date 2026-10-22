@@ -34,6 +34,8 @@ export default [
       'functions/node_modules/**',
       'dashboard/dist/**',
       'sai-extension-*/**',
+      // 🔴 Claude Code 워크트리(2026-10-14) — 다른 작업 사본의 빌드 산출물까지 검사해 `npm test`가 실패했다.
+      '.claude/**',
     ],
   },
   {
