@@ -1300,9 +1300,11 @@ export default function RefinePopup({
             </div>
           )}
 
-          {/* 🔴 빈칸 경고와 같은 자리·같은 무게 — 둘 다 「이대로 보내면 안 되는 것」이다. */}
+          {/* 🔴 빈칸 경고와 같은 자리·같은 무게 — 둘 다 「이대로 보내면 안 되는 것」이다.
+              D5(2026-10-23 실확장): `sai-blank`만으로는 상자 스타일이 없어 팝업 왼쪽 끝에 붙어 나왔다 —
+              아래 경고 전부 빈칸 경고처럼 `sai-missing`을 함께 단다. */}
           {nameDrift.length > 0 && (
-            <div className="sai-blank" role="status">
+            <div className="sai-missing sai-blank" role="status">
               <span className="sai-missing-head sai-blank-head">이름 표기를 확인해 주세요</span>
               <p className="sai-blank-text">{nameWarningText(nameDrift)}</p>
             </div>
@@ -1310,7 +1312,7 @@ export default function RefinePopup({
 
           {/* L31 — 이름 경고와 같은 자리·같은 무게. 🔴 막지 않는다(「적용하기」는 그대로 눌린다). */}
           {numberDrift.length > 0 && (
-            <div className="sai-blank" role="status">
+            <div className="sai-missing sai-blank" role="status">
               <span className="sai-missing-head sai-blank-head">
                 숫자 확인 필요 — {numberDrift.join(' · ')}
               </span>
@@ -1320,7 +1322,7 @@ export default function RefinePopup({
 
           {/* L28 안전망 A — 숫자 경고와 같은 자리·같은 무게. 🔴 고쳐 쓰지 않고 알리기만 한다. */}
           {glossaryCheck.missing.length > 0 && (
-            <div className="sai-blank" role="status">
+            <div className="sai-missing sai-blank" role="status">
               <span className="sai-missing-head sai-blank-head">
                 용어집 확인 필요 — {glossaryCheck.missing.join(' · ')}
               </span>
@@ -1330,7 +1332,7 @@ export default function RefinePopup({
 
           {/* L28 안전망 B — 같은 자리·같은 무게. 역번역이 접혀 있어도 보이게 토글 밖에 둔다. */}
           {intentDrift.map((kind) => (
-            <div key={kind} className="sai-blank" role="status">
+            <div key={kind} className="sai-missing sai-blank" role="status">
               <span className="sai-missing-head sai-blank-head">누가 할 일인지 확인 필요</span>
               <p className="sai-blank-text">{intentDriftWarningText(kind)}</p>
             </div>
