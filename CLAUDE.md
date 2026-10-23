@@ -47,6 +47,7 @@
 > 🔴 **`.env`는 git 워크트리마다 따로 있다** (untracked 파일은 공유되지 않는다). 워크트리에서
 > 작업하면 그 워크트리 루트에 `.env`가 있어야 `npm run proxy`·vite가 값을 읽는다.
 | `/v1/refine` 실 API 20건 | `npm run test:refine:live` (키 필요, 없으면 exit 2) | 미실행 |
+| `/v1/refine` 실 API 20건 — Claude(시험) | `ANTHROPIC_API_KEY=... node scripts/refine-live.js --provider anthropic` → 21/21 통과·폴백 0 (응답 2.6~10.0초) | 2026-10-23 |
 
 > 🔴 **2026-10-01 L03 — 기본 provider는 Gemini다** — 로컬 프록시·회귀 러너·배포본 셋 다 `GEMINI_API_KEY`가
 > 있으면 gemini, 없을 때만 openai(`--provider openai`로 명시 가능). 폴오버 사슬은 gemini → openai → openai/gpt-4.1.

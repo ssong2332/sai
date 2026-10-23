@@ -24,11 +24,21 @@ const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
  * @param {number} [deps.timeoutMs]
  * @param {typeof fetch} [deps.fetchImpl] 테스트에서 주입.
  * @param {object} deps.errors `providers/index.js`가 넘기는 { RefineCallError, classifyHttpFailure, parseJsonContent }.
+ * @param {string} [deps.endpoint] OpenAI 호환 엔드포인트(2026-10-23 — Groq 시험용). 생략하면 OpenAI.
+ * @param {object} [deps.extraBody] 그 엔드포인트에만 필요한 추가 필드. 생략하면 없음.
  * @returns {Promise<object>} 파싱된 LLM JSON (검증은 schema.js가 한다).
  */
 export async function callOpenAI(
   payload,
-  { apiKey, model = DEFAULT_OPENAI_MODEL, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch, errors },
+  {
+    apiKey,
+    model = DEFAULT_OPENAI_MODEL,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    fetchImpl = fetch,
+    errors,
+    endpoint = ENDPOINT,
+    extraBody = {},
+  },
 ) {
   const { RefineCallError, classifyHttpFailure, parseJsonContent } = errors;
 
@@ -39,7 +49,7 @@ export async function callOpenAI(
 
   let response;
   try {
-    response = await fetchImpl(ENDPOINT, {
+    response = await fetchImpl(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,6 +61,7 @@ export async function callOpenAI(
         temperature: 0,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: JSON.stringify(payload) }],
+        ...extraBody,
       }),
       signal: controller.signal,
     });

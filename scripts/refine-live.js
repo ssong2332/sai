@@ -5,7 +5,10 @@
  * 사용:
  *   GEMINI_API_KEY=... node scripts/refine-live.js                 # 기본 (Spec §0 기준 경로)
  *   OPENAI_API_KEY=... node scripts/refine-live.js --provider openai   # 대체 provider
- *   [--bypass-cache] [--model <이름>]
+ *   [--bypass-cache] [--model <이름>] [--delay <ms>]
+ *
+ * 🔴 `--delay <ms>`: 건 사이 대기(2026-10-23 추가). Gemini 무료 티어·OpenAI TPM처럼 **분당 한도**가 있는
+ *    provider는 연달아 부르면 중간부터 429가 난다(CLAUDE.md — 건당 15초 간격 권장).
  *
  * 🔴 provider 기본값 — **Gemini를 먼저 본다**(2026-10-01 L03 변경. 2026-08-17~09-30에는 OpenAI가 먼저였다).
  *    `functions/index.js`의 판정표·`server/refine-proxy.js`와 **같은 순서**여야 한다.
@@ -27,6 +30,8 @@ const flag = (name) => {
 
 const bypassCache = args.includes('--bypass-cache');
 const model = flag('--model');
+const delayMs = Number(flag('--delay') ?? 0);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // 🔴 2026-10-01 L03 — gemini 먼저(배포본·프록시와 같은 순서, `test/providerDefaults.unit.test.js`).
 const providerName =
   flag('--provider') ?? (process.env.GEMINI_API_KEY ? 'gemini' : 'openai');
@@ -49,12 +54,15 @@ const rows = [];
 let passed = 0;
 let fellBack = 0;
 
+let calls = 0;
 for (const testCase of REFINE_CASES) {
   if (testCase.skip) {
     rows.push({ id: testCase.id, field: testCase.field, result: '제외', detail: testCase.skipReason ?? '' });
     continue;
   }
 
+  if (delayMs > 0 && calls > 0) await sleep(delayMs);
+  calls += 1;
   const startedAt = Date.now();
   let result;
   try {
