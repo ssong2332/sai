@@ -24,8 +24,13 @@ import { occursIn } from '../refine/reasoning.js';
 /** `[날짜]`, `[the specific section]` — 줄바꿈 없는 40자 이내만 자리표시자로 본다. */
 const PLACEHOLDER_PATTERN = /\[([^[\]\n]{1,40})\]/g;
 
-/** 숫자 덩어리 — `2`, `14:00`, `8/21`, `3.5`, `482`. */
-const NUMBER_PATTERN = /\d+(?:[.,:/-]\d+)*/g;
+/**
+ * 숫자 덩어리 — `2`, `14:00`, `8/21`, `3.5`, `482`.
+ * 🔴 L31 — 이 파일의 숫자 토큰 규칙(`NUMBER_PATTERN`·`NUMBER_WORDS`·`occursAsWord`·월 묶음)을
+ *    `core/refine/numberCheck.js`가 **그대로 가져다 쓴다**(내보내기만 추가, 동작 무변경). 두 검사가
+ *    숫자를 다르게 자르면 회신 초안에선 통과한 값이 다듬기에선 「확인 필요」로 뜬다.
+ */
+export const NUMBER_PATTERN = /\d+(?:[.,:/-]\d+)*/g;
 
 /**
  * 요일·월 이름. 숫자가 없는 구체 약속("Monday에 드릴게요")도 같은 사고를 낸다.
@@ -36,7 +41,7 @@ const NUMBER_PATTERN = /\d+(?:[.,:/-]\d+)*/g;
  *    "Tuesday"와 대조되지 않아 **멀쩡한 인용이 매번 「확인 필요」로 오탐**한다. 같은 요일은
  *    한 묶음으로 보고, 묶음 안의 어느 표기든 원문·답변에 있으면 통과시킨다.
  */
-const NAMED_TIME_GROUPS = [
+export const NAMED_TIME_GROUPS = [
   ['monday', 'mon', '월요일', '周一'],
   ['tuesday', 'tue', '화요일', '周二'],
   ['wednesday', 'wed', '수요일', '周三'],
@@ -90,7 +95,7 @@ function trimTrailingDigits(part) {
  *    경계 판정으로도 못 가른다. 관측된 실패(영어 원문 → 한국어 초안)를 덮으면 충분하고,
  *    반대 방향은 애초에 경고를 만들지 않는다(초안의 단어 표기는 숫자로 추출되지 않는다).
  */
-const NUMBER_WORDS = [
+export const NUMBER_WORDS = [
   ['0', 'zero'],
   ['1', 'one'],
   ['2', 'two'],
@@ -115,7 +120,7 @@ function isLatinWordChar(ch) {
  * `word`가 `text` 안에 **낱말로** 있는가. 🔴 `includes`로는 안 된다 — "phone"이 `one`을,
  * "tenant"가 `ten`을 검증된 값으로 만들어 지어낸 숫자를 조용히 통과시킨다.
  */
-function occursAsWord(word, text) {
+export function occursAsWord(word, text) {
   const hay = String(text ?? '').toLowerCase();
   const needle = word.toLowerCase();
   if (needle === '') return false;

@@ -5,6 +5,8 @@ import { tagLabel, PERSONAL_TEAM_ID } from '../lib/recipients.js';
 // 🔴 데이터만 가져온다(배열 하나) — 사이드패널의 RegionPicker를 콘텐츠 스크립트로 끌어오지 않는다.
 import { REGIONS } from '../lib/regions.js';
 import { checkNamesPreserved, nameWarningText } from '../core/refine/names.js';
+// L31 — 원문 숫자가 교정문에서 빠졌는지(모델 무관, 코드 대조).
+import { checkNumbersPreserved, numberWarningText } from '../core/refine/numberCheck.js';
 import {
   checkBackTranslation,
   backFailMessage,
@@ -361,6 +363,17 @@ export default function RefinePopup({
         names: recipient?.name ? [recipient.name] : [],
       }).dropped,
     [sourceText, result?.refined, recipient?.name],
+  );
+
+  /**
+   * 🔴 **L31 — 숫자가 빠졌는지 코드가 확인한다** (`core/refine/numberCheck.js`).
+   *    실측: 「200ms에서 3초로」가 영어 교정문에서 `200ms` 없이 나왔다(L30 회귀 P-04·D-05).
+   *    이름 검사와 같은 원칙 — **고쳐 쓰지 않고 알리기만 한다.** 폴백 결과는 검사하지 않는다
+   *    (교정문이 원문 그대로라 대조할 것이 없다 — `checkNumbersPreserved` 참고).
+   */
+  const numberDrift = useMemo(
+    () => checkNumbersPreserved(result, sourceText),
+    [result, sourceText],
   );
 
   /**
@@ -1270,6 +1283,16 @@ export default function RefinePopup({
             <div className="sai-blank" role="status">
               <span className="sai-missing-head sai-blank-head">이름 표기를 확인해 주세요</span>
               <p className="sai-blank-text">{nameWarningText(nameDrift)}</p>
+            </div>
+          )}
+
+          {/* L31 — 이름 경고와 같은 자리·같은 무게. 🔴 막지 않는다(「적용하기」는 그대로 눌린다). */}
+          {numberDrift.length > 0 && (
+            <div className="sai-blank" role="status">
+              <span className="sai-missing-head sai-blank-head">
+                숫자 확인 필요 — {numberDrift.join(' · ')}
+              </span>
+              <p className="sai-blank-text">{numberWarningText(numberDrift)}</p>
             </div>
           )}
 
