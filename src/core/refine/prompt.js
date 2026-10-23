@@ -47,7 +47,13 @@
 // Spec 필수 2 3순위 — 언어권 **어법** 관습(국민성 아님).
 import { conventionRules } from './conventions.js';
 
-export const REFINE_PROMPT_VERSION = 'refine-v21';
+/**
+ * v22 (2026-10-23, L30 N-02) — **사람 용어집의 원문 일치를 코드가 먼저 판정한다.** 원문에 등록된
+ *   원문 언어 호칭(예: `honorifics.ko` = 「김 대리님」)이 그대로 있어도, 실명(「김수진」)이 없으면
+ *   모델이 동명이인을 걱정해 「일치 안 함」으로 처리했다(Claude 반복 측정 매회 실패, Gemini는 통과).
+ *   인용 대조(S36·S43)와 같은 원칙 — 판단을 모델에 맡기지 않고 코드가 대조해 `matchedInOriginal`로 넘긴다.
+ */
+export const REFINE_PROMPT_VERSION = 'refine-v22';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];
@@ -316,7 +322,10 @@ function glossaryRules(glossary) {
     'For entryType "person": sourceText is the person\'s real name and honorifics holds the ' +
     'registered forms of address per language. If you recognize a reference in the original text as ' +
     'matching one of these registered people, use that person\'s registered honorific for the output ' +
-    'language verbatim. If the matched honorific for the output language is null, do NOT guess one — ' +
+    'language verbatim. An entry that carries "matchedInOriginal" is ALREADY confirmed to be referenced ' +
+    'by exactly that phrase in the original (the app checked it) — treat it as a match, replace that phrase, ' +
+    'and list it in "appliedGlossary". ' +
+    'If the matched honorific for the output language is null, do NOT guess one — ' +
     'keep the original reference unchanged. For any other person mentioned who does NOT match a ' +
     'registered entry, do NOT invent or guess an honorific or title — in particular, never ' +
     'manufacture a form like "Manager Kim" by literally translating a job title and attaching it to ' +
@@ -696,6 +705,26 @@ const responseFormatRule = () =>
   'apply — never omit a key. Do not add any text outside the JSON object.';
 
 /**
+ * 사람 엔트리가 원문에 **그대로** 나오는지 코드가 판정해 `matchedInOriginal`을 붙인다 (v22, L30 N-02).
+ *
+ * 🔴 대조 대상: 실명(`sourceText`)과 **원문 언어의 등록 호칭**(`honorifics[sourceLanguage]`). 정확한 부분
+ *    문자열 일치만 본다 — 성씨만 같거나 직급만 같은 경우는 일치로 보지 않는다(「김 과장」≠「김 대리님」).
+ * 🔴 용어(`term`) 엔트리와 일치하지 않는 엔트리는 **손대지 않는다**(원본 객체를 그대로 둔다).
+ * 🔴 원문 문장을 저장하지 않는다 — 일치한 등록 문구만 붙인다(사용자가 등록한 값이다).
+ */
+export function annotateGlossaryMatches(glossary, text, sourceLanguage) {
+  if (!Array.isArray(glossary) || typeof text !== 'string') return glossary;
+  return glossary.map((entry) => {
+    if (entry?.entryType !== 'person') return entry;
+    const candidates = [entry.sourceText, entry.honorifics?.[sourceLanguage]].filter(
+      (value) => typeof value === 'string' && value.trim() !== '',
+    );
+    const matched = candidates.find((value) => text.includes(value));
+    return matched ? { ...entry, matchedInOriginal: matched } : entry;
+  });
+}
+
+/**
  * 통합 refine payload를 만든다. 반환값 전체가 단일 user 메시지의 JSON 본문으로 전송되며,
  * 캐시 키 계산의 입력이기도 하다 — 여기 실리는 값이 그대로 캐시 무효화 단위가 된다.
  *
@@ -727,6 +756,7 @@ export function buildRefinePayload({
   referenceDate,
 }) {
   const referenceYear = referenceDate.slice(0, 4);
+  const annotatedGlossary = annotateGlossaryMatches(glossary, text, sourceLanguage);
   const instruction = [
     'You are refining a cross-border professional work message. In ONE response you must classify ' +
       'its urgency, rewrite it into the target language while preserving what must not be lost, ' +
@@ -734,7 +764,7 @@ export function buildRefinePayload({
       'ticket. Do not invent facts that are not in the original text.',
     URGENCY_RULE,
     PRESERVATION_AND_MISREAD_RULE,
-    glossaryRules(glossary),
+    glossaryRules(annotatedGlossary),
     // Spec 필수 2 3순위 — 🔴 **어법 관습**이지 국민성이 아니다(`conventions.js` 헤더 판정표).
     conventionRules(targetLanguage),
     recipientRules(recipient),
@@ -777,7 +807,7 @@ export function buildRefinePayload({
     userUrgency,
     honorificLevel,
     register,
-    glossary,
+    glossary: annotatedGlossary,
     profile,
     recipient,
     casualTone,
