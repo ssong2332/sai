@@ -21,6 +21,8 @@
 
 import { refine, MemoryCacheStore, PROVIDERS } from '../src/core/refine/index.js';
 import { REFINE_CASES, judgeCase } from '../test/refine.cases.js';
+// L30 — Claude 실제 사용 토큰(숫자만). 다른 provider는 집계하지 않는다.
+import { anthropicUsage } from '../src/core/refine/providers/anthropic.js';
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -105,4 +107,17 @@ for (const row of rows) {
 
 const attempted = rows.filter((row) => row.result !== '제외').length;
 console.log(`\n결과: ${passed}/${attempted} 통과 · 폴백 ${fellBack}건`);
+
+/**
+ * 🔴 실제 사용량·비용 (2026-10-23 L30). 단가는 2026-10-23 공식 요금표의 Claude Haiku 5.5(프롬프트 10만 토큰 이하)
+ *    입력 $0.10 · 출력 $0.50 · 캐시 읽기 $0.01 · 캐시 쓰기(5분) $0.125 / 100만 토큰. 다른 모델이면 단가가 다르다.
+ */
+if (providerName === 'anthropic' && anthropicUsage.calls > 0) {
+  const u = anthropicUsage;
+  const usd = (u.input * 0.1 + u.output * 0.5 + u.cacheRead * 0.01 + u.cacheWrite * 0.125) / 1e6;
+  console.log(
+    `실사용: 호출 ${u.calls} · 입력 ${u.input} · 출력(사고 포함) ${u.output} · 캐시 읽기 ${u.cacheRead} · 캐시 쓰기 ${u.cacheWrite} 토큰` +
+      ` → 약 $${usd.toFixed(4)} (건당 $${(usd / u.calls).toFixed(5)}, Haiku 5.5 단가 기준)`,
+  );
+}
 process.exit(passed === attempted ? 0 : 1);
