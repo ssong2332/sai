@@ -9,6 +9,8 @@ import { checkNamesPreserved, nameWarningText } from '../core/refine/names.js';
 import { checkNumbersPreserved, numberWarningText } from '../core/refine/numberCheck.js';
 import { checkGlossaryApplied, glossaryWarningText } from '../core/refine/glossaryCheck.js';
 import { checkIntentDrift, intentDriftWarningText } from '../core/refine/intentDrift.js';
+// L32 — 등록되지 않은 사람의 직급을 지어냈는지(「박 과장님」→ "Manager Park").
+import { checkInventedTitles, inventedTitleWarningText } from '../core/refine/titleCheck.js';
 import {
   checkBackTranslation,
   backFailMessage,
@@ -292,6 +294,8 @@ export default function RefinePopup({
    * 🔴 사용자가 등록한 용어집에서만 뜻을 가져온다 — 없는 뜻을 지어내지 않는다.
    */
   const [glossaryMeanings, setGlossaryMeanings] = useState({});
+  /** L32 — 직급 검사가 「사용자가 등록한 번역」을 오탐하지 않게 개인 용어집 항목을 그대로 둔다. */
+  const [personalGlossary, setPersonalGlossary] = useState([]);
   useEffect(() => {
     let cancelled = false;
     listPersonalGlossary().then((entries) => {
@@ -301,6 +305,7 @@ export default function RefinePopup({
         if (entry.targetText && entry.sourceText) map[entry.targetText] = entry.sourceText;
       }
       setGlossaryMeanings(map);
+      setPersonalGlossary(Array.isArray(entries) ? entries : []);
     });
     return () => {
       cancelled = true;
@@ -396,6 +401,19 @@ export default function RefinePopup({
         recipientNames: recipient?.name ? [recipient.name] : [],
       }),
     [result, sourceText, recipient?.name],
+  );
+
+  /**
+   * 🔴 **L32 — 등록되지 않은 사람의 직급을 지어냈는지** (`core/refine/titleCheck.js`).
+   *    실측(운영 Gemini, 2회): 「박 과장님이 … 확인해야 합니다」 → "Manager Park needs to check…".
+   *    프롬프트가 명시적으로 금지한 동작이다. 한국어 → 영어만, 「직급 + 성」이 붙은 것만 본다. 막지 않는다.
+   * 🔴 팀 용어집 항목은 이 화면이 모른다 — 모델이 `appliedGlossary`에 신고한 것으로만 거른다(헤더 「범위 밖」).
+   * 🔴 이름 경고(`nameDrift`)와는 겹치지 않는다 — 그쪽은 **수신자 이름이 사라졌는가**만 보고,
+   *    이쪽은 **원문의 제3자 호칭에 직급을 지어 붙였는가**를 본다.
+   */
+  const inventedTitles = useMemo(
+    () => checkInventedTitles(result, sourceText, { glossary: personalGlossary }),
+    [result, sourceText, personalGlossary],
   );
 
   /**
@@ -1327,6 +1345,16 @@ export default function RefinePopup({
                 용어집 확인 필요 — {glossaryCheck.missing.join(' · ')}
               </span>
               <p className="sai-blank-text">{glossaryWarningText(glossaryCheck.missing)}</p>
+            </div>
+          )}
+
+          {/* L32 — 같은 자리·같은 무게. 🔴 고쳐 쓰지 않고 알리기만 한다(「적용하기」는 그대로 눌린다). */}
+          {inventedTitles.length > 0 && (
+            <div className="sai-missing sai-blank" role="status">
+              <span className="sai-missing-head sai-blank-head">
+                직급 확인 필요 — {inventedTitles.map((f) => f.produced).join(' · ')}
+              </span>
+              <p className="sai-blank-text">{inventedTitleWarningText(inventedTitles)}</p>
             </div>
           )}
 
