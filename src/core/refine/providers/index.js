@@ -26,9 +26,9 @@ export class RefineCallError extends Error {
 export const PROVIDERS = {
   openai: { call: callOpenAI, defaultModel: DEFAULT_OPENAI_MODEL, envKey: 'OPENAI_API_KEY' },
   gemini: { call: callGemini, defaultModel: DEFAULT_GEMINI_MODEL, envKey: 'GEMINI_API_KEY' },
-  // 🔴 시험용 옵션(2026-10-23) — `--provider anthropic`으로 명시할 때만 쓴다. 폴오버 사슬(`failover.js`)에는 없다.
+  // 🔴 2026-10-23 — 기본 provider(폴오버 사슬 1번, `failover.js`). gemini는 사슬 밖 — 명시할 때만 쓴다.
   anthropic: { call: callAnthropic, defaultModel: DEFAULT_ANTHROPIC_MODEL, envKey: 'ANTHROPIC_API_KEY' },
-  // 🔴 시험용 옵션(2026-10-23) — OpenAI 호환 엔드포인트 재사용. 폴오버 사슬에는 없다.
+  // 🔴 2026-10-23 — 폴오버 사슬 2번. OpenAI 호환 엔드포인트 재사용(openai는 사슬 밖 — 키 무효 2026-09-28~).
   groq: { call: callGroq, defaultModel: DEFAULT_GROQ_MODEL, envKey: 'GROQ_API_KEY' },
 };
 

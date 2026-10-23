@@ -11,7 +11,8 @@
  *    `mode: "reply"`면 회신 초안(S37), 그 외(기본값)는 작성 교정(S03/S05/S09).
  *
  * 🔴 **API 키는 코드·환경변수 파일이 아니라 Secret Manager에 있다.**
- *    등록: `firebase functions:secrets:set GEMINI_API_KEY` / `… OPENAI_API_KEY`
+ *    등록: `firebase functions:secrets:set GEMINI_API_KEY` / `… OPENAI_API_KEY` (등록됨)
+ *    · `… ANTHROPIC_API_KEY` / `… GROQ_API_KEY` (🔴 2026-10-23 기준 **미등록** — 아래 `SECRETS_BY_PROVIDER` 표)
  *    (사용자가 직접 입력한다 — 키가 소스·로그·대화에 남지 않는다.)
  *    🔴 **숨김 프롬프트에 붙여넣기가 조용히 실패해 `Secret Payload cannot be empty`가 난다**
  *       (2026-08-17 실측). 값을 파일로 넘기고 지우는 쪽이 확실하다 — 끝 개행이 섞이면
@@ -32,9 +33,15 @@
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
-import { refine, MemoryCacheStore as RefineCacheStore } from './core/refine/index.js';
+import { refine, PROVIDERS, MemoryCacheStore as RefineCacheStore } from './core/refine/index.js';
 // 🔴 폴오버 사슬은 `src/core/refine/failover.js` 한 곳에만 있다 — sync-core가 복사한다.
-import { remainingChain, sameStep, shouldFailOver, stepLabel } from './core/refine/failover.js';
+import {
+  pickDefaultProvider,
+  remainingChain,
+  sameStep,
+  shouldFailOver,
+  stepLabel,
+} from './core/refine/failover.js';
 import { decode, MemoryCacheStore as DecodeCacheStore } from './core/decode/index.js';
 import {
   summarizeDecisions,
@@ -69,7 +76,47 @@ const geminiKey = defineSecret('GEMINI_API_KEY');
 // 2026-08-17 — `firebase functions:secrets:set OPENAI_API_KEY` 등록 완료(version 1) 후 복원.
 // 🔴 등록 **전에** 이 줄을 되살리면 배포가 "no value for OPENAI_API_KEY"로 죽는다(위 주석 참조).
 const openaiKey = defineSecret('OPENAI_API_KEY');
-const BOUND_SECRETS = [geminiKey, openaiKey];
+// 🔴 2026-10-23 — 기본 사슬(anthropic → groq)의 시크릿. **등록 전에는 주석을 풀지 않는다**(위 헤더 —
+//    풀면 배포가 "no value for ANTHROPIC_API_KEY"로 죽는다). 순서: ① 값 등록(헤더의 --data-file 방식)
+//    ② 이 줄과 아래 표의 해당 행 주석 해제 ③ anthropic이면 `functions/package.json`에 `@anthropic-ai/sdk` 추가
+//    (🔴 지금 functions에는 없다 — `providers/anthropic.js`가 호출 때만 동적 import하므로 로드는 되지만, 부르면
+//    모듈을 못 찾아 실패한다(🔴 추정 — error 폴백 예상, 미실측). 추가 후 `npm ls`로 peer 범위 확인 — CLAUDE.md) ④ 배포.
+// const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
+// const groqKey = defineSecret('GROQ_API_KEY');
+
+/**
+ * provider → 시크릿 표 (2026-10-23). **등록된 시크릿만** 넣는다 — 여기 없는 provider는 「키 없음」이다.
+ *
+ * | provider | 시크릿 | 상태(2026-10-23) | 사슬 |
+ * |---|---|---|---|
+ * | anthropic | `ANTHROPIC_API_KEY` | 🔴 미등록 — 주석 | 1번(기본) |
+ * | groq | `GROQ_API_KEY` | 🔴 미등록 — 주석 | 2번 |
+ * | gemini | `GEMINI_API_KEY` | 등록됨 | 사슬 밖 — 명시 요청 · **임시 기본**(아래 `INTERIM_DEFAULT_PROVIDER`) |
+ * | openai | `OPENAI_API_KEY` | 등록됨(키 무효 2026-09-28~) | 사슬 밖 — 명시 요청만 |
+ */
+const SECRETS_BY_PROVIDER = {
+  // anthropic: anthropicKey,
+  // groq: groqKey,
+  gemini: geminiKey,
+  openai: openaiKey,
+};
+const BOUND_SECRETS = Object.values(SECRETS_BY_PROVIDER);
+
+/**
+ * 🔴 **임시 기본값 — 사슬 provider 시크릿이 하나도 등록되지 않았을 때만** 쓴다 (2026-10-23).
+ *    사슬(anthropic → groq)을 그대로 적용하면, 시크릿 등록 전에 배포했을 때 **모든 교정이 500**
+ *    (`no provider configured`)이 된다. 운영 중인 확장이 즉시 멈추는 것보다, 지금 배포본과 같은 동작
+ *    (gemini)을 유지하는 쪽을 택했다 — 🔴 사용자 확인 필요(PR 본문 「열린 질문」). Gemini 무료 티어는 입력을
+ *    학습에 쓴다(Tasks L02) — 그래서 **사슬 시크릿을 등록하면 이 값은 저절로 쓰이지 않는다**(아래 판정표).
+ *    시크릿 등록·배포 후 이 상수와 판정표 마지막 두 행을 지운다.
+ */
+const INTERIM_DEFAULT_PROVIDER = 'gemini';
+
+/** 그 provider의 키(없으면 null). 🔴 표에 없는 provider는 `defineSecret`을 부르지 않는다. */
+function keyFor(provider) {
+  const secret = SECRETS_BY_PROVIDER[provider];
+  return secret ? safeSecret(secret) : null;
+}
 
 /**
  * 인스턴스 수명 동안만 사는 캐시 (Lessons #6). refine/decode는 프롬프트 버전이 달라
@@ -100,35 +147,35 @@ const decisionsCache = new DecisionsCacheStore({ ttlMs: cacheTtlMs });
 const replyCache = new ReplyCacheStore({ ttlMs: cacheTtlMs });
 
 /**
- * provider 판정표 (2026-08-17). **표에 없는 경우를 임의로 처리하지 않는다.**
+ * provider 판정표 (2026-10-23 — 이전: 2026-10-01 L03 gemini → openai, 2026-08-17 openai 먼저).
+ * **표에 없는 경우를 임의로 처리하지 않는다.**
  *
- * | `req.body.provider` | OPENAI 키 | GEMINI 키 | 선택 |
- * |---|---|---|---|
- * | `'openai'` | 있음 | — | openai |
- * | `'openai'` | 없음 | — | **null** (다른 걸로 대체하지 않는다) |
- * | `'gemini'` | — | 있음 | gemini |
- * | `'gemini'` | — | 없음 | **null** |
- * | 미지정·기타 | — | 있음 | **gemini** ← Spec §0 기준 provider (2026-10-01 L03) |
- * | 미지정·기타 | 있음 | 없음 | openai |
- * | 미지정·기타 | 없음 | 없음 | **null** |
+ * | `req.body.provider` | 그 provider 키 | 사슬 키(ANTHROPIC → GROQ 순) | GEMINI 키 | 선택 |
+ * |---|---|---|---|---|
+ * | 알려진 이름(`PROVIDERS`) | 있음 | — | — | 그 provider (폴오버 없음) |
+ * | 알려진 이름 | 없음 | — | — | **null** (다른 걸로 대체하지 않는다) |
+ * | 미지정·기타 | — | 있는 첫 provider | — | **그 provider** ← Spec §0 기본(Claude) |
+ * | 미지정·기타 | — | 없음 | 있음 | **gemini (임시)** — `INTERIM_DEFAULT_PROVIDER` |
+ * | 미지정·기타 | — | 없음 | 없음 | **null** |
  *
  * 🔴 **명시 요청은 대체하지 않는다.** `provider: 'openai'`로 부른 쪽은 그 결과를 기준으로
- *    판단하는 중인데, 조용히 gemini로 바꿔 답하면 **어느 모델의 출력인지 모르는 채로
+ *    판단하는 중인데, 조용히 다른 걸로 바꿔 답하면 **어느 모델의 출력인지 모르는 채로
  *    품질을 논하게 된다**(역번역 문제를 Gemini에서 4번 오진한 것이 정확히 이 계열이다).
- * 🔴 미지정일 때만 gemini → openai 순으로 내려간다. 기본값이 Spec의 기준 provider다
- *    (2026-10-01 L03 — 그전에는 openai가 먼저였고, 무효 키를 먼저 골랐다).
- * 🔴 **순서는 `core/refine/failover.js`의 사슬 1번과 같아야 한다** — `test/providerDefaults.unit.test.js`.
+ * 🔴 미지정 기본은 `failover.js` `pickDefaultProvider` — 프록시·회귀 러너·Worker와 **같은 함수**다
+ *    (`test/providerDefaults.unit.test.js`). 여기서 순서를 다시 적지 않는다.
  * 🔴 **없는 키로 부르지 않는다** — 지어낸 키를 보내면 401을 받고 그게 폴백 사유를 흐린다.
  */
 function resolveProviderAndKey(requested) {
-  const openai = safeSecret(openaiKey);
-  const gemini = safeSecret(geminiKey);
+  if (typeof requested === 'string' && Object.hasOwn(PROVIDERS, requested)) {
+    const apiKey = keyFor(requested);
+    return apiKey ? { provider: requested, apiKey } : null;
+  }
 
-  if (requested === 'openai') return openai ? { provider: 'openai', apiKey: openai } : null;
-  if (requested === 'gemini') return gemini ? { provider: 'gemini', apiKey: gemini } : null;
+  const provider = pickDefaultProvider((name) => Boolean(keyFor(name)));
+  if (provider) return { provider, apiKey: keyFor(provider) };
 
-  if (gemini) return { provider: 'gemini', apiKey: gemini };
-  return openai ? { provider: 'openai', apiKey: openai } : null;
+  const interim = keyFor(INTERIM_DEFAULT_PROVIDER);
+  return interim ? { provider: INTERIM_DEFAULT_PROVIDER, apiKey: interim } : null;
 }
 
 /**
@@ -140,11 +187,11 @@ function resolveProviderAndKey(requested) {
  *    논하게 된다**(위 판정표의 원칙과 같다). 미지정일 때만 넘긴다.
  * 🔴 **한도·키 무효일 때만**(auth는 2026-10-12 L15 추가 — 401은 한도를 쓰지 않는다). 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패하고, 조용한 이중
  *    호출은 한도만 더 태운다.
- * 🔴 **사슬 끝까지.** 2026-08-20부터 한 번이 아니라 `FAILOVER_CHAIN`(2026-10-01 L03 순서: gemini →
- *    openai → openai/gpt-4.1)을 순서대로 내려간다. 근거는 **한도가 모델별로 따로**라는 실측이다 —
- *    `core/refine/failover.js` 헤더 참조. 사슬을 다 쓰고도 실패하면 폴백 응답을 낸다.
- * 🔴 어느 쪽이 답했는지 `providerUsed`·`modelUsed`로 남긴다 — 2·3단계가 **둘 다 openai**라
- *    provider만으로는 구분되지 않는다. 문체가 달라진 이유를 나중에 추적할 수 있어야 한다.
+ * 🔴 **사슬 끝까지.** 2026-08-20부터 한 번이 아니라 `FAILOVER_CHAIN`(2026-10-23 순서: anthropic →
+ *    groq. 그전 10-01 L03: gemini → openai → openai/gpt-4.1)을 순서대로 내려간다 —
+ *    `core/refine/failover.js` 헤더 참조. 키 없는 단계는 건너뛴다. 사슬을 다 쓰고도 실패하면 폴백 응답을 낸다.
+ * 🔴 어느 쪽이 답했는지 `providerUsed`·`modelUsed`로 남긴다 — 같은 provider의 다른 모델이 사슬에 들어올 수
+ *    있어(2026-08-20 사슬은 2·3단계가 둘 다 openai였다) provider만으로는 구분되지 않는다. 문체가 달라진 이유를 나중에 추적할 수 있어야 한다.
  * 🔴 코어(`refine/decode/...`)는 고치지 않았다. 실패를 던지지 않고 `{fallback, fallbackReason}`
  *    으로 흡수하므로, **결과만 보고** 판단하면 네 모드에 한 번에 적용된다.
  */
@@ -438,7 +485,8 @@ export const health = onRequest(
     res.status(200).json(
       healthPayload({
         selected: resolveProviderAndKey(undefined),
-        keys: { openai: safeSecret(openaiKey), gemini: safeSecret(geminiKey) },
+        // 🔴 표에 없는(미등록) provider는 null — `defineSecret`을 부르지 않는다.
+        keys: Object.fromEntries(Object.keys(PROVIDERS).map((name) => [name, keyFor(name)])),
       }),
     );
   },

@@ -14,7 +14,13 @@ const GEMINI = 'gemini-test-value-should-never-leak';
 
 test('🔴 두 시크릿이 다 있으면 둘 다 보고한다 — 예전 하드코딩은 openai를 빠뜨렸다', () => {
   const body = healthPayload({ selected: { provider: 'openai' }, keys: { openai: OPENAI, gemini: GEMINI } });
-  assert.deepEqual(body, { ok: true, provider: 'openai', availableProviders: ['gemini', 'openai'], configured: true });
+  assert.deepEqual(body, {
+    ok: true,
+    provider: 'openai',
+    availableProviders: ['gemini', 'openai'],
+    configured: true,
+    interim: true,
+  });
 });
 
 test('gemini만 있으면 gemini만', () => {
@@ -25,7 +31,7 @@ test('gemini만 있으면 gemini만', () => {
 
 test('아무 시크릿도 없으면 비어 있고 configured=false', () => {
   const body = healthPayload({ selected: null, keys: { openai: null, gemini: null } });
-  assert.deepEqual(body, { ok: true, provider: null, availableProviders: [], configured: false });
+  assert.deepEqual(body, { ok: true, provider: null, availableProviders: [], configured: false, interim: false });
 });
 
 test('🔴 키 값이 응답에 나가지 않는다', () => {
@@ -34,4 +40,19 @@ test('🔴 키 값이 응답에 나가지 않는다', () => {
   );
   assert.equal(text.includes(OPENAI), false);
   assert.equal(text.includes(GEMINI), false);
+});
+
+test('🔴 2026-10-23 — 사슬 시크릿이 있으면 사슬 순서(anthropic → groq)로 먼저 보고하고 interim=false', () => {
+  const body = healthPayload({
+    selected: { provider: 'anthropic' },
+    keys: { anthropic: 'a', groq: 'g', gemini: GEMINI, openai: OPENAI },
+  });
+  assert.deepEqual(body.availableProviders, ['anthropic', 'groq', 'gemini', 'openai']);
+  assert.equal(body.interim, false);
+});
+
+test('🔴 Functions 임시 기본(gemini — 사슬 시크릿 미등록)이면 interim=true로 드러난다', () => {
+  const body = healthPayload({ selected: { provider: 'gemini' }, keys: { gemini: GEMINI, openai: OPENAI } });
+  assert.equal(body.provider, 'gemini');
+  assert.equal(body.interim, true);
 });

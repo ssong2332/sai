@@ -13,13 +13,13 @@
 | 목표 | 8/21 제출·시연 | **Chrome Web Store 공개 출시** — 0 정리 → 1 출시 차단 제거 → 2 비공개 베타(Unlisted) → 3 공개 |
 | 인원 | 4인 (§7) | **1인 개발** |
 | 기간 | 10일 | 기한 없음 — 단계별 진입·졸업 조건으로 관리 |
-| Main LLM (§6-3) | OpenAI | **Google Gemini** — OpenAI는 현재 사용 불가. 복구 시 재검토 |
+| Main LLM (§6-3) | OpenAI | **Anthropic Claude (`claude-haiku-5-5`, 사고 끔)** — 폴오버 예비 **Groq** (`openai/gpt-oss-120b`). 2026-10-23 사용자 결정(이전: 2026-09-30 Gemini). 근거: Tasks L30 실측(건당 $0.00070·중앙값 2.4~2.5초) + 데이터 정책(Anthropic API 입력은 기본적으로 학습에 쓰지 않음 · Groq는 계약상 학습 금지 + 무보존(ZDR) 가능 · **Gemini 무료 티어는 입력을 학습에 씀** — 그래서 Gemini는 예비로도 두지 않는다, 결정 (b)). Gemini·OpenAI는 명시 요청으로만 남는다. 🔴 운영 Functions는 ANTHROPIC·GROQ 시크릿 등록·배포 전까지 Gemini(임시 기본)로 돈다 — `functions/index.js` `INTERIM_DEFAULT_PROVIDER` |
 | 수익화 (§1) | 개인 무료 · 팀 구독 · 인앱 포인트 | **유료화는 나중.** 팀 기능은 **당분간 무료 공개**. 포인트는 적립만 있고 사용처는 유료화와 함께 |
 | 권장 12 회의 시간 추천의 캘린더 빈 시간 | 포함 (`calendar.readonly`) | **첫 출시에서 제외** — 민감 범위의 구글 OAuth 검증 대기를 피한다 |
 | 타깃 | 기획안 | 그대로 — **한국 개발 조직의 개인 사용자** |
 
 * 🔴 **Zero Retention(필수 5)은 출시 기준에서도 불변이다.** 베타 지표·모니터링도 카운트·메타데이터만 쓴다.
-* 🔴 **Gemini는 유료 티어로만 공개한다** (2026-10-01 약관 원문 확인 — Gemini API Additional Terms, 최종 수정 2026-04-28, `https://ai.google.dev/gemini-api/terms`).
+* 🔴 **Gemini는 유료 티어로만 공개한다** — 2026-10-23부터 기본·예비가 아니므로, 실제 사용자 텍스트가 Gemini로 가는 경로는 **Functions 임시 기본**(사슬 시크릿 등록 전)과 **명시 요청**뿐이다 (2026-10-01 약관 원문 확인 — Gemini API Additional Terms, 최종 수정 2026-04-28, `https://ai.google.dev/gemini-api/terms`).
   | 구분 | 약관 내용 | 우리에게 뜻하는 것 |
   |---|---|---|
   | 무료(Unpaid) | 입력·출력을 Google 제품 개선에 쓰고 사람 검토자가 볼 수 있다. **「민감·기밀·개인 정보를 보내지 말라」**고 명시 | 업무 메시지를 보내는 이 제품은 **무료 티어로 공개할 수 없다** |

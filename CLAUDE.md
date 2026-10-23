@@ -16,7 +16,7 @@
 ## Project Overview
 - Name: 사이 (Sai) — 글로벌 업무 메시지 AI 교정 크롬 확장
 - 🔴 **상태: 해커톤(2026-08-12 ~ 08-21) 종료 후, 실제 서비스 출시를 목표로 계속 개발 중 (2026-09-30~, 1인 개발).** 결정·우선순위는 `docs/Spec.md` §0, 태스크는 `docs/Tasks.md` 「출시 v1.0」(L01~). 판단 기준은 「시연이 되는가」가 아니라 **「누구나·매일·안전하게 쓸 수 있는가」**.
-- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore·Functions, Node 22) / **Google Gemini API** (단일 통합 호출 `POST /v1/refine`) — 2026-09-30부터 OpenAI 사용 불가로 Gemini 유지(Spec §0). 아래 명령 절의 "provider가 OpenAI로 바뀌었다"(2026-08-17) 기록보다 이 줄이 우선한다
+- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore·Functions, Node 22) / **Anthropic Claude API** (`claude-haiku-5-5`, 사고 끔 · 단일 통합 호출 `POST /v1/refine`) — 2026-10-23 사용자 결정으로 기본, 폴오버 예비는 Groq(Spec §0). Gemini(2026-09-30~10-22 기본)·OpenAI는 명시 요청으로만 남는다. 아래 명령 절의 옛 provider 기록(2026-08-17 OpenAI, 10-01 Gemini)보다 이 줄이 우선한다
 - 범위 밖(출시 v1.0): 캘린더 빈 시간(`calendar.readonly`) · 유료화. 팀 기능은 무료 공개
 - 해커톤 기간 기록: 2026-08-12 ~ 08-21 (컷 규칙은 `docs/Tasks.md`의 「컷 규칙 (해커톤)」)
 
@@ -54,11 +54,19 @@
 | `/v1/refine` 실 API 20건 | `npm run test:refine:live` (키 필요, 없으면 exit 2) | 미실행 |
 | `/v1/refine` 실 API 20건 — Claude(시험) | `ANTHROPIC_API_KEY=... node scripts/refine-live.js --provider anthropic` → 21/21 통과·폴백 0 (응답 2.6~10.0초) | 2026-10-23 |
 
-> 🔴 **2026-10-01 L03 — 기본 provider는 Gemini다** — 로컬 프록시·회귀 러너·배포본 셋 다 `GEMINI_API_KEY`가
-> 있으면 gemini, 없을 때만 openai(`--provider openai`로 명시 가능). 폴오버 사슬은 gemini → openai → openai/gpt-4.1.
-> (2026-08-17~09-30에는 openai가 먼저였다.) 확장은 provider를 요청에 싣지 않는다 — 실으면 폴오버가 꺼진다.
-> **셋의 기본값 순서는 항상 같아야 한다** — 하나만 바꾸면 "로컬에선 되는데 배포하면 다르다"가 시작된다.
+> 🔴 **2026-10-23 — 기본 provider는 Claude(anthropic)이고 예비는 groq뿐이다** (사용자 결정, Spec §0).
+> 로컬 프록시·회귀 러너·Functions·Worker 넷 다 `failover.js` `pickDefaultProvider` **한 함수**로 고른다 —
+> `ANTHROPIC_API_KEY`가 있으면 anthropic, 없으면 `GROQ_API_KEY`의 groq, 둘 다 없으면 **사슬 밖으로 내려가지 않는다**
+> (gemini·openai는 `--provider`/`provider`로 명시할 때만). 폴오버 사슬은 anthropic → groq.
+> 🔴 **예외 하나 — 운영 Functions**: ANTHROPIC·GROQ 시크릿이 Secret Manager에 **미등록**이라 등록 전에는
+> `INTERIM_DEFAULT_PROVIDER`(gemini)로 돈다(배포 즉시 전면 500을 막으려는 임시 조치 — `functions/index.js` 표).
+> 시크릿 등록 + 주석 해제 + 배포 후 이 예외를 지운다. 🔴 미등록 시크릿을 `defineSecret`하면 배포가 죽는다(아래 08-14·08-17 기록).
+> 이력: 2026-10-01 L03 gemini → openai → openai/gpt-4.1 · 2026-08-17~09-30 openai 먼저.
+> 확장은 provider를 요청에 싣지 않는다 — 실으면 폴오버가 꺼진다.
+> **셋의 기본값 순서는 항상 같아야 한다**(지금은 넷) — 하나만 바꾸면 "로컬에선 되는데 배포하면 다르다"가 시작된다.
 > `test/providerDefaults.unit.test.js`가 잠근다.
+> 🔴 Claude 사고(thinking)는 **기본 끔**(L30 — 건당 $0.00070·2.4초 vs 켬 $0.00107·6.2초). 실험으로 켤 때만
+> `SAI_ANTHROPIC_THINKING=adaptive`(그 밖의 값·없음은 전부 끔).
 
 > 🔴 **OpenAI 한도는 「하루 N건」이 아니라 「분당 토큰(TPM)」이다**(2026-08-17 실측, 헤더
 > `x-ratelimit-*`): **TPM 10,000 · 요청 묶음 50(약 5시간마다 초기화)**. 교정 1건이 약 1,800토큰이라
@@ -70,13 +78,14 @@
 > ```
 > (`x-ratelimit-remaining-tokens`, `x-ratelimit-reset-tokens`)
 
-> 🔴 **Gemini 무료 티어는 모델당 하루 20건**(2026-08-13 429 실측). 대체 provider로 쓸 때 유효하다.
+> 🔴 **Gemini 무료 티어는 모델당 하루 20건**(2026-08-13 429 실측). 명시 요청·Functions 임시 기본으로 쓸 때 유효하다.
 
 > 🟢 **한도에 걸리면 자동으로 예비 provider로 한 번 더 부른다**(2026-08-19 도입). 조건이 좁다 —
 > **① 사유가 `quota` 또는 `auth`(키 무효, 2026-10-12 L15 추가)일 때만**(네트워크·형식 오류는 넘기지 않는다).
 > 판정은 `src/core/refine/failover.js` `shouldFailOver` 한 곳 — 서버가 사유 문자열을 직접 비교하지 않는다 **② 요청이 provider를 명시하지
 > 않았을 때만** **③ 한 번만**. 어느 쪽이 답했는지는 응답 `providerUsed`와 서버 로그에 남는다.
-> 프록시·Functions **양쪽에 같은 규칙**이 있고 `test/failover.unit.test.js`가 그걸 잠근다.
+> 프록시·Functions·Worker(2026-10-23) **세 곳에 같은 규칙**이 있고 `test/failover.unit.test.js`가 그걸 잠근다.
+> (③은 2026-08-20부터 「사슬 끝까지, 키 없는 단계는 건너뜀」이다.)
 >
 > 🟢 **시연 촬영용 캐시 수명**: `.env`에 `SAI_CACHE_TTL_MS=14400000`(4시간)을 넣으면 같은 문장
 > 재호출이 그동안 **API를 쓰지 않는다**(기본 10분 · 상한 6시간 · 프로세스 메모리 전용).

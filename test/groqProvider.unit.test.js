@@ -1,8 +1,8 @@
 /**
- * Groq provider — 시험용 옵션(2026-10-23). OpenAI provider를 엔드포인트만 바꿔 재사용한다.
+ * Groq provider — 폴오버 사슬 2번(2026-10-23). OpenAI provider를 엔드포인트만 바꿔 재사용한다.
  *
  * 🔴 지키는 것: ① Groq 요청은 Groq 엔드포인트·모델·추론 깊이 low ② **OpenAI 요청은 예전과 똑같다**
- *    (재사용하려고 넣은 선택 인자가 운영 경로를 바꾸지 않는다) ③ 기본 순서·폴오버 사슬에 끼어들지 않는다.
+ *    (재사용하려고 넣은 선택 인자가 운영 경로를 바꾸지 않는다) ③ 폴오버 사슬 2번이다(2026-10-23 — 순서 전체는 `failover.unit.test.js`).
  */
 
 import test from 'node:test';
@@ -53,10 +53,10 @@ function stubFetch() {
 const run = (provider, fetchImpl) =>
   refine(BASE_REQUEST, { apiKey: 'k', provider, cache: new MemoryCacheStore(), fetchImpl });
 
-test('🔴 옵션으로만 등록 — 폴오버 사슬에 없다', () => {
+test('🔴 폴오버 사슬 2번(anthropic 다음)이다 — 2026-10-23', () => {
   assert.equal(PROVIDERS.groq.envKey, 'GROQ_API_KEY');
   assert.equal(PROVIDERS.groq.defaultModel, 'openai/gpt-oss-120b');
-  assert.ok(!FAILOVER_CHAIN.some((step) => step.provider === 'groq'));
+  assert.deepEqual(FAILOVER_CHAIN[1], { provider: 'groq', model: null });
 });
 
 test('Groq 요청 — 엔드포인트·모델·추론 low, reasoning 필드는 무시하고 content만 읽는다', async () => {

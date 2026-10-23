@@ -1,6 +1,6 @@
 /**
- * Groq provider — **시험용 옵션** (2026-10-23 사용자 요청, Tasks L30).
- * 기본 provider 순서·폴오버 사슬은 바꾸지 않는다 — `--provider groq`로 명시할 때만 쓴다.
+ * Groq provider — 🔴 **폴오버 사슬 2번** (2026-10-23 사용자 결정 — anthropic 다음, `failover.js`).
+ * 같은 날 시험용 옵션으로 붙였다(Tasks L30). Gemini 대신 예비가 된 이유는 아래 「데이터」 줄.
  *
  * 🔴 **OpenAI provider를 그대로 재사용한다** — Groq는 OpenAI 호환 `/chat/completions`를 제공한다
  *    (console.groq.com/docs/openai). 다른 점만 여기 둔다: 엔드포인트, 모델, 추론 깊이.

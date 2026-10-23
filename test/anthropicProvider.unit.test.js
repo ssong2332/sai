@@ -1,11 +1,11 @@
 /**
- * Anthropic(Claude) provider — 시험용 옵션(2026-10-23).
+ * Anthropic(Claude) provider — 2026-10-23 시험용 옵션으로 붙였다가 같은 날 기본 provider가 됐다(사용자 결정).
  *
  * 🔴 **실제 SDK에 가짜 `fetch`를 주입한다** — 네트워크 없이 SDK가 응답·오류를 실제로 어떻게 해석하는지까지
  *    검증한다(SDK 자체를 대역으로 바꾸면 그 해석을 못 본다). 가짜 fetch를 안 넘기면 실제 요청이 나가므로,
  *    모든 테스트가 `fetchImpl`을 넘기는지 첫 테스트가 잠근다.
  * 🔴 지키는 것: ① `temperature`를 보내지 않는다(2026-10-21부터 400) ② 오류를 기존 사유 표로 분류한다
- *    ③ 기본 provider 순서·폴오버 사슬에 끼어들지 않는다(옵션일 뿐).
+ *    ③ 폴오버 사슬 **1번**이다(2026-10-23 — 순서 전체는 `failover.unit.test.js`가 잠근다) ④ 사고는 기본으로 끈다.
  */
 
 import test from 'node:test';
@@ -72,11 +72,11 @@ const errorBody = (type) => ({ type: 'error', error: { type, message: 'test' } }
 const run = (fetchImpl) =>
   refine(BASE_REQUEST, { apiKey: 'test-key', provider: 'anthropic', cache: new MemoryCacheStore(), fetchImpl });
 
-test('🔴 기본 provider 순서·폴오버 사슬에 끼어들지 않는다 — 옵션으로만 등록', () => {
+test('🔴 기본 provider — 폴오버 사슬 1번이다(2026-10-23)', () => {
   assert.ok(PROVIDERS.anthropic, '등록 안 됨');
   assert.equal(PROVIDERS.anthropic.envKey, 'ANTHROPIC_API_KEY');
   assert.equal(PROVIDERS.anthropic.defaultModel, 'claude-haiku-5-5');
-  assert.ok(!FAILOVER_CHAIN.some((step) => step.provider === 'anthropic'), '사슬에 들어갔다');
+  assert.deepEqual(FAILOVER_CHAIN[0], { provider: 'anthropic', model: null }, '사슬 1번이 anthropic(기본 모델)이 아니다');
 });
 
 test('정상 응답 — 사고 블록은 건너뛰고 text만, ```json 울타리는 벗긴다', async () => {
@@ -131,18 +131,26 @@ test('거절·잘림은 invalid — 형식에 맞는 답이 없다', async () =>
   }
 });
 
-test('사고 끄기 스위치 — SAI_ANTHROPIC_THINKING=disabled일 때만 thinking을 끈다(기본은 보내지 않음)', async () => {
+test('🔴 사고 스위치 — 기본은 끈다, SAI_ANTHROPIC_THINKING=adaptive일 때만 켠다(2026-10-23 판정표)', async () => {
   const before = process.env.SAI_ANTHROPIC_THINKING;
+  const sentThinking = async (value) => {
+    if (value === undefined) delete process.env.SAI_ANTHROPIC_THINKING;
+    else process.env.SAI_ANTHROPIC_THINKING = value;
+    const fetchImpl = fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }]));
+    await run(fetchImpl);
+    return 'thinking' in fetchImpl.seen.body ? fetchImpl.seen.body.thinking : '(생략)';
+  };
   try {
-    delete process.env.SAI_ANTHROPIC_THINKING;
-    const on = fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }]));
-    await run(on);
-    assert.equal('thinking' in on.seen.body, false);
-
-    process.env.SAI_ANTHROPIC_THINKING = 'disabled';
-    const off = fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }]));
-    await run(off);
-    assert.deepEqual(off.seen.body.thinking, { type: 'disabled' });
+    // [환경변수 값, 보내는 것]
+    const rows = [
+      [undefined, { type: 'disabled' }], // 기본(운영)
+      ['disabled', { type: 'disabled' }],
+      ['enabled', { type: 'disabled' }], // 🔴 모르는 값은 끈다 — 오타로 비용·지연이 3배가 되지 않게
+      ['adaptive', '(생략)'], //            실험 전용 — 모델 기본(L30 「켬」 조건)
+    ];
+    for (const [value, expected] of rows) {
+      assert.deepEqual(await sentThinking(value), expected, `SAI_ANTHROPIC_THINKING=${value}`);
+    }
   } finally {
     if (before === undefined) delete process.env.SAI_ANTHROPIC_THINKING;
     else process.env.SAI_ANTHROPIC_THINKING = before;

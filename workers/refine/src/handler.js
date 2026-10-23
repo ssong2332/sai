@@ -1,67 +1,100 @@
 /**
- * Worker ?붿껌 泥섎━ ??`functions/index.js` `refineV1`??**refine 紐⑤뱶留?* ??릿 1?④퀎 ?쒗뿕??L33).
+ * Worker 요청 처리 — `functions/index.js` `refineV1`의 **refine 모드만** 옮긴 1단계 시험판(L33).
  *
- * ?뵶 ???뚯씪??**?뉗? 猿띾뜲湲?*?? ?꾨＼?꾪듃쨌?먯젙쨌罹먯떆쨌?대갚? 怨듭쑀 肄붿뼱 `src/core/refine/`瑜?**蹂듭궗 ?놁씠 吏곸젒**
- *    遺瑜몃떎(wrangler/esbuild媛 踰덈뱾?쒕떎). `functions/`泥섎읆 sync-core 蹂듭궗蹂몄쓣 ?먯? ?딅뒗????蹂듭궗蹂몄씠 ?섎굹
- *    ???앷린硫?媛덈씪吏?怨녹씠 ?섎굹 ???앷릿??
+ * 🔴 이 파일은 **얇은 껍데기**다. 프롬프트·판정·캐시·폴백·**폴오버 사슬**은 공유 코어 `src/core/refine/`를
+ *    **복사 없이 직접** 부른다(wrangler/esbuild가 번들한다). `functions/`처럼 sync-core 복사본을 두지 않는다 —
+ *    복사본이 하나 더 생기면 갈라질 곳이 하나 더 생긴다.
  *
- * ?쇱슦???? * | 硫붿꽌?쑣룰꼍濡?| 泥섎━ |
+ * 라우팅 표
+ * | 메서드·경로 | 처리 |
  * |---|---|
- * | `OPTIONS *` | CORS ?ъ쟾 ?붿껌 ??`cors.js` ?먯젙??|
- * | `GET /health` | ?ㅼ젙 ?곹깭(??**?대쫫쨌?좊Т**留? 媛??놁쓬) |
- * | `POST /v1/refine` + `mode` ?놁쓬쨌`refine`쨌紐⑤Ⅴ??媛?| 援먯젙 ??湲곗〈 ?쒕쾭? 媛숈씠 紐⑤Ⅴ??mode??refine?쇰줈 蹂몃떎 |
- * | `POST /v1/refine` + `mode` = `decode`쨌`decisions`쨌`reply` | **501** `{error:'not implemented', mode}` ???뵶 1?④퀎 踰붿쐞 諛? LLM쨌?곹븳 ??? |
- * | `/v1/refine` 洹?諛?硫붿꽌??| 405 `{error:'method not allowed'}` (湲곗〈怨?媛숇떎) |
- * | 洹?諛?寃쎈줈 | 404 |
+ * | `OPTIONS *` | CORS 사전 요청 — `cors.js` 판정표 |
+ * | `GET /health` | 설정 상태(키 **이름·유무**만, 값 없음) |
+ * | `POST /v1/refine` + `mode` 없음·`refine`·모르는 값 | 교정 — 기존 서버와 같이 모르는 mode는 refine으로 본다 |
+ * | `POST /v1/refine` + `mode` = `decode`·`decisions`·`reply` | **501** `{error:'not implemented', mode}` — 🔴 1단계 범위 밖(LLM·상한 안 씀) |
+ * | `/v1/refine` 그 밖 메서드 | 405 `{error:'method not allowed'}` (기존과 같다) |
+ * | 그 밖 경로 | 404 |
  *
- * ?붿껌 泥섎━ ?쒖꽌 (湲곗〈 refineV1怨?媛숈? ?쒖꽌 ???뵶 李⑥씠???ㅒ룐뫁留?
- * ??Origin ?먯젙(?ㅻⅨ ?ㅻ━吏?403) ???ㅼ젙 ?꾨씫 500 ???좏겙 401 `{error:'unauthorized', reason}` ??蹂몃Ц JSON(源⑥?硫?400)
- * ??1?④퀎 誘몄???mode 501(?곹븳???곌린 ?꾩뿉 ?딅뒗?? ???쇱씪 ?곹븳 429 ???뵶 1?④퀎???ㅽ뀅(`usageStore.js`)?대씪 ??긽 ?듦낵
- * ??provider: 紐낆떆媛믪씠 `anthropic`???꾨땲硫?500 `no provider configured`(湲곗〈 ?뚮챸???붿껌? ?泥댄븯吏 ?딅뒗?ㅳ띿? 媛숇떎)
- *    쨌 ???놁쓬 500 ??肄붿뼱 `refine()` ???섏?硫?400 `{error: message}` ??吏??湲곕줉 ??200
+ * 요청 처리 순서 (기존 refineV1과 같은 순서 — 🔴 차이는 ①·⑤만)
+ * ① Origin 판정(다른 오리진 403) → 설정 누락 500 → 토큰 401 `{error:'unauthorized', reason}` → 본문 JSON(깨지면 400)
+ * → ⑤ 1단계 미지원 mode 501(상한을 쓰기 전에 끊는다) → 일일 상한 429 — 🔴 1단계는 스텁(`usageStore.js`)이라 항상 통과
+ * → provider 판정(아래 표) → 코어 `refine()` + 폴오버 → 던지면 400 `{error: message}` → 지표 기록 → 200
  *
- * ?뵶 **?댁삤踰??놁쓬.** ??Worker?먮뒗 provider媛 Claude ?섎굹肉먯씠??湲곗〈 ?ъ뒳 gemini ??openai ??gpt-4.1? Functions???⑥쓬).
- *    ?쒕룄쨌??臾몄젣硫?肄붿뼱媛 ?대갚 ?묐떟(`fallback:true, fallbackReason`)??洹몃?濡??몃떎 ???뺤옣? ?뚭탳?뺥븯吏 紐삵뻽?댁슂??
- * ?뵶 Zero Retention (Spec ?꾩닔 5): 濡쒓렇?먮뒗 provider쨌湲닿툒?꽷룹쓽?꽷룹틦?쑣룻뤃諛??ъ쑀쨌?쒓컙留? ?붿껌 蹂몃Ц쨌援먯젙臾맞? *    ?좏겙쨌?ㅻ뒗 ?대뼡 濡쒓렇?먮룄 ?곗? ?딅뒗????`test/handler.test.js` ?뚮줈洹몄뿉 蹂몃Ц ?놁쓬?띿씠 ?좉렐??
+ * provider 판정표 (2026-10-23 — `functions/index.js` `resolveProviderAndKey`와 같은 규칙, 임시 기본만 없다)
+ * | `body.provider` | 그 provider 키 | 사슬 키(ANTHROPIC → GROQ 순) | 선택 |
+ * |---|---|---|---|
+ * | 알려진 이름(`PROVIDERS`) | 있음 | — | 그 provider (폴오버 없음) |
+ * | 알려진 이름 | 없음 | — | **500** `no provider configured` (대체하지 않는다) |
+ * | 미지정·기타 | — | 있는 첫 provider | 그 provider ← Spec §0 기본(Claude) |
+ * | 미지정·기타 | — | 없음 | **500** `no provider configured` |
+ * 🔴 Functions의 「임시 기본 gemini」는 여기 없다 — Worker는 새로 배포하는 것이라 지켜야 할 운영 동작이 없고,
+ *    Gemini 무료 티어는 입력을 학습에 쓴다(사용자 결정 (b)). 시크릿을 넣지 않고 배포하면 500으로 드러난다.
+ *
+ * 폴오버 (2026-10-23 — 같은 날 1단계는 「폴오버 없음, Claude 하나」였다)
+ * 🔴 판정·사슬은 `failover.js`의 `shouldFailOver`·`remainingChain`·`pickDefaultProvider`만 쓴다 — 표를 여기 다시
+ *    적지 않는다(`test/failover.unit.test.js`가 잠근다). 조건: ① 사유 quota·auth만 ② 명시 요청은 넘기지 않는다
+ *    ③ 키 없는 단계는 건너뛴다 ④ 사슬 끝까지. 다른 단계가 답하면 `providerUsed`·`modelUsed`를 붙인다(Functions와 같다).
+ * 🔴 Zero Retention (Spec 필수 5): 로그에는 provider·긴급도·의도·캐시·폴백 사유·시간만. 요청 본문·교정문·
+ *    토큰·키는 어떤 로그에도 쓰지 않는다 — `test/handler.test.js` 「로그에 본문 없음」이 잠근다.
  */
 
-import { refine, MemoryCacheStore } from '../../../src/core/refine/index.js';
+import { refine, MemoryCacheStore, PROVIDERS } from '../../../src/core/refine/index.js';
+import {
+  DEFAULT_PROVIDER_ORDER,
+  pickDefaultProvider,
+  remainingChain,
+  sameStep,
+  shouldFailOver,
+  stepLabel,
+} from '../../../src/core/refine/failover.js';
 import { readConfig } from './config.js';
 import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
 
-const PROVIDER = 'anthropic';
 const NOT_IMPLEMENTED_MODES = new Set(['decode', 'decisions', 'reply']);
 
 /**
- * ?뵶 ?ш퀬 ?꾧린 ?ㅼ쐞移??대뙌????肄붿뼱 `providers/anthropic.js`??`globalThis.process?.env?.SAI_ANTHROPIC_THINKING`?? *    ?쎈뒗??Node 寃쎈줈). Worker ?ㅼ젙? `env`濡??ㅻ?濡?洹?媛믪쓣 `process.env`????꺼 以????**肄붿뼱瑜?怨좎튂吏 ?딆쑝?ㅺ퀬**.
- *    `nodejs_compat`(compat date ??2025-04-01)?먯꽌??vars媛 `process.env`???먮룞?쇰줈 ?ㅼ뼱?⑤떎怨??뚮젮???덉?留? *    (?뵶 異붿젙 ??諛고룷 ??`/health`??`thinking`쨌?붿껌 蹂몃Ц?쇰줈 ?뺤씤), ?섏〈?섏? ?딄퀬 紐낆떆?곸쑝濡??ｋ뒗??
- * @returns {boolean} ??꼈?붿?(`process.env`媛 ?놁쑝硫?false ??洹몃븣???ш퀬媛 耳쒖쭊 梨꾨줈 媛꾨떎).
+ * 🔴 사고(thinking) 스위치 전달 — 코어 `providers/anthropic.js`는 `globalThis.process?.env?.SAI_ANTHROPIC_THINKING`을
+ *    읽는다(Node 경로). Worker 설정은 `env`로 오므로 그 값을 `process.env`에 옮겨 준다 — **코어를 고치지 않으려고**.
+ *    `nodejs_compat`(compat date ≥ 2025-04-01)에서는 vars가 `process.env`에 자동으로 들어온다고 알려져 있지만
+ *    (🔴 추정 — 배포 후 `/health`의 `thinking`·요청 본문으로 확인), 의존하지 않고 명시적으로 넣는다.
+ * 🔴 2026-10-23부터 **기본이 끔**이다(코어 판정표). 켜려면(실험) `SAI_ANTHROPIC_THINKING = "adaptive"`.
+ * 🔴 값이 없어도 `disabled`를 **매번 써 넣는다** — 「없으면 안 건드림」이면 isolate 안에서 이전 요청이 넣은
+ *    `adaptive`가 남아, 설정을 지운 뒤에도 사고가 켜진 채로 돈다.
+ * @returns {boolean} 옮겼는지(`process.env`가 없으면 false — 그때도 코어 기본(끔)으로 간다).
  */
 export function applyThinkingSwitch(value) {
-  if (value === undefined) return false;
   const env = globalThis.process?.env;
   if (!env) return false;
-  env.SAI_ANTHROPIC_THINKING = value;
+  env.SAI_ANTHROPIC_THINKING = value ?? 'disabled';
   return true;
 }
 
+/** 위 판정표. @returns {{provider: string, apiKey: string} | null} */
+export function resolveProvider(requested, keys) {
+  if (typeof requested === 'string' && Object.hasOwn(PROVIDERS, requested)) {
+    return keys[requested] ? { provider: requested, apiKey: keys[requested] } : null;
+  }
+  const provider = pickDefaultProvider((name) => Boolean(keys[name]));
+  return provider ? { provider, apiKey: keys[provider] } : null;
+}
+
 /**
- * @param {object} [deps] ?꾨? ?뚯뒪??二쇱엯?? ?댁쁺 湲곕낯媛믪? `index.js`.
- * @param {Function} [deps.jwks] jose ??臾띠쓬(?뚯뒪?몃뒗 `createLocalJWKSet`).
- * @param {object} [deps.usageStore] `usageStore.js` ?명꽣?섏씠??
- * @param {typeof fetch} [deps.fetchImpl] Anthropic SDK???섍만 fetch(?뚯뒪?몃뒗 媛吏??묐떟).
- * @param {object} [deps.cache] 肄붿뼱 罹먯떆 ?ㅽ넗??
+ * @param {object} [deps] 전부 테스트 주입용. 운영 기본값은 `index.js`.
+ * @param {Function} [deps.jwks] jose 키 묶음(테스트는 `createLocalJWKSet`).
+ * @param {object} [deps.usageStore] `usageStore.js` 인터페이스.
+ * @param {typeof fetch} [deps.fetchImpl] provider 호출에 넘길 fetch(테스트는 가짜 응답 — 모든 provider 공용).
+ * @param {object} [deps.cache] 코어 캐시 스토어.
  * @param {() => number} [deps.now]
- * @param {{log: Function, warn: Function, error: Function}} [deps.logger] 湲곕낯 console.
+ * @param {{log: Function, warn: Function, error: Function}} [deps.logger] 기본 console.
  */
 export function createHandler(deps = {}) {
   const {
     jwks,
     usageStore = createNoopUsageStore(),
     fetchImpl,
-    // ?뵶 isolate 硫붾え由??꾩슜(Zero Retention 寃쎄퀎 ??肄붿뼱 cache.js? 媛숇떎). isolate媛 ?щ윭 媛쒕씪 ?곸쨷瑜좎? ??떎.
+    // 🔴 isolate 메모리 전용(Zero Retention 경계 — 코어 cache.js와 같다). isolate가 여러 개라 적중률은 낮다.
     cache = new MemoryCacheStore(),
     now = () => Date.now(),
     logger = console,
@@ -82,7 +115,7 @@ export function createHandler(deps = {}) {
       });
 
     if (origin === 'rejected') {
-      logger.warn('[cors] ?덉슜?섏? ?딆? ?ㅻ━吏???嫄곗젅');
+      logger.warn('[cors] 허용되지 않은 오리진 — 거절');
       return new globalThis.Response(JSON.stringify({ error: 'origin not allowed' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
@@ -98,17 +131,21 @@ export function createHandler(deps = {}) {
 
     if (url.pathname === '/health') {
       if (request.method !== 'GET') return json(405, { error: 'method not allowed' });
-      // ?뵶 ??媛믪? ?덈? ?대낫?댁? ?딅뒗?????덈뒗吏留?
+      const selected = resolveProvider(undefined, config.keys);
+      // 🔴 키 값은 절대 내보내지 않는다 — 이름·유무만. 순서: 사슬 → 사슬 밖(명시 요청용).
+      const order = [...DEFAULT_PROVIDER_ORDER, ...Object.keys(PROVIDERS).filter((n) => !DEFAULT_PROVIDER_ORDER.includes(n))];
       return json(200, {
         ok: true,
         runtime: 'cloudflare-workers',
         stage: 1,
-        provider: PROVIDER,
-        availableProviders: config.anthropicKey ? [PROVIDER] : [],
-        configured: Boolean(config.anthropicKey) && config.missing.length === 0,
+        provider: selected?.provider ?? null,
+        availableProviders: order.filter((name) => Boolean(config.keys[name])),
+        failoverChain: remainingChain({ provider: null }).map(stepLabel),
+        configured: selected !== null && config.missing.length === 0,
         missingConfig: config.missing,
-        model: config.model ?? null,
-        thinking: config.thinking ?? 'default',
+        model: config.anthropicModel ?? null,
+        // 코어 판정표와 같게 — `adaptive`만 켬, 나머지(없음 포함)는 끔.
+        thinking: config.thinking === 'adaptive' ? 'adaptive' : 'disabled',
         usageStore: usageStore.kind ?? 'custom',
       });
     }
@@ -119,11 +156,11 @@ export function createHandler(deps = {}) {
     const receivedAt = now();
 
     if (config.missing.length > 0) {
-      logger.error(`[refine] ?ㅼ젙 ?꾨씫: ${config.missing.join(',')}`);
+      logger.error(`[refine] 설정 누락: ${config.missing.join(',')}`);
       return json(500, { error: 'server misconfigured' });
     }
 
-    // ???몄쬆 ???뵶 紐⑹뾽?쇰줈 ????듯븯吏 ?딅뒗??湲곗〈 refineV1 二쇱꽍怨?媛숇떎). ?뺤옣??401??蹂닿퀬 濡쒓렇?몄쓣 ?꾩슫??
+    // ③ 인증 — 🔴 목업으로 대신 통과하지 않는다(기존 refineV1 주석과 같다). 확장은 401을 보고 로그인을 띄운다.
     let uid;
     try {
       ({ uid } = await verifyFirebaseIdToken(bearerToken(request), {
@@ -133,12 +170,12 @@ export function createHandler(deps = {}) {
       }));
     } catch (error) {
       const reason = error instanceof AuthError ? error.reason : 'bad-token';
-      // ?뵶 jose ?ㅻ쪟 肄붾뱶留??? ERR_JWT_EXPIRED) ???좏겙 臾몄옄?는룻겢?덉엫? ?④린吏 ?딅뒗??
-      logger.warn(`[refine] ?몄쬆 嫄곗젅 reason=${reason} code=${error?.code ?? '-'}`);
+      // 🔴 jose 오류 코드만(예: ERR_JWT_EXPIRED) — 토큰 문자열·클레임은 남기지 않는다.
+      logger.warn(`[refine] 인증 거절 reason=${reason} code=${error?.code ?? '-'}`);
       return json(401, { error: 'unauthorized', reason });
     }
 
-    // ??蹂몃Ц
+    // ④ 본문
     let body;
     try {
       body = await request.json();
@@ -147,58 +184,85 @@ export function createHandler(deps = {}) {
     }
     if (body === null || typeof body !== 'object' || Array.isArray(body)) return json(400, { error: 'bad request' });
 
-    // ??1?④퀎 踰붿쐞 諛?mode ???곹븳쨌LLM???곌린 ?꾩뿉 ?딅뒗??
+    // ⑤ 1단계 범위 밖 mode — 상한·LLM을 쓰기 전에 끊는다.
     if (NOT_IMPLEMENTED_MODES.has(body.mode)) {
       return json(501, { error: 'not implemented', mode: body.mode });
     }
 
-    // ???쇱씪 ?곹븳 ???뵶 1?④퀎 ?ㅽ뀅. 湲곗〈怨?媛숈씠 **移댁슫???μ븷濡?援먯젙??硫덉텛吏 ?딅뒗??*.
+    // ⑥ 일일 상한 — 🔴 1단계 스텁. 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**.
     try {
       const quota = await usageStore.consumeDailyQuota(uid);
       if (!quota.ok) {
-        logger.warn(`[refine] ?쇱씪 ?곹븳 珥덇낵 used=${quota.used} limit=${quota.limit}`);
+        logger.warn(`[refine] 일일 상한 초과 used=${quota.used} limit=${quota.limit}`);
         return json(429, { error: 'daily-limit', limit: quota.limit });
       }
       if (quota.used === 1) await safeMetric(logger, () => usageStore.recordDailyUser(uid));
     } catch (error) {
-      logger.error(`[refine] ?곹븳 ?뺤씤 ?ㅽ뙣 ???듦낵?쒗궡: ${error?.code ?? error?.name ?? 'unknown'}`);
+      logger.error(`[refine] 상한 확인 실패 — 통과시킴: ${error?.code ?? error?.name ?? 'unknown'}`);
     }
 
-    // ??provider ??紐낆떆 ?붿껌? ?泥댄븯吏 ?딅뒗??
-    if ((body.provider && body.provider !== PROVIDER) || !config.anthropicKey) {
-      logger.error('[refine] ?ъ슜?????덈뒗 provider ?ㅺ? ?놁뒿?덈떎 ??wrangler secret put ANTHROPIC_API_KEY ?꾩슂');
+    // ⑦ provider — 위 판정표. 명시 요청은 대체하지 않는다.
+    const selected = resolveProvider(body.provider, config.keys);
+    if (!selected) {
+      logger.error('[refine] 사용할 수 있는 provider 키가 없습니다 — wrangler secret put ANTHROPIC_API_KEY / GROQ_API_KEY 필요');
       return json(500, { error: 'no provider configured' });
     }
 
     applyThinkingSwitch(config.thinking);
 
-    // ??肄붿뼱
-    let result;
-    try {
-      result = await refine(body, {
-        apiKey: config.anthropicKey,
-        provider: PROVIDER,
-        model: config.model,
+    /** 한 단계 호출. 🔴 `ANTHROPIC_MODEL`은 anthropic 단계에만 — 사슬 단계 모델이 있으면 그게 이긴다. */
+    const runStep = ({ provider, apiKey }, stepModel) => {
+      const model = stepModel ?? (provider === 'anthropic' ? config.anthropicModel : undefined);
+      return refine(body, {
+        apiKey,
+        provider,
+        model,
         cache,
         ...(fetchImpl ? { fetchImpl } : {}),
         now,
         logger: (event) =>
           logger.log(
-            `[refine] provider=${PROVIDER}${config.model ? `/${config.model}` : ''} urgency=${event.urgency ?? '-'} ` +
+            `[refine] provider=${stepLabel({ provider, model })} urgency=${event.urgency ?? '-'} ` +
               `intent=${event.detectedIntent ?? '-'} cache=${event.cacheHit ? 'hit' : 'miss'} ` +
               `fallback=${event.fallback ? (event.fallbackReason ?? 'yes') : 'no'} ${event.latencyMs}ms`,
           ),
       });
+    };
+
+    // ⑧ 코어 + 폴오버 — `functions/index.js` `runWithFailover`와 같은 흐름.
+    let result;
+    try {
+      const start = { provider: selected.provider, model: null };
+      let used = start;
+      result = await runStep(selected);
+      if (!body.provider) {
+        for (const step of remainingChain(used)) {
+          // 🔴 매 단계 다시 본다 — 중간 단계가 quota·auth 아닌 이유로 실패하면 거기서 멈춘다.
+          if (!shouldFailOver(result)) break;
+          const apiKey = config.keys[step.provider];
+          if (!apiKey) continue; // 그 provider의 키가 없다 — 건너뛴다(멈추지 않는다)
+          logger.log(`[refine] ${stepLabel(used)} ${result.fallbackReason} — ${stepLabel(step)}로 다시 시도합니다.`);
+          result = await runStep({ provider: step.provider, apiKey }, step.model ?? undefined);
+          used = { provider: step.provider, model: step.model ?? null };
+        }
+      }
+      if (!sameStep(used, start)) {
+        if (result?.fallback) {
+          logger.log(`[refine] ${stepLabel(used)}도 실패(${result.fallbackReason}) — 폴백을 냅니다.`);
+        } else {
+          result = { ...result, providerUsed: used.provider, modelUsed: used.model };
+        }
+      }
     } catch (error) {
-      // ?뵶 肄붿뼱??RefineRequestError 臾멸뎄???곕━ 臾멸뎄??蹂몃Ц ?놁쓬). 洹?諛??ㅻ쪟???대쫫留?濡쒓렇??
-      logger.error(`[refine] ?붿껌 嫄곗젅: ${error?.name ?? 'error'}`);
+      // 🔴 코어의 RefineRequestError 문구는 우리 문구다(본문 없음). 그 밖 오류는 이름만 로그에.
+      logger.error(`[refine] 요청 거절: ${error?.name ?? 'error'}`);
       await safeMetric(logger, () =>
         usageStore.recordRequest({ mode: 'refine', rejected: true, latencyMs: now() - receivedAt }),
       );
       return json(400, { error: error?.message ?? 'bad request' });
     }
 
-    // ??吏????紐⑤뱶쨌?깃났 ?щ?쨌?ъ쑀 肄붾뱶쨌?쒓컙肉?
+    // ⑨ 지표 — 모드·성공 여부·사유 코드·시간뿐.
     await safeMetric(logger, () =>
       usageStore.recordRequest({
         mode: 'refine',
@@ -211,11 +275,11 @@ export function createHandler(deps = {}) {
   };
 }
 
-/** 吏???ㅽ뙣媛 援먯젙??留됱? ?딅뒗??L20). 濡쒓렇?먮뒗 ?ㅻ쪟 肄붾뱶留? */
+/** 지표 실패가 교정을 막지 않는다(L20). 로그에는 오류 코드만. */
 async function safeMetric(logger, write) {
   try {
     await write();
   } catch (error) {
-    logger.error(`[metrics] 湲곕줉 ?ㅽ뙣: ${error?.code ?? error?.name ?? 'unknown'}`);
+    logger.error(`[metrics] 기록 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
   }
 }
