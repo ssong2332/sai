@@ -44,9 +44,11 @@
 | 대시보드 배포 | `firebase deploy --only hosting` | 2026-08-13 |
 | 대시보드 배포 확인 | `curl https://sai-global-msg-2026.web.app/` | 2026-08-13 |
 | 한글 포함 API 실측 | 본문을 UTF-8 파일로 저장 후 `curl --data-binary @body.json` (🔴 인라인 `-d '{"text":"한글"}'`은 Windows 셸에서 깨져 **모델 결함으로 오진하게 된다** — Lessons #13) | 2026-08-13 |
-| Worker(L33) 설치 · 테스트 | `workers/refine/` 안에서 `npm ci` · `npm --prefix workers/refine test` — 🔴 `npm --prefix workers/refine install`은 쓰지 않는다: `package.json`에 `"sai": "file:../.."`를 몰래 넣는다(2026-10-23 하위 작업 2회 실측) (🔴 루트 `npm install`도 필요 — 코어가 루트의 `@anthropic-ai/sdk`를 쓴다) | 2026-10-23 |
+| Worker(L33) 설치 · 테스트 | `workers/refine/` 안에서 `npm ci` · `npm --prefix workers/refine test` — 🔴 `npm --prefix workers/refine install`은 쓰지 않는다: `package.json`에 `"sai": "file:../.."`를 몰래 넣는다(2026-10-23 하위 작업 2회 실측) (🔴 루트 `npm install`도 필요 — 코어가 루트의 `@anthropic-ai/sdk`를 쓴다. 🔴 2026-10-23부터 `test`는 `--import ./test/sdkAlias.mjs`로 배포본과 같은 SDK 대역을 탄다) | 2026-10-23 |
 | Worker CPU 추정 | `npm --prefix workers/refine run bench:cpu` (Node 추정치 — 실제 cpuTime은 배포 후 Cloudflare) | 2026-10-23 |
 | Worker 번들 확인(배포 안 함·로그인 불필요) | `npm --prefix workers/refine run build:dry` | 2026-10-23 |
+| Worker 번들에 SDK 없음 확인(build:dry 포함) | `npm --prefix workers/refine run check:bundle` (🔴 `wrangler.toml` `[alias]`가 SDK를 `src/anthropicFetch.js`로 바꾼다 — 기준 112.8 KiB) | 2026-10-23 |
+| Worker 콜드 CPU 추정(배포 번들 그대로·새 프로세스) | `npm --prefix workers/refine run bench:cold -- --runs 31` (먼저 build:dry. 🔴 run 수가 적으면 흔들린다 — 5회 11~17ms. Node 추정 — 실제는 배포 후 `wrangler tail` cpuTime) | 2026-10-23 |
 | Worker 로컬 workerd(가짜 키·가짜 Claude, 🔴 배포 금지 설정) | `npm --prefix workers/refine run dev:mock` → `http://127.0.0.1:8790` (`/__dev/token`으로 시험 토큰) | 2026-10-23 |
 
 > 🔴 **`.env`는 git 워크트리마다 따로 있다** (untracked 파일은 공유되지 않는다). 워크트리에서

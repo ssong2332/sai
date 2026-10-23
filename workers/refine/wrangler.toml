@@ -21,6 +21,13 @@ compatibility_date = "2026-10-15"
 #       (Worker에서는 `src/handler.js` `applyThinkingSwitch`가 env 값을 — 없으면 `disabled`를 — 거기에 옮겨 준다).
 compatibility_flags = ["nodejs_compat"]
 
+# 🔴 Anthropic SDK를 번들에서 뺀다(2026-10-23 L33 — 콜드 cpuTime 34ms·30ms > 무료 한도 10ms 대응, 선택지 A).
+#    코어 `providers/anthropic.js`의 `import('@anthropic-ai/sdk')`가 이 대역(fetch 한 번)으로 바뀐다 — 코어 코드는 그대로.
+#    Node 경로(프록시·Functions·회귀 러너)는 영향 없음. 대역이 흉내 내는 표면·이유는 `src/anthropicFetch.js` 헤더.
+#    🔴 이 줄을 지우면 SDK가 다시 번들된다 — `npm run check:bundle`이 잡는다. `wrangler.dev.toml`에도 같은 줄이 있다.
+[alias]
+"@anthropic-ai/sdk" = "./src/anthropicFetch.js"
+
 # 🔴 공개 설정값만(비밀 아님). 로직에 하드코딩하지 않고 여기서 읽는다(`src/config.js`).
 [vars]
 FIREBASE_PROJECT_ID = "sai-global-msg-2026"

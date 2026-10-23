@@ -4,9 +4,11 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "test": "node --test \"test/*.test.js\"",
-    "bench:cpu": "node scripts/cpu-bench.mjs",
+    "test": "node --import ./test/sdkAlias.mjs --test \"test/*.test.js\"",
+    "bench:cpu": "node --import ./test/sdkAlias.mjs scripts/cpu-bench.mjs",
+    "bench:cold": "node scripts/cold-bench.mjs",
     "build:dry": "wrangler deploy --dry-run --outdir .wrangler/dry",
+    "check:bundle": "npm run build:dry && node scripts/check-bundle.mjs",
     "dev:mock": "wrangler dev --config wrangler.dev.toml --local --port 8790 --ip 127.0.0.1"
   },
   "dependencies": {
