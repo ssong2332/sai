@@ -44,7 +44,7 @@
 | 대시보드 배포 | `firebase deploy --only hosting` | 2026-08-13 |
 | 대시보드 배포 확인 | `curl https://sai-global-msg-2026.web.app/` | 2026-08-13 |
 | 한글 포함 API 실측 | 본문을 UTF-8 파일로 저장 후 `curl --data-binary @body.json` (🔴 인라인 `-d '{"text":"한글"}'`은 Windows 셸에서 깨져 **모델 결함으로 오진하게 된다** — Lessons #13) | 2026-08-13 |
-| Worker(L33) 설치 · 테스트 | `npm --prefix workers/refine install` · `npm --prefix workers/refine test` (🔴 루트 `npm install`도 필요 — 코어가 루트의 `@anthropic-ai/sdk`를 쓴다. 🔴 2026-10-23부터 `test`는 `--import ./test/sdkAlias.mjs`로 배포본과 같은 SDK 대역을 탄다) | 2026-10-23 |
+| Worker(L33) 설치 · 테스트 | `workers/refine/` 안에서 `npm ci` · `npm --prefix workers/refine test` — 🔴 `npm --prefix workers/refine install`은 쓰지 않는다: `package.json`에 `"sai": "file:../.."`를 몰래 넣는다(2026-10-23 하위 작업 2회 실측) (🔴 루트 `npm install`도 필요 — 코어가 루트의 `@anthropic-ai/sdk`를 쓴다. 🔴 2026-10-23부터 `test`는 `--import ./test/sdkAlias.mjs`로 배포본과 같은 SDK 대역을 탄다) | 2026-10-23 |
 | Worker CPU 추정 | `npm --prefix workers/refine run bench:cpu` (Node 추정치 — 실제 cpuTime은 배포 후 Cloudflare) | 2026-10-23 |
 | Worker 번들 확인(배포 안 함·로그인 불필요) | `npm --prefix workers/refine run build:dry` | 2026-10-23 |
 | Worker 번들에 SDK 없음 확인(build:dry 포함) | `npm --prefix workers/refine run check:bundle` (🔴 `wrangler.toml` `[alias]`가 SDK를 `src/anthropicFetch.js`로 바꾼다 — 기준 112.8 KiB) | 2026-10-23 |
