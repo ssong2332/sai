@@ -148,3 +148,12 @@ test('사고 끄기 스위치 — SAI_ANTHROPIC_THINKING=disabled일 때만 thin
     else process.env.SAI_ANTHROPIC_THINKING = before;
   }
 });
+
+test('실사용 토큰 누계 — 응답 usage를 숫자만 더한다(L30 비용 측정)', async () => {
+  const { anthropicUsage } = await import('../src/core/refine/providers/anthropic.js');
+  const before = { ...anthropicUsage };
+  await run(fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }])));
+  assert.equal(anthropicUsage.calls, before.calls + 1);
+  assert.equal(anthropicUsage.input, before.input + 10);
+  assert.equal(anthropicUsage.output, before.output + 10);
+});

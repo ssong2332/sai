@@ -22,6 +22,13 @@ export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-5-5';
 export const DEFAULT_TIMEOUT_MS = 20_000;
 
 /**
+ * 실제 사용 토큰 누계 (2026-10-23 L30 — Sai 전용 키로 건당 실제 비용을 재기 위해).
+ * 🔴 **숫자만 모은다** — 본문·응답은 담지 않는다(Spec 필수 5). 프로세스 메모리 전용이며,
+ *    회귀 러너(`scripts/refine-live.js`)가 실행 끝에 합계를 출력한다. 서버에서는 읽는 곳이 없다.
+ */
+export const anthropicUsage = { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+
+/**
  * 🔴 사고(thinking) 끄기 시험 스위치 (2026-10-23) — `SAI_ANTHROPIC_THINKING=disabled`일 때만 끈다.
  *    Haiku 5.5는 effort `high` 이하에서만 `disabled`를 받는다(여기는 `low`). 기본은 지금처럼 켜 둔다 —
  *    시험 결과로 기본값을 정한다(Tasks L30).
@@ -99,6 +106,13 @@ export async function callAnthropic(
     }
     throw new RefineCallError(classifyHttpFailure(status, error?.type ?? undefined), `http ${status}`);
   }
+
+  const usage = response?.usage ?? {};
+  anthropicUsage.calls += 1;
+  anthropicUsage.input += usage.input_tokens ?? 0;
+  anthropicUsage.output += usage.output_tokens ?? 0;
+  anthropicUsage.cacheRead += usage.cache_read_input_tokens ?? 0;
+  anthropicUsage.cacheWrite += usage.cache_creation_input_tokens ?? 0;
 
   // 거절·잘림은 「형식에 맞는 답이 없다」로 본다.
   if (response?.stop_reason === 'refusal') throw new RefineCallError(FALLBACK_REASONS.INVALID, 'refusal');
