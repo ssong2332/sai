@@ -22,6 +22,15 @@ export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-5-5';
 export const DEFAULT_TIMEOUT_MS = 20_000;
 
 /** 응답 형태만 고정한다 — 판단 기준은 payload의 instruction이 진다(다른 provider와 같은 프롬프트). */
+/**
+ * 🔴 사고(thinking) 끄기 시험 스위치 (2026-10-23) — `SAI_ANTHROPIC_THINKING=disabled`일 때만 끈다.
+ *    Haiku 5.5는 effort `high` 이하에서만 `disabled`를 받는다(여기는 `low`). 기본은 지금처럼 켜 둔다 —
+ *    시험 결과로 기본값을 정한다(Tasks L30).
+ */
+function thinkingConfig() {
+  return globalThis.process?.env?.SAI_ANTHROPIC_THINKING === 'disabled' ? { thinking: { type: 'disabled' } } : {};
+}
+
 const SYSTEM = 'Respond with exactly one JSON object as specified in the request. No markdown code fences, no text before or after the JSON.';
 
 /** 모델이 지시를 어기고 ```json 울타리를 붙였을 때만 벗긴다 — 본문은 건드리지 않는다. */
@@ -64,6 +73,7 @@ export async function callAnthropic(
       max_tokens: 8000,
       // 교정은 짧은 변환이다 — 사고 깊이를 낮춰 지연·비용을 줄인다(Haiku 5.5 기본값은 medium).
       output_config: { effort: 'low' },
+      ...thinkingConfig(),
       system: SYSTEM,
       messages: [{ role: 'user', content: JSON.stringify(payload) }],
     });

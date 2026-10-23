@@ -130,3 +130,21 @@ test('거절·잘림은 invalid — 형식에 맞는 답이 없다', async () =>
     assert.equal(result.fallbackReason, FALLBACK_REASONS.INVALID, stop);
   }
 });
+
+test('사고 끄기 스위치 — SAI_ANTHROPIC_THINKING=disabled일 때만 thinking을 끈다(기본은 보내지 않음)', async () => {
+  const before = process.env.SAI_ANTHROPIC_THINKING;
+  try {
+    delete process.env.SAI_ANTHROPIC_THINKING;
+    const on = fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }]));
+    await run(on);
+    assert.equal('thinking' in on.seen.body, false);
+
+    process.env.SAI_ANTHROPIC_THINKING = 'disabled';
+    const off = fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }]));
+    await run(off);
+    assert.deepEqual(off.seen.body.thinking, { type: 'disabled' });
+  } finally {
+    if (before === undefined) delete process.env.SAI_ANTHROPIC_THINKING;
+    else process.env.SAI_ANTHROPIC_THINKING = before;
+  }
+});
