@@ -41,7 +41,8 @@ test('🔴 실측 2 — "Manager Park needs to check…"를 잡고 문구에 두
   assert.deepEqual(out, [{ original: '박 과장님', produced: 'Manager Park' }]);
   const text = inventedTitleWarningText(out);
   assert.match(text, /직급을 지어냈을 수 있어요 — "Manager Park"\(원문 「박 과장님」\)/);
-  assert.match(text, /용어집에 등록하면/);
+  // 사용자 결정 A안(2026-10-23) — 지금 화면으로 할 수 있는 행동(용어로 등록)을 원문 표기로 안내한다.
+  assert.match(text, /용어집에 「박 과장님 → 표기」로 등록해 두세요/);
 });
 
 test('여러 단어 직급어·로마자 변형·붙여 쓴 원문·이름 포함도 잡는다', () => {

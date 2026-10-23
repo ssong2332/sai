@@ -276,5 +276,10 @@ export function checkInventedTitles(result, sourceText = '', { glossary = [] } =
 export function inventedTitleWarningText(findings) {
   if (!Array.isArray(findings) || findings.length === 0) return '';
   const list = findings.map((f) => `"${f.produced}"(원문 「${f.original}」)`).join(', ');
-  return `직급을 지어냈을 수 있어요 — ${list}. 등록되지 않은 사람의 직급은 옮기지 않는 게 원칙이에요 — 용어집에 등록하면 원하는 호칭으로 바뀌어요.`;
+  /**
+   * 🔴 안내 문장은 **지금 화면으로 실제 할 수 있는 행동**만 말한다 (2026-10-23 사용자 결정 A안).
+   *    확장에는 사람(person) 항목 등록 화면이 없고 용어(term)만 만들 수 있다(`src/lib/glossary.js`) —
+   *    「박 과장님 → 원하는 표기」를 용어로 등록하면 그대로 바뀐다.
+   */
+  return `직급을 지어냈을 수 있어요 — ${list}. 등록되지 않은 사람의 직급은 옮기지 않는 게 원칙이에요 — 원하는 표기가 있으면 용어집에 「${findings[0].original} → 표기」로 등록해 두세요.`;
 }
