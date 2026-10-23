@@ -14,8 +14,11 @@ export const TEST_ENV = Object.freeze({
   FIREBASE_PROJECT_ID: PROJECT_ID,
   EXTENSION_ID,
   ANTHROPIC_API_KEY: 'test-key-not-real',
-  SAI_ANTHROPIC_THINKING: 'disabled',
+  // 🔴 2026-10-23부터 사고 끔이 코어 기본 — 여기서 켜거나 끄지 않는다(기본값이 실제로 끄는지를 시험한다).
 });
+
+/** 사슬 두 단계 키가 다 있는 env (폴오버 시험용). 값은 지어낸 문자열. */
+export const CHAIN_ENV = Object.freeze({ ...TEST_ENV, GROQ_API_KEY: 'test-groq-key-not-real' });
 
 /** RS256 키 한 쌍 + 그 공개키만 담은 로컬 JWKS. */
 export async function makeKeys(kid = 'test-kid-1') {
@@ -82,6 +85,59 @@ export function fakeAnthropicFetch(raw = goodRaw(), { status = 200 } = {}) {
           }
         : { type: 'error', error: { type: 'rate_limit_error', message: 'test' } };
     return new globalThis.Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  };
+  impl.seen = seen;
+  return impl;
+}
+
+/**
+ * 폴오버 시험용 — URL로 provider를 가려 각각 정해진 상태로 답하는 가짜 fetch (2026-10-23).
+ * 🔴 네트워크 없음. 어느 provider를 몇 번 불렀는지 `seen.byProvider`에 남긴다(본문은 모양 검사용으로만 보관).
+ * @param {Record<'anthropic'|'groq'|'gemini'|'openai', number>} statusByProvider 없으면 200.
+ *   429 → 한도(quota) · 401 → 키 무효(auth) · 500 → 일반 오류(error).
+ */
+export function fakeMultiFetch(statusByProvider = {}, raw = goodRaw()) {
+  const seen = { calls: 0, order: [], byProvider: {} };
+  const providerOf = (url) => {
+    if (url.startsWith('https://api.anthropic.com/')) return 'anthropic';
+    if (url.startsWith('https://api.groq.com/')) return 'groq';
+    if (url.startsWith('https://generativelanguage.googleapis.com/')) return 'gemini';
+    if (url.startsWith('https://api.openai.com/')) return 'openai';
+    return 'unknown';
+  };
+  const errorType = { 429: 'rate_limit_error', 401: 'authentication_error', 500: 'api_error' };
+  const impl = async (url) => {
+    const provider = providerOf(String(url));
+    seen.calls += 1;
+    seen.order.push(provider);
+    seen.byProvider[provider] = (seen.byProvider[provider] ?? 0) + 1;
+    const status = statusByProvider[provider] ?? 200;
+    const reply = (body) =>
+      new globalThis.Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    if (status !== 200) {
+      return reply(
+        provider === 'anthropic'
+          ? { type: 'error', error: { type: errorType[status] ?? 'api_error', message: 'test' } }
+          : { error: { code: status === 429 ? 'rate_limit_exceeded' : 'test_error', message: 'test' } },
+      );
+    }
+    if (provider === 'anthropic') {
+      return reply({
+        id: 'msg_test',
+        type: 'message',
+        role: 'assistant',
+        model: 'claude-haiku-5-5',
+        content: [{ type: 'text', text: JSON.stringify(raw) }],
+        stop_reason: 'end_turn',
+        stop_sequence: null,
+        usage: { input_tokens: 4900, output_tokens: 410 },
+      });
+    }
+    if (provider === 'gemini') {
+      return reply({ candidates: [{ content: { parts: [{ text: JSON.stringify(raw) }] }, finishReason: 'STOP' }] });
+    }
+    // groq·openai — OpenAI 호환 chat completions 모양.
+    return reply({ choices: [{ message: { role: 'assistant', content: JSON.stringify(raw) } }] });
   };
   impl.seen = seen;
   return impl;

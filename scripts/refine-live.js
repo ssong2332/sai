@@ -3,15 +3,15 @@
  * `/v1/refine` 실 API 통합 러너 — 선별 20건(`test/refine.cases.js`)을 실제 LLM 호출로 돌린다.
  *
  * 사용:
- *   GEMINI_API_KEY=... node scripts/refine-live.js                 # 기본 (Spec §0 기준 경로)
- *   OPENAI_API_KEY=... node scripts/refine-live.js --provider openai   # 대체 provider
+ *   ANTHROPIC_API_KEY=... node scripts/refine-live.js               # 기본 (Spec §0 — Claude)
+ *   GEMINI_API_KEY=... node scripts/refine-live.js --provider gemini  # 사슬 밖 provider는 명시
  *   [--bypass-cache] [--model <이름>] [--delay <ms>]
  *
  * 🔴 `--delay <ms>`: 건 사이 대기(2026-10-23 추가). Gemini 무료 티어·OpenAI TPM처럼 **분당 한도**가 있는
  *    provider는 연달아 부르면 중간부터 429가 난다(CLAUDE.md — 건당 15초 간격 권장).
  *
- * 🔴 provider 기본값 — **Gemini를 먼저 본다**(2026-10-01 L03 변경. 2026-08-17~09-30에는 OpenAI가 먼저였다).
- *    `functions/index.js`의 판정표·`server/refine-proxy.js`와 **같은 순서**여야 한다.
+ * 🔴 provider 기본값 — **키가 있는 사슬 첫 provider**(2026-10-23: anthropic → groq. 그전: 10-01 L03 gemini 먼저,
+ *    08-17~09-30 OpenAI 먼저). `failover.js` `pickDefaultProvider` 하나로 고르며 Functions·프록시·Worker와 같다.
  *    셋 중 하나만 바꾸면 "로컬에선 되는데 배포하면 다르다"가 시작된다 — 실제로 Gemini
  *    시절 역번역 문제를 그 계열로 4번 오진했다.
  * 🔴 키가 없으면 **실행하지 않고 종료 코드 2로 끝난다.** 미실행을 "통과"로 기록하지 않기 위함이다
@@ -23,6 +23,7 @@ import { refine, MemoryCacheStore, PROVIDERS } from '../src/core/refine/index.js
 import { REFINE_CASES, judgeCase } from '../test/refine.cases.js';
 // L30 — Claude 실제 사용 토큰(숫자만). 다른 provider는 집계하지 않는다.
 import { anthropicUsage } from '../src/core/refine/providers/anthropic.js';
+import { DEFAULT_PROVIDER_ORDER, pickDefaultProvider } from '../src/core/refine/failover.js';
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -34,9 +35,12 @@ const bypassCache = args.includes('--bypass-cache');
 const model = flag('--model');
 const delayMs = Number(flag('--delay') ?? 0);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-// 🔴 2026-10-01 L03 — gemini 먼저(배포본·프록시와 같은 순서, `test/providerDefaults.unit.test.js`).
+// 🔴 2026-10-23 — 키가 있는 사슬 첫 provider(배포본·프록시·Worker와 같은 함수, `test/providerDefaults.unit.test.js`).
+//    둘 다 없으면 anthropic으로 두고 아래에서 exit 2 — 사슬 밖으로 조용히 내려가지 않는다.
 const providerName =
-  flag('--provider') ?? (process.env.GEMINI_API_KEY ? 'gemini' : 'openai');
+  flag('--provider') ??
+  pickDefaultProvider((name) => Boolean(process.env[PROVIDERS[name]?.envKey])) ??
+  DEFAULT_PROVIDER_ORDER[0];
 
 const provider = PROVIDERS[providerName];
 if (!provider) {

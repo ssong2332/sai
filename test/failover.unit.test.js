@@ -3,8 +3,8 @@
  *
  * 🔴 **여기서 검사하는 것은 「언제 넘기는가」이지 provider 구현이 아니다.** 실제 호출은
  *    네트워크가 필요하고 한도를 태운다 — 판정 규칙만 표로 고정해 둔다.
- * 🔴 규칙이 두 곳(`server/refine-proxy.js` · `functions/index.js`)에 있으므로, 같은 표를
- *    양쪽에서 지키는지 **여기 한 곳에서** 잠근다. 한쪽만 고치면 이 테스트가 깨진다.
+ * 🔴 규칙이 세 곳(`server/refine-proxy.js` · `functions/index.js` · `workers/refine/src/handler.js`)에 있으므로,
+ *    같은 표를 모두 지키는지 **여기 한 곳에서** 잠근다. 한쪽만 고치면 이 테스트가 깨진다.
  */
 
 import test from 'node:test';
@@ -61,8 +61,11 @@ test('🔴 실제 판정 함수 `shouldFailOver`가 위 표와 같다', async ()
   assert.equal(shouldFailOver(null), false);
 });
 
-test('🔴 두 서버가 모두 폴오버를 갖고 있다 — 한쪽만 고치면 "로컬에선 되는데 배포하면 다르다"', () => {
-  for (const file of ['../server/refine-proxy.js', '../functions/index.js']) {
+// 🔴 2026-10-23 — Worker(`workers/refine/src/handler.js`)도 같은 규칙을 갖는다(세 서버).
+const SERVERS = ['../server/refine-proxy.js', '../functions/index.js', '../workers/refine/src/handler.js'];
+
+test('🔴 세 서버가 모두 폴오버를 갖고 있다 — 한쪽만 고치면 "로컬에선 되는데 배포하면 다르다"', () => {
+  for (const file of SERVERS) {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.match(source, /runWithFailover/, `${file}에 폴오버가 없다`);
     assert.match(source, /providerUsed/, `${file}이 어느 provider가 답했는지 남기지 않는다`);
@@ -89,13 +92,19 @@ test('🔴 캐시 수명 상한 6시간 — 두 서버 모두', () => {
  *    그 증상이 「로컬에선 되는데 배포하면 다르다」다 — 그래서 두 서버가 그 파일을 **임포트하는지**
  *    까지 잠근다.
  */
-test('🔴 폴오버 사슬 순서 — gemini → openai → openai/gpt-4.1 (2026-10-01 L03)', async () => {
+test('🔴 폴오버 사슬 순서 — anthropic → groq (2026-10-23, 그전 10-01 L03은 gemini → openai → openai/gpt-4.1)', async () => {
   const { FAILOVER_CHAIN } = await import('../src/core/refine/failover.js');
   assert.deepEqual(FAILOVER_CHAIN, [
-    { provider: 'gemini', model: null },
-    { provider: 'openai', model: null },
-    { provider: 'openai', model: 'gpt-4.1' },
+    { provider: 'anthropic', model: null },
+    { provider: 'groq', model: null },
   ]);
+});
+
+test('🔴 Gemini·OpenAI는 사슬에 없다 — Gemini 무료 티어는 입력을 학습에 쓴다(사용자 결정 (b)), OpenAI 키는 무효', async () => {
+  const { FAILOVER_CHAIN } = await import('../src/core/refine/failover.js');
+  for (const outside of ['gemini', 'openai']) {
+    assert.ok(!FAILOVER_CHAIN.some((step) => step.provider === outside), `사슬에 ${outside}가 있다`);
+  }
 });
 
 test('🔴 gpt-5 계열은 사슬에 없다 — temperature 0을 거부해 결정성이 깨진다', async () => {
@@ -108,22 +117,24 @@ test('🔴 gpt-5 계열은 사슬에 없다 — temperature 0을 거부해 결�
 test('🔴 이미 쓴 단계는 다시 시도하지 않는다 — 같은 통에서 또 퍼내지 않게', async () => {
   const { remainingChain } = await import('../src/core/refine/failover.js');
 
-  const afterPrimary = remainingChain({ provider: 'gemini', model: null });
-  assert.deepEqual(afterPrimary, [
-    { provider: 'openai', model: null },
-    { provider: 'openai', model: 'gpt-4.1' },
-  ]);
+  assert.deepEqual(remainingChain({ provider: 'anthropic', model: null }), [{ provider: 'groq', model: null }]);
+  assert.deepEqual(remainingChain({ provider: 'groq', model: null }), [{ provider: 'anthropic', model: null }]);
 
-  // 🔴 provider가 같아도 «모델»이 다르면 다른 단계다 — 이걸 놓치면 gpt-4.1이 통째로 건너뛰어진다.
-  const afterGpt41 = remainingChain({ provider: 'openai', model: 'gpt-4.1' });
-  assert.deepEqual(afterGpt41, [
-    { provider: 'gemini', model: null },
-    { provider: 'openai', model: null },
+  // 사슬 밖 provider(Functions 임시 기본 gemini · 명시 요청)에서 시작해도 규칙이 그대로 성립한다.
+  assert.deepEqual(remainingChain({ provider: 'gemini', model: null }), [
+    { provider: 'anthropic', model: null },
+    { provider: 'groq', model: null },
   ]);
 });
 
-test('🔴 두 서버가 사슬 «표»를 각자 적지 않고 같은 파일을 임포트한다', () => {
-  for (const file of ['../server/refine-proxy.js', '../functions/index.js']) {
+test('🔴 provider가 같아도 «모델»이 다르면 다른 단계다 — 놓치면 같은 provider의 다른 모델 단계가 건너뛰어진다', async () => {
+  const { sameStep } = await import('../src/core/refine/failover.js');
+  assert.equal(sameStep({ provider: 'openai', model: 'gpt-4.1' }, { provider: 'openai', model: null }), false);
+  assert.equal(sameStep({ provider: 'anthropic', model: null }, { provider: 'anthropic' }), true);
+});
+
+test('🔴 세 서버가 사슬 «표»를 각자 적지 않고 같은 파일을 임포트한다', () => {
+  for (const file of SERVERS) {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.match(source, /remainingChain/, `${file}이 사슬을 쓰지 않는다`);
     assert.match(source, /failover\.js/, `${file}이 사슬 표를 임포트하지 않는다`);

@@ -1,6 +1,6 @@
 /**
- * Anthropic(Claude) provider — **시험용 옵션** (2026-10-23 사용자 결정, Tasks 참조).
- * 기본 provider 순서(gemini 우선)는 바꾸지 않는다 — `--provider anthropic`으로 명시할 때만 쓴다.
+ * Anthropic(Claude) provider — 🔴 **2026-10-23부터 기본 provider다** (사용자 결정, Spec §0 · Tasks L30).
+ * 폴오버 사슬 1번(`failover.js` — anthropic → groq). 같은 날 시험용 옵션으로 붙였다가 L30 실측 후 기본이 됐다.
  *
  * API 형태 근거: 공식 SDK `@anthropic-ai/sdk` 1.1.0 (`client.d.ts` ClientOptions: apiKey·timeout(ms)·fetch·maxRetries,
  * `core/error.d.ts` APIError.status·type, `resources/shared.d.ts` ErrorType).
@@ -29,12 +29,18 @@ export const DEFAULT_TIMEOUT_MS = 20_000;
 export const anthropicUsage = { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
 /**
- * 🔴 사고(thinking) 끄기 시험 스위치 (2026-10-23) — `SAI_ANTHROPIC_THINKING=disabled`일 때만 끈다.
- *    Haiku 5.5는 effort `high` 이하에서만 `disabled`를 받는다(여기는 `low`). 기본은 지금처럼 켜 둔다 —
- *    시험 결과로 기본값을 정한다(Tasks L30).
+ * 🔴 사고(thinking) 스위치 — **기본은 끈다** (2026-10-23 사용자 결정, L30 실측 근거).
+ *    L30: 사고 끔 건당 $0.00070·중앙값 2.4~2.5초 / 켬(파라미터 생략 = 모델 기본) $0.00107·6.2~6.7초.
+ *    Haiku 5.5는 effort `high` 이하에서만 `disabled`를 받는다(여기는 `low`).
+ *
+ * | `SAI_ANTHROPIC_THINKING` | 보내는 것 | 용도 |
+ * |---|---|---|
+ * | 없음 · `disabled` · 그 밖의 값 | `thinking: {type:'disabled'}` | 기본(운영) — 오타가 비용·지연을 3배로 올리지 않게 모르는 값도 끔 |
+ * | `adaptive` | `thinking` 생략(모델 기본) | 실험 전용 — L30의 「켬」 측정과 같은 조건 |
  */
+export const THINKING_ON_VALUE = 'adaptive';
 function thinkingConfig() {
-  return globalThis.process?.env?.SAI_ANTHROPIC_THINKING === 'disabled' ? { thinking: { type: 'disabled' } } : {};
+  return globalThis.process?.env?.SAI_ANTHROPIC_THINKING === THINKING_ON_VALUE ? {} : { thinking: { type: 'disabled' } };
 }
 
 /**

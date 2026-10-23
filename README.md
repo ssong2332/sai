@@ -21,8 +21,8 @@
 | 항목 | 값 |
 |---|---|
 | 확장 버전 | **v0.1.6** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
-| 주 provider | OpenAI `gpt-4o` |
-| 한도 폴오버 | **openai → gemini → openai/`gpt-4.1`** ([src/core/refine/failover.js](src/core/refine/failover.js)) |
+| 주 provider | Anthropic Claude `claude-haiku-5-5` (사고 끔, 2026-10-23 — Spec §0) |
+| 한도 폴오버 | **anthropic → groq** ([src/core/refine/failover.js](src/core/refine/failover.js)) — Gemini·OpenAI는 명시 요청만 |
 | 단위 테스트 | 775건 |
 
 🔴 **교정 품질을 고칠 때 «어느 쪽»을 배포해야 하는지 반드시 확인한다** (2026-08-20에 실제로
@@ -81,10 +81,10 @@ npm run dev
 
 | 변수 | 위치 | 설명 |
 |---|---|---|
-| `OPENAI_API_KEY` | Secret Manager + 로컬 `.env` | **주 provider**(`gpt-4o`). 서버 전용, 클라이언트 번들 포함 금지 |
-| `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | **예비 provider.** 로컬 전용이 아니라 **배포에서도 쓴다** — 한도 폴오버 2단계 |
-| `ANTHROPIC_API_KEY` | 로컬 `.env` | **시험용 옵션**(2026-10-23, Claude Haiku 5.5). `--provider anthropic`으로 명시할 때만 쓴다 — 기본 순서·폴오버에는 없음, 배포 미사용 |
-| `GROQ_API_KEY` | 로컬 `.env` | **시험용 옵션**(2026-10-23, `openai/gpt-oss-120b`). `--provider groq`로 명시할 때만 — 기본 순서·폴오버에는 없음, 배포 미사용 |
+| `OPENAI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖 — 명시 요청만(키 무효 2026-09-28~). 서버 전용, 클라이언트 번들 포함 금지 |
+| `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖(2026-10-23) — 명시 요청만. 🔴 배포 Functions는 사슬 시크릿 등록 전까지 **임시 기본** |
+| `ANTHROPIC_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **기본 provider**(2026-10-23, Claude Haiku 5.5, 사고 끔 — `SAI_ANTHROPIC_THINKING=adaptive`로만 켬). 폴오버 1단계 |
+| `GROQ_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **폴오버 예비**(2026-10-23, `openai/gpt-oss-120b`). 폴오버 2단계 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
 | `SAI_CACHE_TTL_MS` | 로컬 `.env` | 프록시 캐시 수명(기본 10분 · 상한 6시간). 시연 촬영 때 호출을 줄이는 용도 |
 
@@ -116,17 +116,15 @@ https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/refineV1
 
 | 순서 | provider · 모델 | 넘어가는 조건 |
 |---|---|---|
-| 1 | openai · `gpt-4o` | — |
-| 2 | gemini · 기본 | 1번이 `quota` |
-| 3 | openai · `gpt-4.1` | 2번이 `quota` |
+| 1 | anthropic · `claude-haiku-5-5` | — |
+| 2 | groq · `openai/gpt-oss-120b` | 1번이 `quota`·`auth` |
 
-- 🔴 **한도는 모델별로 따로다** — 그래서 3단계가 성립한다(같은 키인데 `gpt-4o`가 0일 때
-  `gpt-4.1`은 별도 한도를 갖는다는 것을 응답 헤더로 실측했다).
-- 🔴 **`quota`일 때«만»** 넘긴다. 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패한다.
+- 2026-10-23 변경(이전: 10-01 gemini → openai → openai/`gpt-4.1`). Gemini는 무료 티어 학습 사용 때문에 예비로도 두지 않는다(Spec §0).
+- 🔴 **`quota`·`auth`(키 무효)일 때«만»** 넘긴다. 네트워크·형식 오류는 두 번 불러도 같은 이유로 실패한다. 키 없는 단계는 건너뛴다.
 - 🔴 요청이 provider를 **명시**했으면 대체하지 않는다 — 어느 모델의 출력인지 모르는 채 품질을
   논하게 되기 때문이다.
-- 표는 **한 파일에만** 있다([failover.js](src/core/refine/failover.js)). 프록시와 Functions가
-  같은 파일을 임포트하므로 두 곳이 어긋날 수 없다.
+- 표는 **한 파일에만** 있다([failover.js](src/core/refine/failover.js)). 프록시·Functions·Worker가
+  같은 파일을 임포트하므로 어긋날 수 없다.
 - 어느 쪽이 답했는지는 응답의 `providerUsed`·`modelUsed`에 남는다.
 
 ### 로컬 프록시 (오프라인 개발용)

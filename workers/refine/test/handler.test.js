@@ -54,7 +54,7 @@ test('성공 교정 — 기존 refineV1과 같은 응답 계약, Claude는 가�
   const sent = fetchImpl.seen.bodies[0];
   assert.equal(sent.model, 'claude-haiku-5-5');
   assert.equal('temperature' in sent, false, '🔴 temperature는 보내면 400');
-  assert.deepEqual(sent.thinking, { type: 'disabled' }, 'env SAI_ANTHROPIC_THINKING=disabled가 코어까지 가야 한다');
+  assert.deepEqual(sent.thinking, { type: 'disabled' }, '🔴 설정 없이도 사고가 꺼져야 한다(2026-10-23 기본)');
 
   assert.equal(usageStore.requests.length, 1);
   assert.deepEqual(Object.keys(usageStore.requests[0]).sort(), ['fallback', 'fallbackReason', 'latencyMs', 'mode']);
@@ -68,7 +68,7 @@ test('같은 문장 두 번 → 두 번째는 캐시(Claude 1회)', async () => 
   assert.equal(fetchImpl.seen.calls, 1);
 });
 
-test('Claude 429 → 200 폴백(quota) — 폴오버 없음(provider 하나)', async () => {
+test('Claude 429 + GROQ 키 없음 → 200 폴백(quota) — 키 없는 단계는 건너뛰고 대체 호출 없음', async () => {
   const { handle, fetchImpl } = setup({ fetchImpl: fakeAnthropicFetch(undefined, { status: 429 }) });
   const res = await handle(refineRequest(token, BASE_BODY), TEST_ENV);
   assert.equal(res.status, 200);
@@ -138,7 +138,7 @@ test('1단계 미지원 mode(decode·decisions·reply) → 501, 상한·LLM 안 
   assert.equal(usageStore.dailyUsers.size, 0);
 });
 
-test('provider 명시가 anthropic이 아니면 대체하지 않고 500', async () => {
+test('명시 provider(gemini)의 키가 없으면 대체하지 않고 500', async () => {
   const { handle, fetchImpl } = setup();
   const res = await handle(refineRequest(token, { ...BASE_BODY, provider: 'gemini' }), TEST_ENV);
   assert.equal(res.status, 500);
@@ -201,4 +201,16 @@ test('🔴 Zero Retention — 성공·폴백·401·400 어느 경로에서도 �
       assert.equal(all.includes(needle), false, `로그에 남았다: ${needle.slice(0, 12)}…`);
     }
   }
+});
+
+test('🔴 사고 스위치 — SAI_ANTHROPIC_THINKING=adaptive일 때만 켠다(실험용), /health도 같은 값을 보고한다', async () => {
+  const { handle, fetchImpl } = setup();
+  const env = { ...TEST_ENV, SAI_ANTHROPIC_THINKING: 'adaptive' };
+  assert.equal((await handle(refineRequest(token, BASE_BODY), env)).status, 200);
+  assert.equal('thinking' in fetchImpl.seen.bodies[0], false, 'adaptive면 thinking을 생략(모델 기본)해야 한다');
+  const health = await (await handle(refineRequest(null, undefined, { method: 'GET', path: '/health' }), env)).json();
+  assert.equal(health.thinking, 'adaptive');
+  process.env.SAI_ANTHROPIC_THINKING = 'disabled'; // 다른 테스트에 새지 않게
+  const off = await (await handle(refineRequest(null, undefined, { method: 'GET', path: '/health' }), TEST_ENV)).json();
+  assert.equal(off.thinking, 'disabled');
 });
