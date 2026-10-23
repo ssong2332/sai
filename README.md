@@ -84,6 +84,7 @@ npm run dev
 | `OPENAI_API_KEY` | Secret Manager + 로컬 `.env` | **주 provider**(`gpt-4o`). 서버 전용, 클라이언트 번들 포함 금지 |
 | `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | **예비 provider.** 로컬 전용이 아니라 **배포에서도 쓴다** — 한도 폴오버 2단계 |
 | `ANTHROPIC_API_KEY` | 로컬 `.env` | **시험용 옵션**(2026-10-23, Claude Haiku 5.5). `--provider anthropic`으로 명시할 때만 쓴다 — 기본 순서·폴오버에는 없음, 배포 미사용 |
+| `GROQ_API_KEY` | 로컬 `.env` | **시험용 옵션**(2026-10-23, `openai/gpt-oss-120b`). `--provider groq`로 명시할 때만 — 기본 순서·폴오버에는 없음, 배포 미사용 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
 | `SAI_CACHE_TTL_MS` | 로컬 `.env` | 프록시 캐시 수명(기본 10분 · 상한 6시간). 시연 촬영 때 호출을 줄이는 용도 |
 

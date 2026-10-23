@@ -12,6 +12,7 @@ import { FALLBACK_REASONS } from '../fallback.js';
 import { callOpenAI, DEFAULT_OPENAI_MODEL } from './openai.js';
 import { callGemini, DEFAULT_GEMINI_MODEL } from './gemini.js';
 import { callAnthropic, DEFAULT_ANTHROPIC_MODEL } from './anthropic.js';
+import { callGroq, DEFAULT_GROQ_MODEL } from './groq.js';
 
 /** 호출 실패를 폴백 사유로 분류해 실어 나른다 — 메시지 본문은 담지 않는다. */
 export class RefineCallError extends Error {
@@ -27,6 +28,8 @@ export const PROVIDERS = {
   gemini: { call: callGemini, defaultModel: DEFAULT_GEMINI_MODEL, envKey: 'GEMINI_API_KEY' },
   // 🔴 시험용 옵션(2026-10-23) — `--provider anthropic`으로 명시할 때만 쓴다. 폴오버 사슬(`failover.js`)에는 없다.
   anthropic: { call: callAnthropic, defaultModel: DEFAULT_ANTHROPIC_MODEL, envKey: 'ANTHROPIC_API_KEY' },
+  // 🔴 시험용 옵션(2026-10-23) — OpenAI 호환 엔드포인트 재사용. 폴오버 사슬에는 없다.
+  groq: { call: callGroq, defaultModel: DEFAULT_GROQ_MODEL, envKey: 'GROQ_API_KEY' },
 };
 
 /** Spec 기준 provider. 명시하지 않으면 이 값이 쓰인다. */
