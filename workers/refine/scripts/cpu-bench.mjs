@@ -127,7 +127,8 @@ await bench('③ buildRefinePayload', async () => buildRefinePayload(payloadInpu
 const payload = buildRefinePayload(payloadInput);
 await bench('④ 캐시 키 sha256', async () => computeCacheKey({ model: 'anthropic:claude-haiku-5-5', promptVersion: 'x', payload }));
 
-await bench('⑤ SDK 호출(조립·가짜 응답 파싱)', () =>
+// 🔴 2026-10-23부터 `npm run bench:cpu`는 `--import ./test/sdkAlias.mjs`로 돈다 — 배포본처럼 SDK 대신 대역(`src/anthropicFetch.js`).
+await bench('⑤ provider 호출(대역 — 조립·가짜 응답 파싱)', () =>
   callAnthropic(payload, {
     apiKey: 'test-key-not-real',
     fetchImpl,

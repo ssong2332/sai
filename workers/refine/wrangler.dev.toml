@@ -5,6 +5,10 @@ main = "dev/dev-entry.js"
 compatibility_date = "2026-10-15"
 compatibility_flags = ["nodejs_compat"]
 
+# 🔴 운영(`wrangler.toml`)과 같은 SDK 대역 — 로컬 workerd에서도 배포본과 같은 코드가 돈다(2026-10-23 L33).
+[alias]
+"@anthropic-ai/sdk" = "./src/anthropicFetch.js"
+
 [vars]
 FIREBASE_PROJECT_ID = "sai-global-msg-2026"
 EXTENSION_ID = "ogbcccaaojphhgobeeidpafokjieckdf"
