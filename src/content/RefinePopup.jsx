@@ -7,6 +7,8 @@ import { REGIONS } from '../lib/regions.js';
 import { checkNamesPreserved, nameWarningText } from '../core/refine/names.js';
 // L31 — 원문 숫자가 교정문에서 빠졌는지(모델 무관, 코드 대조).
 import { checkNumbersPreserved, numberWarningText } from '../core/refine/numberCheck.js';
+import { checkGlossaryApplied, glossaryWarningText } from '../core/refine/glossaryCheck.js';
+import { checkIntentDrift, intentDriftWarningText } from '../core/refine/intentDrift.js';
 import {
   checkBackTranslation,
   backFailMessage,
@@ -307,7 +309,13 @@ export default function RefinePopup({
 
   /** 범례에 무엇을 보여줄지 — 실제로 표시된 것만 설명한다(없는 색을 설명하면 더 헷갈린다). */
   const riskCount = useMemo(() => findRiskySpans(swapped.text).length, [swapped.text]);
-  const glossaryCount = result?.appliedGlossary?.length ?? 0;
+  /**
+   * 🔴 **L28 안전망 A — 용어집 「적용했다」는 모델의 신고를 교정문과 대조한다**
+   *    (`core/refine/glossaryCheck.js`). 실측(N-02): 「Sujin Kim」을 적용했다고 신고했지만
+   *    교정문에 없었다. 「적용됨」 개수·초록 강조는 **대조를 통과한 항목만** 쓴다.
+   */
+  const glossaryCheck = useMemo(() => checkGlossaryApplied(result), [result]);
+  const glossaryCount = glossaryCheck.applied.length;
 
   /**
    * 2026-08-14 제안 ③ — 「왜 이렇게 바꿨나」.
@@ -374,6 +382,20 @@ export default function RefinePopup({
   const numberDrift = useMemo(
     () => checkNumbersPreserved(result, sourceText),
     [result, sourceText],
+  );
+
+  /**
+   * 🔴 **L28 안전망 B — 「누가 할 일인가」가 바뀌었는지** (`core/refine/intentDrift.js`).
+   *    실측: 「확인하겠습니다」(내 약속)가 역번역 「확인해 주실 수 있나요?」(상대에게 요청)로,
+   *    「김 대리님이 확인해 주셔야 합니다」(3인칭 전달)가 수신자에게 직접 부탁하는 말로 바뀌었다.
+   *    원문·역번역의 문장 끝을 비교한다 — 한국어 원문만, 확실한 끝맺음만. 막지 않는다.
+   */
+  const intentDrift = useMemo(
+    () =>
+      checkIntentDrift(result, sourceText, {
+        recipientNames: recipient?.name ? [recipient.name] : [],
+      }),
+    [result, sourceText, recipient?.name],
   );
 
   /**
@@ -733,7 +755,7 @@ export default function RefinePopup({
         <p className="sai-back-text">
           <Highlighted
             text={swapRiskyEmoji(result?.backTranslation ?? '').text}
-            phrases={result?.appliedGlossary ?? []}
+            phrases={glossaryCheck.applied}
             meanings={glossaryMeanings}
             risks={false}
           />
@@ -1186,7 +1208,7 @@ export default function RefinePopup({
                   토글이 접는 것은 아래 범례(설명)뿐이다. */}
               <Highlighted
                 text={swapped.text}
-                phrases={result.appliedGlossary}
+                phrases={glossaryCheck.applied}
                 memes={memeSpans}
                 onMemeHover={setHoveredMeme}
               />
@@ -1295,6 +1317,24 @@ export default function RefinePopup({
               <p className="sai-blank-text">{numberWarningText(numberDrift)}</p>
             </div>
           )}
+
+          {/* L28 안전망 A — 숫자 경고와 같은 자리·같은 무게. 🔴 고쳐 쓰지 않고 알리기만 한다. */}
+          {glossaryCheck.missing.length > 0 && (
+            <div className="sai-blank" role="status">
+              <span className="sai-missing-head sai-blank-head">
+                용어집 확인 필요 — {glossaryCheck.missing.join(' · ')}
+              </span>
+              <p className="sai-blank-text">{glossaryWarningText(glossaryCheck.missing)}</p>
+            </div>
+          )}
+
+          {/* L28 안전망 B — 같은 자리·같은 무게. 역번역이 접혀 있어도 보이게 토글 밖에 둔다. */}
+          {intentDrift.map((kind) => (
+            <div key={kind} className="sai-blank" role="status">
+              <span className="sai-missing-head sai-blank-head">누가 할 일인지 확인 필요</span>
+              <p className="sai-blank-text">{intentDriftWarningText(kind)}</p>
+            </div>
+          ))}
 
           {missing.length > 0 && (
             <div className="sai-missing" role="status">
