@@ -4,6 +4,9 @@ dist/
 .env.local
 .env.*.local
 .firebase/
+# Cloudflare Worker(L33) — 로컬 workerd 상태·번들 산출물, 로컬 시크릿 파일
+.wrangler/
+.dev.vars
 firebase-debug.log
 *.log
 .DS_Store

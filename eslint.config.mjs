@@ -32,6 +32,9 @@ export default [
       'dist/**',
       'node_modules/**',
       'functions/node_modules/**',
+      // 🔴 L33 Cloudflare Worker — 자체 의존성(jose·wrangler)과 wrangler 번들 산출물. 소스(`workers/*/src` 등)는 검사한다.
+      'workers/*/node_modules/**',
+      'workers/*/.wrangler/**',
       'dashboard/dist/**',
       'sai-extension-*/**',
       // 🔴 Claude Code 워크트리(2026-10-14) — 다른 작업 사본의 빌드 산출물까지 검사해 `npm test`가 실패했다.
