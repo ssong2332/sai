@@ -1,0 +1,12 @@
+# 🔴 로컬 workerd 확인 전용 — 배포 금지(`dev/dev-entry.js` 헤더 참조). 실행: `npm run dev:mock`
+# 운영 설정은 `wrangler.toml`. 여기 값은 전부 지어낸 것이다(실제 키 아님 — 가짜 fetch가 받으므로 쓰이지 않는다).
+name = "sai-refine-dev"
+main = "dev/dev-entry.js"
+compatibility_date = "2026-10-15"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_ID = "sai-global-msg-2026"
+EXTENSION_ID = "ogbcccaaojphhgobeeidpafokjieckdf"
+SAI_ANTHROPIC_THINKING = "disabled"
+ANTHROPIC_API_KEY = "dev-fake-key-not-real"

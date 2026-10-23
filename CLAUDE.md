@@ -44,6 +44,10 @@
 | 대시보드 배포 | `firebase deploy --only hosting` | 2026-08-13 |
 | 대시보드 배포 확인 | `curl https://sai-global-msg-2026.web.app/` | 2026-08-13 |
 | 한글 포함 API 실측 | 본문을 UTF-8 파일로 저장 후 `curl --data-binary @body.json` (🔴 인라인 `-d '{"text":"한글"}'`은 Windows 셸에서 깨져 **모델 결함으로 오진하게 된다** — Lessons #13) | 2026-08-13 |
+| Worker(L33) 설치 · 테스트 | `npm --prefix workers/refine install` · `npm --prefix workers/refine test` (🔴 루트 `npm install`도 필요 — 코어가 루트의 `@anthropic-ai/sdk`를 쓴다) | 2026-10-23 |
+| Worker CPU 추정 | `npm --prefix workers/refine run bench:cpu` (Node 추정치 — 실제 cpuTime은 배포 후 Cloudflare) | 2026-10-23 |
+| Worker 번들 확인(배포 안 함·로그인 불필요) | `npm --prefix workers/refine run build:dry` | 2026-10-23 |
+| Worker 로컬 workerd(가짜 키·가짜 Claude, 🔴 배포 금지 설정) | `npm --prefix workers/refine run dev:mock` → `http://127.0.0.1:8790` (`/__dev/token`으로 시험 토큰) | 2026-10-23 |
 
 > 🔴 **`.env`는 git 워크트리마다 따로 있다** (untracked 파일은 공유되지 않는다). 워크트리에서
 > 작업하면 그 워크트리 루트에 `.env`가 있어야 `npm run proxy`·vite가 값을 읽는다.

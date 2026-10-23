@@ -1,0 +1,18 @@
+{
+  "name": "sai-refine-worker",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "bench:cpu": "node scripts/cpu-bench.mjs",
+    "build:dry": "wrangler deploy --dry-run --outdir .wrangler/dry",
+    "dev:mock": "wrangler dev --config wrangler.dev.toml --local --port 8790 --ip 127.0.0.1"
+  },
+  "dependencies": {
+    "jose": "^6.2.13"
+  },
+  "devDependencies": {
+    "wrangler": "^4.152.0"
+  }
+}
