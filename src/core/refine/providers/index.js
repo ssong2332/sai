@@ -11,6 +11,7 @@
 import { FALLBACK_REASONS } from '../fallback.js';
 import { callOpenAI, DEFAULT_OPENAI_MODEL } from './openai.js';
 import { callGemini, DEFAULT_GEMINI_MODEL } from './gemini.js';
+import { callAnthropic, DEFAULT_ANTHROPIC_MODEL } from './anthropic.js';
 
 /** 호출 실패를 폴백 사유로 분류해 실어 나른다 — 메시지 본문은 담지 않는다. */
 export class RefineCallError extends Error {
@@ -24,6 +25,8 @@ export class RefineCallError extends Error {
 export const PROVIDERS = {
   openai: { call: callOpenAI, defaultModel: DEFAULT_OPENAI_MODEL, envKey: 'OPENAI_API_KEY' },
   gemini: { call: callGemini, defaultModel: DEFAULT_GEMINI_MODEL, envKey: 'GEMINI_API_KEY' },
+  // 🔴 시험용 옵션(2026-10-23) — `--provider anthropic`으로 명시할 때만 쓴다. 폴오버 사슬(`failover.js`)에는 없다.
+  anthropic: { call: callAnthropic, defaultModel: DEFAULT_ANTHROPIC_MODEL, envKey: 'ANTHROPIC_API_KEY' },
 };
 
 /** Spec 기준 provider. 명시하지 않으면 이 값이 쓰인다. */
@@ -46,6 +49,7 @@ export function resolveProvider(name = SPEC_PROVIDER) {
  * | 조건 | 사유 | 근거 |
  * |---|---|---|
  * | 429 · `insufficient_quota` · `rate_limit_exceeded` · `RESOURCE_EXHAUSTED` | quota | 2026-08-13·08-17 실측 |
+ * | `billing_error` | quota | Anthropic SDK `ErrorType`(크레딧 소진) — 🔴 미실측 |
  * | 401 · `invalid_api_key` | auth | OpenAI 가짜 키 실측(2026-10-12 L15) |
  * | 상세 사유 `API_KEY_INVALID` | auth | Gemini 가짜 키 실측 — **400** `INVALID_ARGUMENT`로 온다(2026-10-12) |
  * | 403 | auth | 🔴 추정(미실측) — 키 정지·API 미사용 설정. 어느 쪽이든 키·콘솔을 손봐야 한다 |
@@ -60,7 +64,8 @@ export function classifyHttpFailure(status, errorCode, detailReason) {
     status === 429 ||
     errorCode === 'insufficient_quota' ||
     errorCode === 'rate_limit_exceeded' ||
-    errorCode === 'RESOURCE_EXHAUSTED'
+    errorCode === 'RESOURCE_EXHAUSTED' ||
+    errorCode === 'billing_error' // Anthropic 크레딧 소진 — 한도와 같이 다음 단계로 넘긴다
   ) {
     return FALLBACK_REASONS.QUOTA;
   }
