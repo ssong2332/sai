@@ -36,7 +36,7 @@ export default defineManifest({
    *    L28 안전망·경고 상자가 들어갔는데 숫자가 그대로라 「다시 로드」가 됐는지 화면으로 알 수 없었다.
    *    `package.json`과 같은 값이어야 한다(`test/version.unit.test.js`).
    */
-  version: '0.1.13',
+  version: '0.1.14',
   /**
    * 🔴 **동작을 먼저, 은유는 빼고.** 예전 문구("사람과 사람, 언어와 언어 사이를 매끄럽게 잇는")는
    *    첫 줄이 은유라 무엇을 하는 도구인지 읽는 데 시간이 걸렸다.
@@ -77,6 +77,18 @@ export default defineManifest({
   side_panel: {
     default_path: 'src/sidepanel/index.html',
   },
+  /**
+   * 번들 서체 (시안 A2, 2026-10-24) — 콘텐츠 스크립트가 호스트 문서에 `FontFace`로 등록하려면
+   * 페이지 쪽에서 이 파일을 읽을 수 있어야 한다(`src/lib/saiFont.js`).
+   * 🔴 서체 파일만 연다(`fonts/*.woff2`). 노출된 리소스는 페이지가 확장 설치 여부를 짐작하는 데 쓸 수
+   *    있다 — 남는 위험이며 명세 §3에 적어 뒀다.
+   */
+  web_accessible_resources: [
+    {
+      resources: ['fonts/*.woff2'],
+      matches: ['<all_urls>'],
+    },
+  ],
   /**
    * 단축키 (S26 / Spec 부가 9 — 단축키 커스텀 지정).
    *

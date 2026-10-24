@@ -1,96 +1,81 @@
-/* 사이 디자인 토큰 v2 「Interval」 — 명세: `docs/design/DesignSystem-v2.md`.
+/* 사이 디자인 토큰 — 시안 A2 (2026-10-24 사용자 승인). 명세: `docs/design/DesignSystem-A2.md`.
  *
  * 🔴 금지
- *   - 색을 장식으로 쓰지 않는다. 색 6개는 각각 「뜻」 하나만 가진다(아래 표).
+ *   - 색을 장식으로 쓰지 않는다. 뜻 색 6개는 각각 「뜻」 하나만 가진다(아래 표).
  *   - 원색(`--seam` `--kept` `--dusk` `--check` `--fault`)을 **글자**에 쓰지 않는다 — 글자는 `-deep`.
- *   - 흰 글자를 `--seam` 위에 얹지 않는다(4.31:1). 채움+글자는 `--seam-strong`(5.67:1).
- *   - 새 화면은 v2 이름(`--seam`·`--kept`…)을 쓴다. 옛 이름(`--o`·`--g`·`--r`·`--primary-*`)은
- *     **별칭**으로만 남는다 — 사이드패널·대시보드가 v2로 옮겨질 때까지 깨지지 않게 하려는 것이다.
+ *     (A2 시안 HTML은 원색 글자를 썼지만 `--seam` 3.79:1·`--kept` 3.39:1로 AA 미달이라 `-deep`을 유지한다.)
+ *   - 흰 글자를 `--seam` 위에 얹지 않는다(3.79:1). 채움+글자는 `--seam-strong`(5.51:1).
+ *   - `--faint`를 글자에 쓰지 않는다(선·트랙 전용).
+ *   - v1 별칭(`--o` `--g` `--r` `--primary-*` …)은 2026-10-24 A2에서 지웠다 — 다시 만들지 않는다.
  *
  * 🔴 `:host`를 함께 쓰는 이유: 콘텐츠 스크립트 팝업은 Shadow DOM 안에서 렌더된다(Lessons #3).
- *    Shadow root 안에서는 `:root`가 매치되지 않는다.
  *
- * | 토큰 | 이름 | 뜻 | 라이트 | 다크 |
- * |---|---|---|---|---|
- * | --ink | Graphite | 본문 · 주 동작 채움 | #171A21 (16.95:1) | #EEF0F3 |
- * | --seam | Seam | 사이 자신의 목소리 — 로고 액센트, 로딩, 선택 표시, 포커스, Critical | #E5361B | #FF5A3C |
- * | --kept | Kept | 지켜진 것 — 용어집·보존된 숫자/기한·안전 | #0E8A5F | #2FBF86 |
- * | --dusk | Dusk | 상대 쪽 — 상대 시각·퇴근 시간대·예약·뜻 풀기·Low | #3446B8 | #8C9BFF |
- * | --check | Check | 보내기 전 확인 — 숫자·이름·빈칸·오해 소지 | #D98A00 | #F2B23A |
- * | --fault | Fault | 실패·차단 — 교정 실패, 민감정보 차단 | #C81E45 | #FF6B88 |
+ * | 토큰 | 뜻 | 라이트 | 다크 |
+ * |---|---|---|---|
+ * | --ink | 본문 · 주 동작 채움 · 켜진 스위치 | #191F28 (16.56:1) | #F2F4F6 |
+ * | --seam | 사이 자신 · 지켜야 할 사실(숫자·기한·이름) · Critical | #F04419 | #FF6A45 |
+ * | --kept | 용어집 · 지킨 용어 · Zero Retention | #0E9F6E | #33C38E |
+ * | --dusk | 상대 쪽 — 상대 시각·퇴근 시간대·예약·뜻 풀기·Low | #3D5AFE | #8C9EFF |
+ * | --check | 보내기 전 확인 — 숫자·이름·빈칸·오해 소지 | #E59500 | #FFB938 |
+ * | --fault | 실패·차단 | #C81E45 | #FF6B88 |
  */
 :root,
 :host {
   color-scheme: light;
 
-  /* ── 바닥 · 표면 ── */
-  --bg: #e9ecf0; /* Fog — 페이지/패널 바닥 */
-  --surface: #fbfcfd; /* Porcelain — 카드·팝업 */
-  --sunken: #eff2f5; /* Mist — 트랙·인풋·접힌 영역 */
-  --raised: #ffffff; /* 표면 위에 다시 뜨는 것(메뉴·칩 선택) */
-  --border: rgba(23, 26, 33, 0.09);
-  --border-strong: rgba(23, 26, 33, 0.18);
-  --line: rgba(23, 26, 33, 0.12); /* 구분선 — v1에서 미정의로 쓰이던 이름을 여기서 정의 */
+  /* ── 바닥 · 표면 (A2) ── */
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --sunken: #f2f4f6;
+  --raised: #ffffff;
+  --border: rgba(25, 31, 40, 0.08);
+  --border-strong: rgba(25, 31, 40, 0.16);
+  --line: rgba(25, 31, 40, 0.08);
 
-  /* ── 글자 4단계 (흰 표면 기준 대비) ── */
-  --ink: #171a21; /* 16.95 */
-  --sub: #4a5361; /* 7.57 */
-  --mut: #5b6472; /* 5.82 · sunken 위 5.28 */
-  --faint: #cfd4db; /* 🔴 테두리·트랙 전용 — 글자 금지 */
-  --on-ink: #fbfcfd; /* 잉크 채움 위의 글자 */
+  /* ── 글자 ── */
+  --ink: #191f28; /* 16.56 */
+  --sub: #4e5968; /* 7.11 */
+  /* 🔴 A2 원값 #6B7684는 sunken 위 4.19:1(AA 미달) — 한 단계 진하게(sunken 4.78 · 흰 5.36). */
+  --mut: #626d7a;
+  --faint: #d1d6db; /* 🔴 선·트랙 전용 */
+  --on-ink: #ffffff;
 
-  /* ── 뜻 색 6개 ── */
-  --seam: #e5361b;
-  --seam-strong: #c42b14; /* 흰 글자를 얹는 채움 — 5.67:1 */
-  --seam-deep: #b42612; /* 글자 — 6.34 / tint 5.54 */
-  --on-seam: #ffffff; /* `--seam-strong` 채움 위 글자 */
-  --kept: #0e8a5f;
-  --kept-deep: #0a6e4b; /* 6.11 / tint 5.51 */
-  --dusk: #3446b8; /* 흰 글자 7.74 */
-  --dusk-deep: #2b3a9e; /* 9.29 / tint 8.04 */
+  /* ── 뜻 색 ── */
+  --seam: #f04419;
+  --seam-strong: #c4320e; /* 흰 글자 5.51 */
+  --seam-deep: #c4320e; /* 글자 — 흰 5.51 · tint 4.89 */
+  --on-seam: #ffffff;
+  --kept: #0e9f6e;
+  --kept-deep: #0a7a55; /* tint 4.82 */
+  --dusk: #3d5afe; /* 흰 글자 5.13 */
+  --dusk-deep: #3049d9; /* tint 5.96 */
   --on-dusk: #ffffff;
-  --check: #d98a00;
-  --check-deep: #8a5300; /* 6.16 / tint 5.65 */
-  --fault: #c81e45; /* 흰 글자 5.63 */
-  --fault-deep: #a3173a; /* 7.46 */
+  --check: #e59500;
+  --check-deep: #8a5300; /* tint 5.88 */
+  --fault: #c81e45;
+  --fault-deep: #a3173a;
 
-  --seam-tint: color-mix(in oklab, var(--seam) 9%, var(--surface));
-  --kept-tint: color-mix(in oklab, var(--kept) 10%, var(--surface));
-  --dusk-tint: color-mix(in oklab, var(--dusk) 9%, var(--surface));
-  --check-tint: color-mix(in oklab, var(--check) 12%, var(--surface));
-  --fault-tint: color-mix(in oklab, var(--fault) 8%, var(--surface));
+  --seam-tint: #ffeee8;
+  --kept-tint: #e6f7f0;
+  --dusk-tint: #ecefff;
+  --check-tint: #fff6e0;
+  --fault-tint: color-mix(in oklab, var(--fault) 9%, var(--surface));
 
-  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--seam);
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--dusk);
 
-  /* ── v1 별칭 (사이드패널·결정 화면이 v2로 옮겨질 때까지) ── */
-  --primary-orange: var(--seam);
-  --primary-green: var(--kept);
-  --primary-red: var(--fault);
-  --o: var(--seam);
-  --g: var(--kept);
-  --r: var(--fault);
-  --o-deep: var(--seam-deep);
-  --g-deep: var(--kept-deep);
-  --r-deep: var(--fault-deep);
-  --o-tint: var(--seam-tint);
-  --g-tint: var(--kept-tint);
-  --r-tint: var(--fault-tint);
-  --sai-risk-ink: var(--check-deep);
-  --sai-mut: var(--mut);
-  --seam-line: var(--border-strong);
+  /* ── 깊이 (A2) ── */
+  --e1: 0 1px 3px rgba(25, 31, 40, 0.06);
+  --e2: 0 2px 6px rgba(25, 31, 40, 0.05), 0 12px 28px -12px rgba(25, 31, 40, 0.2);
+  --e3: 0 2px 6px rgba(25, 31, 40, 0.04), 0 24px 48px -16px rgba(25, 31, 40, 0.22);
+  --knob-shadow: 0 2px 6px rgba(25, 31, 40, 0.12);
 
-  /* ── 깊이 ── */
-  --e1: 0 1px 2px rgba(17, 20, 28, 0.08), 0 6px 16px -4px rgba(17, 20, 28, 0.16);
-  --e2: 0 1px 2px rgba(17, 20, 28, 0.06), 0 10px 24px -8px rgba(17, 20, 28, 0.18),
-    0 32px 64px -24px rgba(17, 20, 28, 0.32);
-  --shadow: var(--e2);
-
-  /* ── 모양 ── */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  /* ── 모양 (A2 20/28) ── */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px; /* 버튼·입력 */
+  --radius-lg: 16px; /* 안쪽 상자 */
+  --radius-xl: 20px; /* 팝업·카드 */
+  --radius-2xl: 28px; /* 큰 면 */
   --radius-pill: 999px;
 
   /* ── 간격 (4pt) ── */
@@ -100,37 +85,40 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
-  --gutter-popup: 18px;
+  --gutter-popup: 20px;
 
   /* ── 글자 ──
-   * 🔴 웹폰트를 싣지 않는다 — 콘텐츠 스크립트는 남의 페이지 위에서 돈다. Shadow root 안의
-   *    `@font-face`는 Chrome이 무시하고, 문서에 등록하면 호스트 페이지 폰트 목록을 건드린다.
-   *    OS 기본 서체만 쓴다(근거는 명세 §3).
-   * 🔴 `Pretendard`를 이름으로 부르지 않는다(2026-10-24 실측). 사용자가 직접 설치한 서체는 **일부 굵기만**
-   *    깔린 경우가 있다 — 이 PC는 `Pretendard`가 한 굵기뿐이라 400과 700의 폭이 같았고(337.8px = 337.8px)
-   *    본문 전체가 굵게 보였다. `Pretendard Variable`은 아예 없었다. OS 서체는 굵기 위계가 보장된다.
-   *    Latin은 Segoe/SF, 한글은 글자 단위 대체로 Malgun Gothic/Apple SD Gothic Neo가 맡는다. */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI',
+   * 🔴 `SaiPretendard` = 확장에 **번들한** Pretendard(KS X 1001 서브셋, OFL — `public/fonts/`).
+   *    콘텐츠 스크립트는 `src/lib/saiFont.js`가 호스트 문서에 `FontFace`로 등록하고(Shadow root 안의
+   *    `@font-face`는 쓰지 않는다), 사이드패널·결정 화면은 `fonts.css`의 `@font-face`로 싣는다.
+   * 🔴 사용자가 설치한 `Pretendard`를 이름으로 부르지 않는다(2026-10-24 실측 — 한 굵기만 깔린 PC).
+   *    고유 이름이라 설치 서체와 섞이지 않는다. 불러오지 못하면 다음 순위(OS 서체)로 내려간다.
+   * 🔴 번들 굵기는 400·600·700·800 네 개뿐이다 — 다른 값을 쓰지 않는다(브라우저가 가까운 굵기로 바꾼다). */
+  --font-sans: 'SaiPretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI',
     'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
-  --font-mono: 'Cascadia Mono', 'SF Mono', ui-monospace, Menlo, Consolas, 'D2Coding',
-    'Malgun Gothic', monospace;
+  --font-mono: 'Cascadia Mono', 'SF Mono', ui-monospace, Menlo, Consolas, 'D2Coding', 'Malgun Gothic',
+    monospace;
 
-  --t-micro: 10.5px; /* 태그·배지 */
-  --t-caption: 11.5px; /* 라벨·근거·안내 */
-  --t-small: 12.5px; /* 보조 본문 */
-  --t-body: 13.5px; /* 팝업 본문 */
-  --t-lead: 15px; /* 교정문·해독 의도 — 결과 */
-  --t-title: 17px; /* 경고 제목 */
+  /* 팝업 눈금 — A2: 캡션 13 · 본문 14.5 · 결과 21. 사이드패널은 자체 눈금(같은 비율, 한 단계 큼). */
+  --t-micro: 11.5px;
+  --t-caption: 12.5px;
+  --t-small: 13.5px;
+  --t-body: 14.5px;
+  --t-lead: 21px; /* 결과 — 교정문·실제 의도 */
+  --t-title: 19px;
+  --t-display: 30px; /* 사이드패널 숫자 */
 
-  /* ── 모션 ── (값·규칙: 명세 §5, keyframes: `motion.css`) */
-  --dur-press: 90ms;
-  --dur-quick: 160ms;
-  --dur-enter: 280ms;
-  --dur-reveal: 520ms;
-  --dur-loop: 1600ms;
-  --stagger: 35ms;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-snap: cubic-bezier(0.34, 1.36, 0.5, 1);
+  /* ── 모션 (A2) ── 규칙: 명세 §5, keyframes: `motion.css` */
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 맞물림 — 노브·세그먼트·막대·누름 복귀 */
+  --out: cubic-bezier(0.16, 1, 0.3, 1); /* 등장·드러남 */
+  --dur-press: 250ms;
+  --dur-quick: 200ms;
+  --dur-enter: 450ms;
+  --dur-reveal: 600ms;
+  --dur-loop: 1100ms;
+  --stagger: 40ms;
+  --ease-out: var(--out);
+  --ease-snap: var(--spring);
   --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
   --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
 
@@ -141,45 +129,45 @@
 
 :root[data-theme='dark'],
 :host([data-theme='dark']) {
-  /* 🔴 네이티브 위젯(select 목록·스크롤바)도 다크로 — 없으면 셀렉트 목록만 흰색으로 뜬다. */
   color-scheme: dark;
-  --bg: #0d0f13;
-  --surface: #16191f;
-  --sunken: #1f232b;
-  --raised: #232831;
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --line: rgba(255, 255, 255, 0.12);
+  --bg: #101318;
+  --surface: #1b1f27;
+  --sunken: #242a33;
+  --raised: #242a33;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --line: rgba(255, 255, 255, 0.08);
 
-  --ink: #eef0f3; /* 15.42 */
-  --sub: #c2c8d0; /* 10.45 */
-  --mut: #98a1ad; /* sunken 위 6.03 */
-  --faint: #3a404b;
-  --on-ink: #16191f;
+  --ink: #f2f4f6;
+  --sub: #b0b8c1; /* 8.23 */
+  --mut: #8b95a1; /* surface 5.43 · sunken 4.75 */
+  --faint: #333b46;
+  --on-ink: #101318;
 
-  --seam: #ff5a3c;
-  --seam-strong: #ff5a3c; /* 다크에서는 채움 위 글자를 잉크(어두운색)로 쓴다 */
-  --seam-deep: #ff7a5e;
-  --on-seam: #16191f;
-  --kept: #2fbf86;
+  --seam: #ff6a45;
+  --seam-strong: #ff6a45; /* 다크에서는 채움 위 글자를 어두운색으로(6.56) */
+  --seam-deep: #ff8a6b;
+  --on-seam: #101318;
+  --kept: #33c38e;
   --kept-deep: #4fd6a4;
-  --dusk: #8c9bff;
-  --dusk-deep: #a3afff;
-  --on-dusk: #16191f;
-  --check: #f2b23a;
-  --check-deep: #f5c060;
+  --dusk: #8c9eff;
+  --dusk-deep: #a3b1ff;
+  --on-dusk: #101318;
+  --check: #ffb938;
+  --check-deep: #ffc861;
   --fault: #ff6b88;
   --fault-deep: #ff8ba0;
 
-  --seam-tint: color-mix(in oklab, var(--seam) 14%, var(--surface));
-  --kept-tint: color-mix(in oklab, var(--kept) 14%, var(--surface));
-  --dusk-tint: color-mix(in oklab, var(--dusk) 14%, var(--surface));
-  --check-tint: color-mix(in oklab, var(--check) 13%, var(--surface));
-  --fault-tint: color-mix(in oklab, var(--fault) 13%, var(--surface));
+  --seam-tint: #3a211b;
+  --kept-tint: #15302a;
+  --dusk-tint: #1e2440;
+  --check-tint: #3a2e14;
+  --fault-tint: color-mix(in oklab, var(--fault) 14%, var(--surface));
 
-  --e1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px -4px rgba(0, 0, 0, 0.5);
-  --e2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 28px -8px rgba(0, 0, 0, 0.6),
-    0 32px 64px -24px rgba(0, 0, 0, 0.7);
+  --e1: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --e2: 0 12px 28px -10px rgba(0, 0, 0, 0.6);
+  --e3: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+  --knob-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 
   --sai-logo-bar: #f8f4f4;
 }

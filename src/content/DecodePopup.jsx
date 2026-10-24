@@ -529,6 +529,7 @@ function UrgencyGap({ surface, actual, gap, reason }) {
   const surfaceStep = (URGENCY_ORDER[surface] ?? 1) + 1;
   const actualStep = (URGENCY_ORDER[actual] ?? 1) + 1;
   const actualKey = actual in URGENCY_ORDER ? actual : 'NORMAL';
+  const surfaceKey = surface in URGENCY_ORDER ? surface : 'NORMAL';
 
   return (
     <div className="sai-decode-section sai-decode-gap">
@@ -551,6 +552,10 @@ function UrgencyGap({ surface, actual, gap, reason }) {
               style={{ width: `${(surfaceStep / 3) * 100}%` }}
             />
           </span>
+          {/* A2 — 줄 끝 단계 이름(서술 단계, 점수 아님). 머리줄과 같은 말이라 막대 묶음째 aria-hidden. */}
+          <span className={`sai-decode-gap-lvl sai-urgency-${surfaceKey.toLowerCase()}`}>
+            {URGENCY_LABEL[surfaceKey]}
+          </span>
         </span>
         <span className="sai-decode-gap-row">
           <span className="sai-decode-gap-key">실제</span>
@@ -559,6 +564,9 @@ function UrgencyGap({ surface, actual, gap, reason }) {
               className={`sai-decode-gap-fill sai-decode-gap-fill-actual sai-urgency-${actualKey.toLowerCase()}`}
               style={{ width: `${(actualStep / 3) * 100}%`, '--from': surfaceStep / actualStep }}
             />
+          </span>
+          <span className={`sai-decode-gap-lvl sai-urgency-${actualKey.toLowerCase()}`}>
+            {URGENCY_LABEL[actualKey]}
           </span>
         </span>
       </div>

@@ -13,6 +13,8 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   root: here,
+  // 🔴 확장의 `public/`(번들 서체 `fonts/`)을 그대로 쓴다 — 확장 페이지와 같은 `/fonts/...` 경로가 열린다.
+  publicDir: fileURLToPath(new URL('../public', import.meta.url)),
   plugins: [react()],
   define: {
     'process.env.NODE_ENV': JSON.stringify('development'),

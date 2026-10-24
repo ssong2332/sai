@@ -1,4 +1,4 @@
-/* 콘텐츠 팝업 v2 「Interval」 — 명세 `docs/design/DesignSystem-v2.md`, 토큰 `src/styles/tokens.css`,
+/* 콘텐츠 팝업 — 시안 A2(2026-10-24). 명세 `docs/design/DesignSystem-A2.md`, 토큰 `src/styles/tokens.css`,
  * keyframes `src/styles/motion.css`. v1의 결정 기록(주석)은 git 이력에 있다(`git log -p -- src/content/content.css`).
  *
  * 🔴 금지 (v1에서 실측으로 확정된 것 — v2도 지킨다)
@@ -11,6 +11,8 @@
  *   - 팝업 글자는 사이드패널보다 작다(2026-08-18 사용자 확인) — 남의 화면을 덜 가리려는 것이다.
  *   - 접근 경로를 hover에 걸지 않는다(2026-08-14). hover 모션은 장식일 때만.
  *   - 글자에 원색 금지 — `-deep` 토큰. 회색 글자는 `--mut`까지(AA). `--faint`는 선 전용.
+ *   - 굵기는 번들 서체가 가진 400·600·700·800만 쓴다(`src/lib/saiFont.js`).
+ *   - 움직임은 transform·opacity만. 누름 = scale(.96) 스프링 복귀, 노브·세그먼트·막대 = `--spring`.
  */
 
 :host {
@@ -33,7 +35,18 @@
 .sai-fab-wrap,
 .sai-fab-snippets {
   font-family: var(--font-sans);
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 숫자는 자리 폭이 같아야 시각·개수가 흔들리지 않는다(A2 `.num`). */
+.sai-clock-time,
+.sai-clock-day,
+.sai-fairy b,
+.sai-menu-count,
+.sai-decode-action-num {
+  font-variant-numeric: tabular-nums;
 }
 
 /* 키보드 포커스 — 모든 컨트롤이 같은 고리를 쓴다(이음선 색). */
@@ -65,12 +78,12 @@
 .sai-fab-wrap {
   align-items: center;
   gap: 4px;
-  padding: 4px;
-  border-radius: 14px;
+  padding: 5px;
+  border-radius: 18px;
   background: var(--surface);
-  border: 1px solid var(--border-strong);
-  box-shadow: var(--e1);
-  animation: sai-pop-in var(--dur-enter) var(--ease-out) both;
+  border: 0;
+  box-shadow: 0 0 0 1px var(--line), var(--e3);
+  animation: sai-pop-in var(--dur-enter) var(--spring) both;
 }
 
 .sai-fab {
@@ -80,10 +93,10 @@
   height: 42px;
   padding: 7px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 13px;
   background: var(--sunken);
   cursor: pointer;
-  transition: background var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--ease-out);
+  transition: background-color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--spring);
 }
 
 .sai-fab:hover {
@@ -91,7 +104,7 @@
 }
 
 .sai-fab:active {
-  transform: scale(0.94);
+  transform: scale(0.96);
 }
 
 .sai-fab .sai-logo-mark {
@@ -142,7 +155,7 @@
 /* 히트 영역 34×34, 아이콘 21px(「Sai Toolbar Icons」 규격). */
 .sai-fab-action {
   border: 0;
-  border-radius: 9px;
+  border-radius: 11px;
   background: transparent;
   color: var(--sub);
   width: 34px;
@@ -152,8 +165,8 @@
   justify-content: center;
   flex: none;
   cursor: pointer;
-  transition: background var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out),
-    transform var(--dur-press) var(--ease-out);
+  transition: background-color var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out),
+  transform var(--dur-press) var(--spring);
 }
 
 .sai-fab-action:hover {
@@ -162,7 +175,7 @@
 }
 
 .sai-fab-action:active {
-  transform: scale(0.92);
+  transform: scale(0.96);
 }
 
 .sai-fab-action-green:hover {
@@ -176,13 +189,13 @@
 
 .sai-fab-hint {
   font-size: var(--t-caption);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--seam-deep);
   background: var(--seam-tint);
-  padding: 6px 10px;
-  border-radius: 8px;
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
   white-space: nowrap;
-  animation: sai-rise var(--dur-enter) var(--ease-out) both;
+  animation: sai-rise var(--dur-enter) var(--out) both;
 }
 
 .sai-fab-hint-loose {
@@ -194,18 +207,18 @@
   position: absolute;
   top: 100%;
   left: 0;
-  width: 320px;
-  max-height: 260px;
+  width: 340px;
+  max-height: 280px;
   overflow-y: auto;
   display: grid;
   gap: 2px;
-  padding: 6px;
+  padding: 8px;
   background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--e2);
+  border: 0;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 0 0 1px var(--line), var(--e3);
   transform-origin: top left;
-  animation: sai-pop-in var(--dur-enter) var(--ease-out) both;
+  animation: sai-pop-in var(--dur-enter) var(--spring) both;
 }
 
 .sai-fab-snippets-up {
@@ -232,10 +245,13 @@
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--t-small);
-  line-height: 1.45;
-  padding: 8px 10px 8px 14px;
-  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  padding: 10px 12px 10px 16px;
+  border-radius: 12px;
   cursor: pointer;
+  transition: background-color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--spring);
 }
 
 /* 고를 문장 앞에 이음선 한 줄이 선다 — 「이걸 넣는다」. */
@@ -254,6 +270,10 @@
 
 .sai-fab-snippet:hover {
   background: var(--sunken);
+}
+
+.sai-fab-snippet:active {
+  transform: scale(0.98);
 }
 
 .sai-fab-snippet:hover::before,
@@ -279,11 +299,13 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--surface);
-  border: 1px solid var(--border-strong);
+  border: 0;
   border-radius: var(--radius-xl);
-  box-shadow: var(--e2);
+  /* 🔴 1px 고리를 그림자에 겹친다 — 흰 페이지 위에서도 팝업 가장자리가 보이게(v2 실측 규칙 유지). */
+  box-shadow: 0 0 0 1px var(--line), var(--e3);
   font-size: var(--t-body);
-  animation: sai-pop var(--dur-enter) var(--ease-out) both;
+  line-height: 1.55;
+  animation: sai-pop var(--dur-enter) var(--spring) both;
   scrollbar-width: thin;
   scrollbar-color: var(--faint) transparent;
 }
@@ -292,9 +314,9 @@
   width: 430px; /* 🔴 = DECODE_PANEL_WIDTH / REPLY_PANEL_WIDTH */
 }
 
-/* 순차 등장 — 블록마다 35ms. 합계 상한 245ms(7번째 이후는 동시). 결과·경고는 아래에서 자기 모션을 쓴다. */
+/* 순차 등장 — 블록마다 40ms. 합계 상한 240ms(7번째 이후는 동시). 결과·경고는 아래에서 자기 모션을 쓴다. */
 .sai-popup > * {
-  animation: sai-rise var(--dur-enter) var(--ease-out) both;
+  animation: sai-rise var(--dur-enter) var(--out) both;
   animation-delay: calc(var(--i, 0) * var(--stagger));
 }
 .sai-popup > :nth-child(2) { --i: 1; }
@@ -307,9 +329,10 @@
 
 .sai-popup-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 14px var(--gutter-popup) 0;
+  gap: 12px 8px;
+  padding: 18px var(--gutter-popup) 0;
   cursor: grab; /* 헤더가 손잡이(S24) */
   user-select: none;
 }
@@ -321,7 +344,7 @@
 .sai-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
@@ -332,21 +355,21 @@
 }
 
 .sai-brand-name {
-  font-size: 12.5px;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
   color: var(--ink);
   white-space: nowrap;
 }
 
 /* 모드 배지 — 다듬기(내 쪽)=이음선, 뜻 풀기·회신(상대 쪽)=Dusk, 차단=Fault. */
 .sai-badge {
-  font-size: var(--t-micro);
+  font-size: var(--t-caption);
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
   color: var(--seam-deep);
   background: var(--seam-tint);
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
 }
@@ -369,12 +392,12 @@
 
 /* 경고 팝업의 「!」 마크. */
 .sai-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
   background: var(--seam-strong);
   color: var(--on-seam);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
@@ -388,20 +411,21 @@
 }
 
 .sai-close {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--sub);
-  font-size: 13px;
+  border-radius: 10px;
+  background: var(--sunken);
+  color: var(--mut);
+  font-size: var(--t-small);
   line-height: 1;
   cursor: pointer;
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out);
+  transition: background-color var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out),
+  transform var(--dur-press) var(--spring);
 }
 
 .sai-close:hover {
@@ -409,47 +433,55 @@
   color: var(--ink);
 }
 
-/* ── 긴급도 세그먼트 — 같은 폭 3칸 + 미끄러지는 표시. 색이 단계의 뜻을 말한다 ──
-   Critical = 이음선 · Normal = 잉크 · Low = Dusk(나중에 · 상대 쪽 시간). */
+.sai-close:active {
+  transform: scale(0.96);
+}
+
+/* ── 긴급도 세그먼트 (A2 .seg) — 같은 폭 3칸 + 흰 노브가 스프링으로 미끄러진다 ──
+   단계의 뜻은 선택된 글자색이 말한다: Critical = 이음선 · Normal = 잉크 · Low = Dusk.
+   🔴 헤더 2줄째에 전체 폭으로 놓인다(`order`) — DOM 순서·접근성 순서는 그대로다. */
 .sai-segment {
   position: relative;
   display: inline-grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   background: var(--sunken);
-  border-radius: 10px;
-  padding: 3px;
-  gap: 2px;
+  border-radius: 13px;
+  padding: 4px;
+  gap: 0;
   flex: none;
   isolation: isolate;
+}
+
+.sai-popup-head > .sai-segment {
+  order: 5;
+  flex: 1 1 100%;
+  display: grid;
 }
 
 .sai-segment::before {
   content: '';
   position: absolute;
   z-index: -1;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  width: calc((100% - 6px - 4px) / 3);
-  border-radius: 8px;
-  background: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-  transform: translateX(calc(var(--seg, 0) * (100% + 2px)));
-  transition: transform var(--dur-enter) var(--ease-snap), background var(--dur-quick) var(--ease-out),
-    opacity var(--dur-quick);
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--knob-shadow);
+  transform: translateX(calc(var(--seg, 0) * 100%));
+  transition: transform var(--dur-enter) var(--spring), opacity var(--dur-quick);
 }
 
 .sai-segment:has(> .sai-seg-item:nth-child(1).sai-seg-active)::before {
   --seg: 0;
-  background: var(--seam-strong);
 }
 .sai-segment:has(> .sai-seg-item:nth-child(2).sai-seg-active)::before {
   --seg: 1;
 }
 .sai-segment:has(> .sai-seg-item:nth-child(3).sai-seg-active)::before {
   --seg: 2;
-  background: var(--dusk);
 }
 .sai-segment:not(:has(> .sai-seg-active))::before {
   opacity: 0;
@@ -459,40 +491,49 @@
   border: 0;
   background: transparent;
   font-family: var(--font-sans);
-  font-size: var(--t-caption);
-  font-weight: 650;
-  padding: 4px 10px;
-  border-radius: 8px;
-  color: var(--sub);
+  font-size: var(--t-small);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--mut);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--dur-quick) var(--ease-out);
+  transition: color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--spring);
 }
 
 .sai-seg-item:hover {
   color: var(--ink);
 }
 
+.sai-seg-item:active {
+  transform: scale(0.96);
+}
+
 .sai-segment > .sai-seg-active {
-  color: var(--on-ink);
+  color: var(--ink);
 }
 .sai-segment > .sai-seg-item:nth-child(1).sai-seg-active {
-  color: var(--on-seam);
+  color: var(--seam-deep);
 }
 .sai-segment > .sai-seg-item:nth-child(3).sai-seg-active {
-  color: var(--on-dusk);
+  color: var(--dusk-deep);
 }
 
 /* 문체 수위(가볍게·기본·격식) — 세그먼트 밖, 헤더에 바로 놓이는 칩. 접힌 상태는 현재 값 하나. */
 .sai-popup-head > .sai-seg-item {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  padding: 3px 10px;
+  height: 30px;
+  border: 0;
+  background: var(--sunken);
+  color: var(--sub);
+  font-size: var(--t-caption);
+  padding: 0 12px;
   border-radius: var(--radius-pill);
 }
 
 .sai-popup-head > .sai-seg-item.sai-seg-active {
-  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
   color: var(--ink);
   background: var(--surface);
 }
@@ -508,50 +549,58 @@
   font-weight: 700;
   color: var(--ink);
   background: var(--sunken);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 4px 6px;
+  border: 0;
+  border-radius: 10px;
+  height: 30px;
+  padding: 0 8px;
   flex: none;
 }
 
-/* ═════════ 로딩 — 「SHIFT 이음선」 ═════════
-   두 바(잉크·이음선)가 서로를 향해 미끄러졌다 벌어진다 = 두 쪽 사이에서 맞추는 중.
+/* ═════════ 로딩 — 두 막대 (A2 .bars) ═════════
+   잉크·이음선 두 막대가 엇갈려 오간다 = 두 쪽 사이에서 맞추는 중. 결과가 오면 전체 폭으로 맞물린다.
    🔴 가짜 진행률이 아니다(단일 호출이라 %를 모른다). 🔴 모션을 끄면 정렬된 정지 선으로 남는다. */
 .sai-loading {
   position: relative;
   display: block;
-  padding-bottom: 14px;
+  padding-top: 28px;
   color: var(--sub);
   font-size: var(--t-small);
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .sai-loading::before,
 .sai-loading::after {
   content: '';
   position: absolute;
-  left: 22%;
-  width: 56%;
-  height: 2px;
-  border-radius: 2px;
+  left: 0;
+  width: 58%;
+  height: 5px;
+  border-radius: 3px;
 }
 
 .sai-loading::before {
-  bottom: 6px;
+  top: 1px;
   background: var(--ink);
-  animation: sai-seam-a-loop var(--dur-loop) var(--ease-inout) infinite;
+  animation: sai-bars-a var(--dur-loop) var(--out) infinite alternate;
 }
 
 .sai-loading::after {
-  bottom: 1px;
+  top: 10px;
   background: var(--seam);
-  animation: sai-seam-b-loop var(--dur-loop) var(--ease-inout) infinite;
+  transform: translateX(42%);
+  animation: sai-bars-b var(--dur-loop) var(--out) infinite alternate;
 }
 
+/* 🔴 모션 최소화 — 맞물린 정지 선으로 남는다(「기다리는 중」 문구는 그대로). */
 @media (prefers-reduced-motion: reduce) {
   .sai-loading::before,
   .sai-loading::after {
     animation: none;
+    width: 100%;
+    transform: none;
+  }
+  .sai-loading::before {
+    opacity: 0.12;
   }
 }
 
@@ -562,30 +611,34 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 12px var(--gutter-popup) 0;
+  padding: 14px var(--gutter-popup) 0;
 }
 
 .sai-select {
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--t-small);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 4px 8px;
+  background: var(--sunken);
+  border: 0;
+  border-radius: 10px;
+  height: 32px;
+  padding: 0 10px;
   cursor: pointer;
+  transition: box-shadow var(--dur-quick) var(--ease-out);
 }
 
 .sai-select:hover {
-  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
 }
 
 /* 팀 — 받는 사람보다 한 단계 약하게. */
 .sai-team-select {
-  font-weight: 500;
-  color: var(--mut);
-  border-style: dashed;
+  font-weight: 600;
+  color: var(--sub);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
   max-width: 168px;
 }
 
@@ -597,12 +650,13 @@
 
 /* 🔴 서술형 태그만 — 숫자 점수 금지(필수 9 G1/G2). */
 .sai-recipient-tag {
-  font-size: var(--t-micro);
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--t-caption);
   font-weight: 600;
   color: var(--sub);
   background: var(--sunken);
-  border: 1px solid var(--border);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
 }
@@ -617,22 +671,24 @@
 .sai-add-recipient {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 8px var(--gutter-popup) 0;
-  padding: 10px;
+  gap: 8px;
+  margin: 10px var(--gutter-popup) 0;
+  padding: 14px;
   background: var(--sunken);
-  border-radius: var(--radius-md);
-  animation: sai-rise var(--dur-enter) var(--ease-out) both;
+  border-radius: var(--radius-lg);
+  animation: sai-rise var(--dur-enter) var(--out) both;
 }
 
 .sai-add-input {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--t-small);
   color: var(--ink);
   background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 6px 9px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  border-radius: 10px;
+  height: 36px;
+  padding: 0 12px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -640,7 +696,8 @@
 .sai-add-region {
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 9px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 
 .sai-add-actions {
@@ -657,7 +714,7 @@
 
 .sai-add-error {
   color: var(--fault-deep);
-  font-weight: 650;
+  font-weight: 700;
 }
 
 /* 감지된 대화 상대 제안 — 등록을 «권하는» 자리(자동 등록 아님). */
@@ -666,10 +723,10 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin: 10px var(--gutter-popup) 0;
-  padding: 8px 10px;
+  margin: 12px var(--gutter-popup) 0;
+  padding: 10px 12px;
   background: var(--dusk-tint);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 
 .sai-decode-body .sai-person-suggest {
@@ -679,7 +736,7 @@
 .sai-person-suggest-text {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--t-small);
   color: var(--sub);
 }
 
@@ -687,103 +744,121 @@
   flex-shrink: 0;
   white-space: nowrap;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--ink);
   color: var(--on-ink);
   font-family: inherit;
   font-size: var(--t-caption);
   font-weight: 700;
-  padding: 5px 10px;
+  height: 30px;
+  padding: 0 12px;
   cursor: pointer;
+  transition: transform var(--dur-press) var(--spring);
 }
 
-/* ── 듀얼 시계 — 나 | 상대. 상대가 퇴근 시간대면 그쪽 칸이 밤(Dusk)이 된다 ── */
+.sai-person-add:active {
+  transform: scale(0.96);
+}
+
+/* ── 듀얼 시계 (A2 .who .t) — 나는 조용히, 상대는 Dusk 알약. 상대가 퇴근 시간대면 알약이 밤(Dusk 채움)이 된다 ── */
 .sai-clock {
   display: inline-flex;
-  align-items: stretch;
+  align-items: center;
+  gap: 6px;
+  flex: none;
   margin-left: auto;
   font-size: var(--t-caption);
   color: var(--mut);
   white-space: nowrap;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
 }
 
 .sai-clock-slot {
   display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  padding: 3px 8px;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+}
+
+/* 상대 칸(두 번째 칸) — A2 알약. */
+.sai-clock-sep + .sai-clock-slot {
+  padding: 0 11px;
+  background: var(--dusk-tint);
+}
+.sai-clock-sep + .sai-clock-slot .sai-clock-label,
+.sai-clock-sep + .sai-clock-slot .sai-clock-time {
+  color: var(--dusk-deep);
 }
 
 .sai-clock-label {
-  font-size: var(--t-micro);
+  font-size: var(--t-caption);
+  font-weight: 600;
   color: var(--sub);
 }
 
 .sai-clock-time {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 11.5px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--t-small);
   color: var(--ink);
-  font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
 /* 칸 사이 — 「사이」 그 자체. 점 대신 세로 이음선. */
 .sai-clock-sep {
   width: 1px;
+  height: 14px;
   overflow: hidden;
   color: transparent;
   background: var(--border-strong);
 }
 
 .sai-clock-off {
-  background: var(--dusk);
+  background: var(--dusk) !important;
 }
 
 .sai-clock-off .sai-clock-label,
 .sai-clock-off .sai-clock-time,
 .sai-clock-off .sai-clock-day {
-  color: var(--on-dusk);
+  color: var(--on-dusk) !important;
 }
 
 .sai-clock-day {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--t-micro);
   color: var(--sub);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .sai-clock-badge {
   align-self: center;
-  margin: 0 6px 0 4px;
+  margin: 0 0 0 2px;
   background: var(--dusk-tint);
   color: var(--dusk-deep);
   border-radius: var(--radius-pill);
-  padding: 1px 7px;
+  padding: 4px 9px;
   font-size: var(--t-micro);
   font-weight: 700;
 }
 
-/* ═════════ AI 판정 근거 + 이음선 ═════════ */
+/* ═════════ AI 판정 근거 + 맞물린 두 막대 (A2 .bars.done) ═════════ */
 
 .sai-ainote {
   position: relative;
-  font-size: var(--t-caption);
+  font-size: var(--t-small);
   color: var(--sub);
-  padding: 8px var(--gutter-popup) 10px;
-  line-height: 1.5;
+  padding: 14px var(--gutter-popup) 12px;
+  line-height: 1.55;
 }
 
 .sai-ainote b {
   color: var(--ink);
 }
 
-/* 결과가 있을 때 근거 아래에 이음선이 맞물린다 → 그 아래에서 교정문이 나온다(시그니처). */
+/* 결과가 오면 로딩의 두 막대가 전체 폭으로 맞물린다 → 그 아래에서 교정문이 선다(시그니처). */
 .sai-ainote:has(+ .sai-refined) {
-  padding-bottom: 20px;
+  padding-bottom: 34px;
 }
 
 .sai-ainote:has(+ .sai-refined)::before,
@@ -791,23 +866,23 @@
   content: '';
   position: absolute;
   left: var(--gutter-popup);
-  height: 2px;
-  border-radius: 2px;
+  right: var(--gutter-popup);
+  height: 5px;
+  border-radius: 3px;
+  transform-origin: left;
 }
 
 .sai-ainote:has(+ .sai-refined)::before {
-  bottom: 10px;
-  width: 30px;
+  bottom: 19px;
   background: var(--ink);
-  animation: sai-seam-a-align var(--dur-reveal) var(--ease-snap) both;
+  opacity: 0.12;
+  animation: sai-bars-lock-a 800ms var(--spring) both;
 }
 
 .sai-ainote:has(+ .sai-refined)::after {
-  bottom: 6px;
-  left: calc(var(--gutter-popup) + 10px);
-  width: 30px;
+  bottom: 10px;
   background: var(--seam);
-  animation: sai-seam-b-align var(--dur-reveal) var(--ease-snap) both;
+  animation: sai-bars-lock-b 800ms var(--spring) both;
 }
 
 .sai-reason {
@@ -816,48 +891,57 @@
 
 .sai-error {
   color: var(--fault-deep);
-  font-weight: 650;
+  font-weight: 700;
 }
 
 /* ═════════ 교정문 — 결과 ═════════ */
 
 .sai-refined {
   display: flow-root; /* 안쪽 float(직접 고치기)을 품는다 */
-  padding: 0 var(--gutter-popup) 8px;
+  padding: 2px var(--gutter-popup) 12px;
   font-size: var(--t-lead);
-  line-height: 1.6;
-  letter-spacing: -0.003em;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.02em;
   color: var(--ink);
   white-space: pre-line;
 }
 
 .sai-popup > .sai-refined:not(.sai-refined-edit) {
-  animation: sai-emerge var(--dur-reveal) var(--ease-out) 120ms both;
+  animation: sai-reveal var(--dur-reveal) var(--spring) 160ms both;
+}
+
+/* 좁은 폭에서는 한 단계 작게 — 남의 화면을 덜 가린다. */
+.sai-popup-compact .sai-refined {
+  font-size: 18px;
 }
 
 .sai-refined-edit {
   display: block;
   width: calc(100% - 2 * var(--gutter-popup));
-  margin: 0 var(--gutter-popup) 8px;
-  padding: 8px 10px;
+  margin: 0 var(--gutter-popup) 10px;
+  padding: 12px 14px;
   box-sizing: border-box;
-  min-height: 92px;
+  min-height: 110px;
   resize: vertical;
   font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   background: var(--sunken);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  border-radius: var(--radius-lg);
   color: var(--ink);
 }
 
-/* 🟢 용어 적용 — 글자색 + 직선 밑줄(배경 없음: 옆 표시를 덮지 않는다). */
+/* 🟢 용어 적용 — A2 `.term`: 글자 아래 38% 띠(Kept). 모양 구분: 용어=띠 · 오해 소지=물결 · 밈=점선. */
 .sai-glossary {
-  background: transparent;
-  color: var(--kept-deep);
-  font-weight: 700;
-  text-decoration: underline solid var(--kept);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
+  background: linear-gradient(transparent 62%, color-mix(in oklab, var(--kept) 30%, transparent) 62%);
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+  border-radius: 2px;
 }
 
 .sai-glossary-gloss {
@@ -871,7 +955,7 @@
 .sai-risk {
   background: transparent;
   color: var(--check-deep);
-  font-weight: 650;
+  font-weight: 700;
   text-decoration: underline wavy var(--check);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
@@ -917,7 +1001,7 @@
   background: transparent;
   color: var(--sub);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--t-small);
   font-weight: 600;
   cursor: pointer;
   padding: 0;
@@ -929,14 +1013,16 @@
 
 .sai-link:hover {
   color: var(--ink);
-  text-decoration-color: var(--seam);
+  text-decoration-color: var(--ink);
 }
 
 .sai-link-inline {
   float: right;
   margin-left: 10px;
-  margin-top: 4px;
+  margin-top: 8px;
   font-size: var(--t-caption);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* 편집 후 줄 · 목업 표시 줄 */
@@ -951,13 +1037,13 @@
 
 .sai-meta-green {
   color: var(--kept-deep);
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .sai-meta-warn {
   color: var(--check-deep);
   background: var(--check-tint);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: var(--radius-pill);
   font-weight: 700;
 }
@@ -987,8 +1073,8 @@
 
 .sai-why-body {
   display: grid;
-  gap: 6px;
-  font-size: 11px;
+  gap: 8px;
+  font-size: var(--t-caption);
   line-height: 1.55;
   color: var(--sub);
 }
@@ -1014,18 +1100,34 @@
 
 .sai-why-tag {
   flex: 0 0 auto;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-micro);
   font-weight: 700;
-  padding: 1px 7px;
+  padding: 3px 9px;
   border-radius: var(--radius-pill);
-  background: var(--kept-tint);
-  color: var(--kept-deep);
+  background: var(--surface);
+  color: var(--sub);
   white-space: nowrap;
 }
 
+.sai-why-tag::before,
+.sai-missing-tag::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--seam);
+  flex: none;
+}
+
 .sai-why-tag-risk {
-  background: var(--check-tint);
-  color: var(--check-deep);
+  background: var(--surface);
+}
+
+.sai-why-tag-risk::before {
+  background: var(--check);
 }
 
 .sai-why-pair {
@@ -1046,12 +1148,12 @@
    띠는 위에서 아래로 그어지고(260ms) 글이 뒤따른다 — 「여기 멈춰서 보라」는 신호. */
 .sai-missing {
   position: relative;
-  margin: 8px var(--gutter-popup) 0;
-  padding: 8px 10px 8px 14px;
-  background: color-mix(in oklab, var(--check) 5%, var(--surface));
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin: 10px var(--gutter-popup) 0;
+  padding: 12px 14px 12px 18px;
+  background: var(--check-tint);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .sai-missing::before {
@@ -1060,10 +1162,10 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   background: var(--check);
   transform-origin: top;
-  animation: sai-draw-y 260ms var(--ease-out) 160ms both;
+  animation: sai-draw-y 360ms var(--out) 160ms both;
 }
 
 .sai-missing + .sai-missing {
@@ -1072,7 +1174,7 @@
 
 .sai-missing-head {
   font-size: var(--t-caption);
-  font-weight: 750;
+  font-weight: 800;
   color: var(--check-deep);
 }
 
@@ -1092,20 +1194,27 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--t-caption);
   line-height: 1.55;
   color: var(--sub);
 }
 
 .sai-missing-tag {
   flex: 0 0 auto;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-micro);
   font-weight: 700;
-  padding: 1px 7px;
+  padding: 2px 9px;
   border-radius: var(--radius-pill);
-  background: var(--check-tint);
+  background: var(--surface);
   color: var(--check-deep);
   white-space: nowrap;
+}
+
+.sai-missing-tag::before {
+  background: var(--check);
 }
 
 .sai-missing-text {
@@ -1118,29 +1227,29 @@
 
 .sai-blank-text {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--t-caption);
   line-height: 1.55;
   color: var(--sub);
 }
 
 /* 긴급도 변경 확인(필수 6 우회 경고) — 결정 버튼과 같은 화면. */
 .sai-urgency-notice {
-  margin: 10px var(--gutter-popup) 0;
-  padding: 8px 12px;
+  margin: 12px var(--gutter-popup) 0;
+  padding: 12px 14px;
   background: var(--check-tint);
   color: var(--check-deep);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   font-size: var(--t-caption);
-  font-weight: 650;
+  font-weight: 700;
   line-height: 1.5;
 }
 
 /* 폴백 — 「이건 교정 결과가 아니다」. Fault 띠 + 접히지 않는다. */
 .sai-fallback {
   position: relative;
-  margin: 0 var(--gutter-popup) 10px;
-  padding: 10px 14px;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin: 0 var(--gutter-popup) 12px;
+  padding: 12px 16px 12px 18px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   background: var(--fault-tint);
 }
 
@@ -1150,10 +1259,10 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   background: var(--fault);
   transform-origin: top;
-  animation: sai-draw-y 260ms var(--ease-out) 120ms both;
+  animation: sai-draw-y 360ms var(--out) 120ms both;
 }
 
 .sai-fallback-head {
@@ -1166,7 +1275,7 @@
 
 .sai-fallback-text {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--t-small);
   line-height: 1.6;
   color: var(--sub);
 }
@@ -1176,15 +1285,15 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 4px var(--gutter-popup) 8px;
-  padding: 7px 8px 7px 12px;
+  margin: 4px var(--gutter-popup) 10px;
+  padding: 8px 10px 8px 14px;
   background: var(--seam-tint);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 
 .sai-urgent-tag-chip {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--t-caption);
   font-weight: 700;
   color: var(--seam-deep);
   white-space: nowrap;
@@ -1200,18 +1309,18 @@
 
 /* 퇴근 요정 — 상대 쪽 시간(Dusk). 밤 하늘처럼 왼쪽에서 짙어진다. */
 .sai-fairy {
-  margin: 0 var(--gutter-popup) 12px;
-  padding: 10px 14px;
-  background: linear-gradient(90deg, color-mix(in oklab, var(--dusk) 16%, var(--surface)), var(--dusk-tint) 60%);
-  border-radius: var(--radius-md);
-  font-size: var(--t-caption);
+  margin: 2px var(--gutter-popup) 14px;
+  padding: 12px 16px;
+  background: var(--dusk-tint);
+  border-radius: var(--radius-lg);
+  font-size: var(--t-small);
   color: var(--dusk-deep);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .sai-fairy b {
-  font-family: var(--font-mono);
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-weight: 800;
 }
 
 .sai-fairy-note {
@@ -1227,10 +1336,10 @@
 }
 
 .sai-back {
-  margin: 0 var(--gutter-popup) 8px;
+  margin: 0 var(--gutter-popup) 10px;
   background: var(--sunken);
   border-radius: var(--radius-lg);
-  padding: 10px 14px;
+  padding: 12px 16px 14px;
 }
 
 .sai-back-head {
@@ -1249,7 +1358,7 @@
 .sai-back.sai-back-off {
   background: transparent;
   padding: 0;
-  margin: 0 var(--gutter-popup) 8px;
+  margin: 0 var(--gutter-popup) 10px;
   border-radius: 0; /* 🔴 왼쪽 구분선이 괄호처럼 휘지 않게(2026-08-16) */
 }
 
@@ -1280,19 +1389,19 @@
 
 .sai-toggles-row > .sai-back.sai-back-off + .sai-back.sai-back-off {
   border-left: 1px solid var(--border);
-  padding-left: 8px;
-  margin-left: 8px;
+  padding-left: 10px;
+  margin-left: 10px;
 }
 
 .sai-label {
   font-size: var(--t-caption);
-  font-weight: 700;
-  color: var(--sub);
+  font-weight: 600;
+  color: var(--mut);
 }
 
 .sai-back-text {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--t-body);
   line-height: 1.6;
   color: var(--sub);
 }
@@ -1304,47 +1413,51 @@
 }
 
 .sai-panel {
-  margin: 0 var(--gutter-popup) 8px;
+  margin: 0 var(--gutter-popup) 10px;
   background: var(--sunken);
   border-radius: var(--radius-lg);
-  padding: 10px 14px;
+  padding: 12px 16px;
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
-/* ── 스위치 — 켜짐은 잉크(조용하게). 노브만 transform으로 움직인다 ── */
+/* ── 스위치 — A2 .sw 비율(52×32 → 팝업 40×24). 켜짐 = 잉크, 노브는 스프링 transform ── */
 .sai-switch {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  width: 30px;
-  height: 18px;
+  width: 40px;
+  height: 24px;
   border: 0;
-  border-radius: 9px;
-  padding: 2px;
+  border-radius: 12px;
+  padding: 3px;
   background: var(--faint);
   cursor: pointer;
   flex: none;
-  transition: background var(--dur-quick) var(--ease-out);
+  transition: background-color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--spring);
 }
 
 .sai-switch-on {
   background: var(--ink);
 }
 
+.sai-switch:active {
+  transform: scale(0.96);
+}
+
 .sai-switch-knob {
-  width: 14px;
-  height: 14px;
-  border-radius: 7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   transform: translateX(0);
-  transition: transform var(--dur-enter) var(--ease-snap);
+  transition: transform var(--dur-enter) var(--spring);
 }
 
 .sai-switch-on .sai-switch-knob {
-  transform: translateX(12px);
-  background: var(--surface);
+  transform: translateX(16px);
+  background: #fff;
 }
 
 :host([data-theme='dark']) .sai-switch-on .sai-switch-knob {
@@ -1375,7 +1488,7 @@
   border: 0;
   background: transparent;
   color: var(--sub);
-  font-size: 13px;
+  font-size: var(--t-small);
   line-height: 1;
   padding: 2px 4px;
   cursor: pointer;
@@ -1416,19 +1529,21 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  border: 0;
+  background: var(--sunken);
   color: var(--sub);
   font-family: var(--font-sans);
   font-size: var(--t-caption);
   font-weight: 700;
-  border-radius: 9px;
-  padding: 6px 10px;
+  border-radius: 10px;
+  height: 32px;
+  padding: 0 12px;
   cursor: pointer;
+  transition: transform var(--dur-press) var(--spring);
 }
 
 .sai-menu-button-open {
-  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
   color: var(--ink);
 }
 
@@ -1456,13 +1571,13 @@
 }
 
 .sai-menu-count {
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
   background: var(--ink);
   color: var(--on-ink);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: var(--t-micro);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -1471,19 +1586,19 @@
 
 .sai-menu-dropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   right: 0;
   z-index: 2;
-  min-width: 200px;
+  min-width: 220px;
   display: grid;
   gap: 2px;
-  padding: 6px;
+  padding: 8px;
   background: var(--raised);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--e2);
+  border: 0;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 0 0 1px var(--line), var(--e3);
   transform-origin: top right;
-  animation: sai-pop-in var(--dur-enter) var(--ease-out) both;
+  animation: sai-pop-in var(--dur-enter) var(--spring) both;
 }
 
 .sai-menu-row {
@@ -1495,8 +1610,8 @@
   border: 0;
   background: transparent;
   font-family: var(--font-sans);
-  padding: 7px 8px;
-  border-radius: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
   cursor: pointer;
 }
 
@@ -1511,18 +1626,18 @@
   white-space: nowrap;
 }
 
-/* ═════════ 푸터 — 항상 보인다(sticky) ═════════ */
+/* ═════════ 푸터 (A2 .foot) — 항상 보인다(sticky). 버튼이 전체 폭을 나눠 쓴다 ═════════ */
 
 .sai-popup-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
-  padding: 10px var(--gutter-popup) 12px;
+  gap: 10px;
+  padding: 12px var(--gutter-popup) 18px;
   border-top: 1px solid var(--line);
   position: sticky;
   bottom: 0;
-  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  background: color-mix(in oklab, var(--surface) 94%, transparent);
   backdrop-filter: blur(8px);
   z-index: 1;
 }
@@ -1535,51 +1650,64 @@
 .sai-foot-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: nowrap;
-  margin-left: auto;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 100%;
 }
 
 .sai-foot-actions .sai-button {
   white-space: nowrap;
+  flex: 1 1 auto;
+}
+
+.sai-foot-actions .sai-button-primary {
+  flex-grow: 2;
 }
 
 /* 🔴 Zero Retention 문구 — 필수 5를 눈으로 확인하는 유일한 지점. 흐리게 두지 않는다. */
 .sai-foot-note {
   display: inline-flex;
   align-items: center;
-  font-size: var(--t-micro);
+  flex-wrap: wrap;
+  font-size: var(--t-caption);
+  font-weight: 600;
   color: var(--sub);
 }
 
 .sai-foot-note::before {
   content: '';
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
   border-radius: 50%;
-  border: 1.5px solid var(--kept);
+  background: var(--kept);
+  box-shadow: 0 0 0 3px var(--kept-tint);
   flex: none;
 }
 
-/* ── 버튼 — 주 동작은 잉크 채움 하나뿐이다(제품 전체). 누르면 아래 이음선이 지나간다 ── */
+/* ── 버튼 (A2 .btn) — 주 동작은 잉크 채움 하나뿐이다(제품 전체). 누르면 scale(.96) 후 스프링 복귀 ── */
 .sai-button {
   position: relative;
   overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
   border: 0;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 650;
-  padding: 8px 14px;
+  font-size: var(--t-body);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 0 16px;
   cursor: pointer;
-  transition: background var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out),
-    border-color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--ease-out);
+  transition: background-color var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out),
+  box-shadow var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--spring);
 }
 
 .sai-button:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
 .sai-button-primary {
@@ -1587,33 +1715,18 @@
   color: var(--on-ink);
 }
 
-.sai-button-primary::after {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 0;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--seam);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--dur-enter) var(--ease-out);
-}
-
-.sai-button-primary:hover:not(:disabled)::after,
-.sai-button-primary:focus-visible::after {
-  transform: scaleX(1);
+.sai-button-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--ink) 86%, var(--surface));
 }
 
 .sai-button-quiet {
-  background: transparent;
-  color: var(--sub);
-  box-shadow: inset 0 0 0 1px var(--border-strong);
+  background: var(--sunken);
+  color: var(--ink);
+  box-shadow: none;
 }
 
 .sai-button-quiet:hover:not(:disabled) {
-  background: var(--sunken);
+  background: color-mix(in oklab, var(--ink) 8%, var(--sunken));
   color: var(--ink);
 }
 
@@ -1634,12 +1747,12 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  padding: 2px 4px;
-  font-size: var(--t-caption);
+  padding: 4px 6px;
+  font-size: var(--t-small);
   line-height: 1;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   opacity: 0.75;
-  transition: opacity var(--dur-quick), transform var(--dur-press) var(--ease-snap), background var(--dur-quick);
+  transition: opacity var(--dur-quick), transform var(--dur-press) var(--spring), background-color var(--dur-quick);
 }
 
 .sai-feedback-btn:hover {
@@ -1665,16 +1778,17 @@
   display: flex;
   align-items: center;
   max-width: calc(100vw - 40px);
-  padding: 11px 18px 11px 20px;
-  background: var(--raised);
-  border: 1px solid var(--border-strong);
+  padding: 14px 18px 14px 22px;
+  background: var(--ink);
+  color: var(--on-ink) !important;
+  border: 0;
   border-radius: var(--radius-lg);
-  box-shadow: var(--e2);
+  box-shadow: var(--e3);
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-small);
+  font-weight: 700;
   overflow: hidden;
-  animation: sai-toast-rise var(--dur-enter) var(--ease-out) both;
+  animation: sai-toast-rise var(--dur-enter) var(--spring) both;
 }
 
 /* 🔴 토스트는 `translateX(-50%)`로 가운데 맞춘다 — 등장 keyframes도 그 값을 품어야 위치가 안 튄다. */
@@ -1695,10 +1809,10 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   background: var(--seam);
   transform-origin: bottom;
-  animation: sai-draw-y 320ms var(--ease-out) 120ms both;
+  animation: sai-draw-y 360ms var(--out) 120ms both;
 }
 
 .sai-toast-text {
@@ -1708,39 +1822,44 @@
 .sai-toast-undo {
   flex: none;
   border: 0;
-  background: transparent;
-  color: var(--seam-deep);
+  background: color-mix(in oklab, var(--on-ink) 14%, transparent);
+  color: var(--on-ink);
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: var(--t-caption);
   font-weight: 800;
   cursor: pointer;
-  padding: 2px 4px;
-  margin-left: 12px;
-  border-radius: 6px;
+  height: 28px;
+  padding: 0 10px;
+  margin-left: 14px;
+  border-radius: 9px;
+  transition: transform var(--dur-press) var(--spring);
 }
 
 .sai-toast-undo:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  background: color-mix(in oklab, var(--on-ink) 22%, transparent);
+}
+
+.sai-toast-undo:active {
+  transform: scale(0.96);
 }
 
 /* ═════════ 하소연 감지 · 민감정보 · 티켓 ═════════ */
 
 .sai-vent-body {
-  padding: 12px var(--gutter-popup) 16px;
+  padding: 14px var(--gutter-popup) 20px;
 }
 
 .sai-vent-title {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-size: var(--t-title);
-  font-weight: 750;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
 .sai-vent-desc {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: var(--t-small);
   color: var(--sub);
   line-height: 1.6;
@@ -1774,13 +1893,12 @@
 
 .sai-vent-actions .sai-button {
   flex: 1;
-  padding: 10px 0;
 }
 
 /* 민감정보 — 「막혔다」. 흔들지 않고 옆에서 멈춰 선다. */
 .sai-popup[role='alertdialog'] {
-  border-color: color-mix(in oklab, var(--fault) 40%, var(--border-strong));
-  animation: sai-halt 360ms var(--ease-out) both;
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--fault) 45%, transparent), var(--e3);
+  animation: sai-halt 360ms var(--out) both;
 }
 
 .sai-popup[role='alertdialog'] .sai-vent-title {
@@ -1789,26 +1907,27 @@
 
 /* 🔴 마스킹된 결과만 — 원래 값은 화면 어디에도 없다. 가려진 문장임을 빗금 가장자리로 보인다. */
 .sai-masked-preview {
-  margin: 0 0 14px;
-  padding: 10px 12px 10px 16px;
+  margin: 0 0 16px;
+  padding: 12px 14px 12px 18px;
   background:
-    repeating-linear-gradient(135deg, var(--fault) 0 2px, transparent 2px 6px) left / 5px 100% no-repeat,
-    var(--sunken);
-  border-radius: var(--radius-md);
+  repeating-linear-gradient(135deg, var(--fault) 0 2px, transparent 2px 6px) left / 5px 100% no-repeat,
+  var(--sunken);
+  border-radius: var(--radius-lg);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--sub);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 140px;
+  max-height: 160px;
   overflow-y: auto;
 }
 
 /* 티켓 — 3단(문제점/영향/요청사항) + 우려 수준(메타, 서술형만). */
 .sai-ticket {
-  margin: 12px var(--gutter-popup) 10px;
-  border: 1px solid var(--border-strong);
+  margin: 14px var(--gutter-popup) 12px;
+  border: 0;
+  background: var(--sunken);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
@@ -1816,9 +1935,9 @@
 .sai-ticket-row {
   display: flex;
   gap: 12px;
-  padding: 10px 13px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--line);
-  animation: sai-rise var(--dur-enter) var(--ease-out) both;
+  animation: sai-rise var(--dur-enter) var(--out) both;
 }
 
 .sai-ticket-row:nth-child(2) {
@@ -1833,16 +1952,16 @@
 }
 
 .sai-ticket-label {
-  font-size: 11px;
-  font-weight: 750;
+  font-size: var(--t-caption);
+  font-weight: 800;
   color: var(--ink);
-  width: 56px; /* = .sai-concern-label */
+  width: 60px; /* = .sai-concern-label */
   flex: none;
   padding-top: 1px;
 }
 
 .sai-ticket-value {
-  font-size: 13px;
+  font-size: var(--t-small);
   line-height: 1.55;
   color: var(--sub);
 }
@@ -1851,15 +1970,15 @@
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin: 0 var(--gutter-popup) 12px;
-  padding: 0 13px;
+  margin: 0 var(--gutter-popup) 14px;
+  padding: 0 16px;
   font-size: var(--t-caption);
   line-height: 1.5;
 }
 
 .sai-concern-label {
   flex: none;
-  width: 56px;
+  width: 60px;
   color: var(--mut);
   font-weight: 700;
 }
@@ -1873,14 +1992,41 @@
 /* ═════════ 뜻 풀기 ═════════ */
 
 .sai-decode-body {
-  padding: 8px var(--gutter-popup) 16px;
+  padding: 12px var(--gutter-popup) 20px;
   display: grid;
-  gap: 14px;
+  gap: 16px;
+}
+
+/* 결과가 오면 로딩의 두 막대가 맞물린 채 머리에 남는다(A2 .bars.done). 긴급도 막대가 있는 해독 결과에서만. */
+.sai-decode-body:has(> .sai-decode-gap) {
+  position: relative;
+  padding-top: 34px;
+}
+.sai-decode-body:has(> .sai-decode-gap)::before,
+.sai-decode-body:has(> .sai-decode-gap)::after {
+  content: '';
+  position: absolute;
+  left: var(--gutter-popup);
+  right: var(--gutter-popup);
+  height: 5px;
+  border-radius: 3px;
+  transform-origin: left;
+}
+.sai-decode-body:has(> .sai-decode-gap)::before {
+  top: 12px;
+  background: var(--ink);
+  opacity: 0.12;
+  animation: sai-bars-lock-a 800ms var(--spring) both;
+}
+.sai-decode-body:has(> .sai-decode-gap)::after {
+  top: 21px;
+  background: var(--seam);
+  animation: sai-bars-lock-b 800ms var(--spring) both;
 }
 
 /* 해독 본문 안의 블록도 순서대로 나온다(팝업 직계가 아니라 여기서 따로). */
 .sai-decode-body > * {
-  animation: sai-rise var(--dur-enter) var(--ease-out) both;
+  animation: sai-rise var(--dur-enter) var(--out) both;
   animation-delay: calc(var(--i, 0) * var(--stagger) + 60ms);
 }
 .sai-decode-body > :nth-child(2) { --i: 1; }
@@ -1890,12 +2036,12 @@
 
 .sai-decode-section {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .sai-decode-section-label {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--t-caption);
+  font-weight: 600;
   color: var(--mut);
 }
 
@@ -1917,46 +2063,34 @@
 .sai-decode-body > .sai-decode-intent {
   position: relative;
   background: var(--dusk-tint);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-  padding: 12px 14px 12px 16px;
-  animation: sai-emerge var(--dur-reveal) var(--ease-out) 140ms both;
-}
-
-.sai-decode-intent::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--dusk);
-  transform-origin: top;
-  animation: sai-draw-y 360ms var(--ease-out) 180ms both;
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  animation: sai-reveal var(--dur-reveal) var(--spring) 140ms both;
 }
 
 .sai-decode-intent-label {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--t-caption);
+  font-weight: 600;
   color: var(--dusk-deep);
   margin-bottom: 4px;
 }
 
 .sai-decode-intent-text {
   margin: 0;
-  font-size: var(--t-lead);
+  font-size: 18px;
   line-height: 1.5;
-  font-weight: 650;
-  letter-spacing: -0.005em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 
 .sai-decode-evidence {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: var(--t-caption);
   color: var(--mut);
 }
 
-/* ── 체감 긴급도 — 두 막대(표면·실제). 실제 막대가 표면 길이에서 실제 길이로 자란다 ── */
+/* ── 체감 긴급도 (A2 .gauge) — 두 막대(표면·실제). 실제 막대가 표면 길이에서 실제 길이로 스프링 ── */
 .sai-decode-gap-head {
   display: flex;
   justify-content: space-between;
@@ -1965,44 +2099,59 @@
 }
 
 .sai-decode-gap-value {
-  font-size: 11px;
+  font-size: var(--t-caption);
   font-weight: 700;
   color: var(--seam-deep);
 }
 
 .sai-decode-gap-same {
-  font-size: 11px;
+  font-size: var(--t-caption);
   color: var(--mut);
 }
 
 .sai-decode-gap-bars {
   display: grid;
-  gap: 5px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .sai-decode-gap-row {
   display: grid;
-  grid-template-columns: 26px 1fr;
+  grid-template-columns: 34px 1fr 56px;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .sai-decode-gap-key {
-  font-size: var(--t-micro);
-  font-weight: 600;
+  font-size: var(--t-caption);
+  font-weight: 700;
   color: var(--mut);
+}
+
+/* 단계 이름 — 서술 단계(Low·Normal·High)이지 점수가 아니다(필수 9). */
+.sai-decode-gap-lvl {
+  text-align: right;
+  font-size: var(--t-caption);
+  font-weight: 700;
+  color: var(--ink);
+}
+.sai-decode-gap-lvl.sai-urgency-critical,
+.sai-decode-gap-lvl.sai-urgency-high {
+  color: var(--seam-deep);
+}
+.sai-decode-gap-lvl.sai-urgency-low {
+  color: var(--dusk-deep);
 }
 
 /* 트랙의 눈금 2개 = Low | Normal | High 세 칸(서술 단계 — 점수가 아니다). */
 .sai-decode-gap-track {
   position: relative;
-  height: 6px;
-  border-radius: 3px;
+  height: 12px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background:
-    linear-gradient(90deg, transparent calc(33.333% - 1px), var(--surface) calc(33.333% - 1px) calc(33.333% + 1px), transparent calc(33.333% + 1px) calc(66.666% - 1px), var(--surface) calc(66.666% - 1px) calc(66.666% + 1px), transparent calc(66.666% + 1px)),
-    var(--sunken);
+  linear-gradient(90deg, transparent calc(33.333% - 1px), var(--surface) calc(33.333% - 1px) calc(33.333% + 1px), transparent calc(33.333% + 1px) calc(66.666% - 1px), var(--surface) calc(66.666% - 1px) calc(66.666% + 1px), transparent calc(66.666% + 1px)),
+  var(--sunken);
 }
 
 .sai-decode-gap-fill {
@@ -2010,22 +2159,23 @@
   left: 0;
   top: 0;
   bottom: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-pill);
   transform-origin: left;
 }
 
 .sai-decode-gap-fill-surface {
-  background: var(--faint);
-  animation: sai-draw-x 360ms var(--ease-out) 200ms both;
+  background: var(--mut);
+  opacity: 0.55;
+  animation: sai-spring-x 900ms var(--spring) 200ms both;
 }
 
 :host([data-theme='dark']) .sai-decode-gap-fill-surface {
-  background: var(--mut);
+  opacity: 0.7;
 }
 
 .sai-decode-gap-fill-actual {
   background: var(--ink);
-  animation: sai-gap-shift 620ms var(--ease-snap) 520ms both;
+  animation: sai-gap-shift 1400ms var(--spring) 480ms both;
 }
 
 .sai-decode-gap-fill-actual.sai-urgency-critical {
@@ -2053,21 +2203,21 @@
 
 .sai-decode-actions li {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: baseline;
-  font-size: 13px;
+  font-size: var(--t-body);
   line-height: 1.5;
   color: var(--ink);
 }
 
 .sai-decode-action-num {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
   background: var(--sunken);
   color: var(--sub);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: var(--t-micro);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -2079,10 +2229,10 @@
 /* 🔴 목업 경고(Lessons #5) — 「분석할 게 없는 문장」과 「분석하지 않은 문장」을 가른다. 눈에 띄어야 한다. */
 .sai-decode-mock {
   margin: 0;
-  padding: 9px 12px;
+  padding: 12px 14px;
   background: var(--check-tint);
   border: 1px dashed var(--check);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   font-size: var(--t-caption);
   font-weight: 700;
   line-height: 1.5;
@@ -2119,7 +2269,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--t-caption);
   color: var(--sub);
   cursor: pointer;
   user-select: none;
@@ -2132,7 +2282,7 @@
 
 .sai-reply-hint {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--t-caption);
   line-height: 1.5;
   color: var(--mut);
 }
@@ -2140,28 +2290,29 @@
 .sai-reply-intents {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 6px;
 }
 
-/* 칩 — 기본 · 추천(사이가 권함 = 이음선 점선) · 선택(내가 고름 = 잉크 채움). 선택이 추천을 이긴다. */
+/* 칩 (A2 .dirs) — 기본 = 가라앉은 면 · 추천(사이가 권함 = 이음선 점선) · 선택(잉크 채움). 선택이 추천을 이긴다. */
 .sai-reply-intent {
   font: inherit;
-  font-size: var(--t-caption);
-  font-weight: 600;
-  padding: 5px 11px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  font-size: var(--t-small);
+  font-weight: 700;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: var(--sunken);
   color: var(--sub);
   cursor: pointer;
-  transition: background var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out),
-    border-color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--ease-out);
+  transition: background-color var(--dur-quick) var(--ease-out), color var(--dur-quick) var(--ease-out),
+  border-color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--spring);
 }
 
 .sai-reply-intent:hover:not(:disabled) {
   color: var(--ink);
-  border-color: var(--ink);
+  border-color: var(--border-strong);
 }
 
 .sai-reply-intent:active:not(:disabled) {
@@ -2177,12 +2328,13 @@
 .sai-reply-intent-rec {
   border-style: dashed;
   border-color: var(--seam);
+  background: var(--surface);
   color: var(--seam-deep);
 }
 
 .sai-reply-rec-tag {
   margin-left: 6px;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   padding: 1px 6px;
   border-radius: var(--radius-pill);
@@ -2205,12 +2357,12 @@
 
 /* 사전 질문 카드 — 초안 자리에 대신 뜬다. */
 .sai-reply-ask {
-  padding: 12px;
+  padding: 14px;
   border-radius: var(--radius-lg);
   background: var(--sunken);
   display: grid;
-  gap: 12px;
-  animation: sai-rise var(--dur-enter) var(--ease-out) both;
+  gap: 14px;
+  animation: sai-rise var(--dur-enter) var(--out) both;
 }
 
 .sai-reply-ask-head {
@@ -2226,7 +2378,7 @@
 }
 
 .sai-reply-ask-q {
-  font-size: 12.5px;
+  font-size: var(--t-small);
   font-weight: 600;
   color: var(--ink);
 }
@@ -2239,24 +2391,27 @@
 
 .sai-reply-ask-chip {
   font: inherit;
-  font-size: 11px;
-  padding: 4px 10px;
+  font-size: var(--t-caption);
+  font-weight: 600;
+  height: 30px;
+  padding: 0 12px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-strong);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
   background: var(--surface);
   color: var(--sub);
   cursor: pointer;
-  transition: background var(--dur-quick), color var(--dur-quick), border-color var(--dur-quick);
+  transition: background-color var(--dur-quick), color var(--dur-quick), box-shadow var(--dur-quick), transform var(--dur-press) var(--spring);
 }
 
 .sai-reply-ask-chip:hover {
-  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
   color: var(--ink);
 }
 
 .sai-reply-ask-chip-on {
   background: var(--ink);
-  border-color: var(--ink);
+  box-shadow: none;
   color: var(--on-ink);
   font-weight: 700;
 }
@@ -2267,10 +2422,12 @@
 
 .sai-reply-ask-input {
   font: inherit;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border-strong);
+  font-size: var(--t-small);
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
   background: var(--surface);
   color: var(--ink);
   width: 100%;
@@ -2314,9 +2471,9 @@
 
 /* 초안 — 쓰는 자리. 이음선에서 나온다. */
 .sai-reply-draft {
-  margin: 8px 0 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
+  margin: 10px 0 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
   background: var(--sunken);
   font-size: var(--t-body);
   line-height: 1.6;
@@ -2329,17 +2486,19 @@
   width: 100%;
   box-sizing: border-box;
   font: inherit;
-  font-size: var(--t-body);
+  font-size: 15px;
+  font-weight: 400;
   line-height: 1.6;
-  border: 1px solid var(--border);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
   resize: vertical;
-  animation: sai-emerge var(--dur-reveal) var(--ease-out) both;
-  transition: border-color var(--dur-quick), background var(--dur-quick);
+  animation: sai-reveal var(--dur-reveal) var(--spring) both;
+  transition: box-shadow var(--dur-quick), background-color var(--dur-quick);
 }
 
 .sai-reply-draft-edit:focus {
   outline: none;
-  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
   background: var(--surface);
 }
 
@@ -2354,7 +2513,7 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--t-caption);
   line-height: 1.55;
   color: var(--sub);
 }
@@ -2362,7 +2521,7 @@
 /* 자리표시자 = 할 일(잉크) · 받은 메시지에 없는 값 = 사고 위험(Check). */
 .sai-reply-check-tag {
   flex: 0 0 auto;
-  font-size: 10px;
+  font-size: var(--t-micro);
   font-weight: 700;
   padding: 1px 7px;
   border-radius: var(--radius-pill);
@@ -2398,38 +2557,26 @@
 .sai-reply-copy {
   position: relative;
   overflow: hidden;
-  margin-top: 10px;
+  margin-top: 12px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--t-body);
   font-weight: 700;
-  padding: 8px 14px;
+  min-height: 44px;
+  padding: 0 18px;
   border-radius: var(--radius-md);
   border: none;
   background: var(--ink);
   color: var(--on-ink);
   cursor: pointer;
-  transition: transform var(--dur-press) var(--ease-out), opacity var(--dur-quick);
+  transition: transform var(--dur-press) var(--spring), opacity var(--dur-quick), background-color var(--dur-quick);
 }
 
-.sai-reply-copy::after {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 0;
-  height: 2px;
-  background: var(--seam);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--dur-enter) var(--ease-out);
-}
-
-.sai-reply-copy:hover:not(:disabled)::after {
-  transform: scaleX(1);
+.sai-reply-copy:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--ink) 86%, var(--surface));
 }
 
 .sai-reply-copy:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
 .sai-reply-copy:disabled {
@@ -2440,11 +2587,11 @@
 /* 빈칸을 남긴 채 넘기려 할 때의 확인. */
 .sai-reply-confirm {
   position: relative;
-  margin-top: 10px;
-  padding: 10px 12px 10px 15px;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin-top: 12px;
+  padding: 12px 14px 12px 18px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   background: var(--check-tint);
-  animation: sai-rise var(--dur-enter) var(--ease-out) both;
+  animation: sai-rise var(--dur-enter) var(--out) both;
 }
 
 .sai-reply-confirm::before {
@@ -2453,13 +2600,13 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   background: var(--check);
 }
 
 .sai-reply-confirm-text {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--t-small);
   line-height: 1.55;
   color: var(--check-deep);
 }

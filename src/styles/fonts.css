@@ -1,0 +1,34 @@
+/* 번들 서체 `SaiPretendard` — 확장 페이지(사이드패널·결정 화면) 전용. 콘텐츠 팝업은 `src/lib/saiFont.js`.
+ *
+ * 🔴 파일은 `public/fonts/`(빌드 시 확장 루트 `/fonts/`로 복사) — 외부 CDN을 부르지 않는다.
+ *    Pretendard v1.3.9 공식 배포본의 KS X 1001 서브셋(굵기 고정 4종), SIL OFL 1.1 — `public/fonts/Pretendard-OFL.txt`.
+ * 🔴 굵기는 400·600·700·800만 있다. 다른 값을 쓰면 브라우저가 가까운 것으로 바꾼다(합성 굵기 없음).
+ * 🔴 서브셋 밖 글자(드문 한글 음절 등)는 `--font-sans`의 다음 순위(OS 서체)로 글자 단위 대체된다. */
+@font-face {
+  font-family: 'SaiPretendard';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Pretendard-Regular.subset.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'SaiPretendard';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Pretendard-SemiBold.subset.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'SaiPretendard';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Pretendard-Bold.subset.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'SaiPretendard';
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Pretendard-ExtraBold.subset.woff2') format('woff2');
+}
