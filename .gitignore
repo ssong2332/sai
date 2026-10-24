@@ -16,3 +16,7 @@ sai-extension-*.zip
 sai-extension-*/
 # 로컬 보관본의 «무엇이 들었는지» 기록 — 저장소가 아니라 그 폴더에서만 의미가 있다.
 sai-extension-VERSIONS.txt
+
+# 디자인 하네스(개발 전용) — 스크린샷은 로컬 산출물
+design-harness/screenshots/
+design-harness/dist/

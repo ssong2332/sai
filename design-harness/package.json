@@ -1,0 +1,9 @@
+{
+  "name": "sai-design-harness",
+  "private": true,
+  "type": "module",
+  "description": "개발 전용 — 콘텐츠 팝업 화면 검토용. 의존성은 루트 node_modules(react·vite)를 쓴다.",
+  "scripts": {
+    "dev": "vite --config vite.config.js"
+  }
+}
