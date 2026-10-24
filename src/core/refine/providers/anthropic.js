@@ -39,8 +39,17 @@ export const anthropicUsage = { calls: 0, input: 0, output: 0, cacheRead: 0, cac
  * | `adaptive` | `thinking` 생략(모델 기본) | 실험 전용 — L30의 「켬」 측정과 같은 조건 |
  */
 export const THINKING_ON_VALUE = 'adaptive';
-function thinkingConfig() {
-  return globalThis.process?.env?.SAI_ANTHROPIC_THINKING === THINKING_ON_VALUE ? {} : { thinking: { type: 'disabled' } };
+/**
+ * 값의 출처 판정표 (2026-10-24 L33 — Worker 콜드 CPU 절감)
+ * | `deps.thinking` | 읽는 값 | 쓰는 곳 |
+ * |---|---|---|
+ * | `undefined`(안 넘김) | `process.env.SAI_ANTHROPIC_THINKING` | Node 경로(프록시·Functions·회귀 러너) — 이전과 같다 |
+ * | 그 밖(문자열·null 등) | 그 값 — `process`를 **건드리지 않는다** | Worker — 요청 중 `globalThis.process` 첫 접근이 Node 호환 내부를 늦게 불러 +3ms(로컬 workerd 실측) |
+ * 🔴 어느 쪽이든 위 표 그대로 `adaptive`만 켬 — 오타·null은 끔.
+ */
+function thinkingConfig(explicit) {
+  const value = explicit === undefined ? globalThis.process?.env?.SAI_ANTHROPIC_THINKING : explicit;
+  return value === THINKING_ON_VALUE ? {} : { thinking: { type: 'disabled' } };
 }
 
 /**
@@ -73,12 +82,13 @@ function stripFence(text) {
  * @param {string} [deps.model]
  * @param {number} [deps.timeoutMs]
  * @param {typeof fetch} [deps.fetchImpl] 테스트에서 주입 — SDK `fetch` 옵션으로 넘긴다.
+ * @param {string} [deps.thinking] 사고 스위치 — 위 `thinkingConfig` 판정표. 생략하면 `process.env`를 읽는다.
  * @param {object} deps.errors `providers/index.js`가 넘기는 { RefineCallError, classifyHttpFailure, parseJsonContent }.
  * @returns {Promise<object>} 파싱된 LLM JSON (검증은 schema.js가 한다).
  */
 export async function callAnthropic(
   payload,
-  { apiKey, model = DEFAULT_ANTHROPIC_MODEL, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl, errors },
+  { apiKey, model = DEFAULT_ANTHROPIC_MODEL, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl, thinking, errors },
 ) {
   const { RefineCallError, classifyHttpFailure, parseJsonContent } = errors;
 
@@ -100,7 +110,7 @@ export async function callAnthropic(
       max_tokens: 8000,
       // 교정은 짧은 변환이다 — 사고 깊이를 낮춰 지연·비용을 줄인다(Haiku 5.5 기본값은 medium).
       output_config: { effort: 'low' },
-      ...thinkingConfig(),
+      ...thinkingConfig(thinking),
       system: SYSTEM,
       messages: [{ role: 'user', content: JSON.stringify(payload) }],
     });

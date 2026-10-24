@@ -138,6 +138,8 @@ function normalizeThreadContext(value) {
  * @param {object} [deps.cache] get/set을 가진 스토어. 생략 시 프로세스 메모리 캐시.
  * @param {typeof fetch} [deps.fetchImpl]
  * @param {number} [deps.timeoutMs]
+ * @param {string} [deps.thinking] anthropic 사고 스위치(`providers/anthropic.js` 판정표). 생략하면 provider가
+ *   `process.env.SAI_ANTHROPIC_THINKING`을 읽는다(Node 경로). Worker는 항상 넘긴다 — `process`를 건드리지 않게.
  * @param {(event: object) => void} [deps.logger] 🔴 본문 없는 메타데이터만 받는다.
  * @param {() => number} [deps.now]
  */
@@ -149,6 +151,7 @@ export async function refine(request, deps = {}) {
     cache = defaultCache,
     fetchImpl,
     timeoutMs,
+    thinking,
     logger = () => {},
     now = () => Date.now(),
   } = deps;
@@ -182,6 +185,8 @@ export async function refine(request, deps = {}) {
       model,
       timeoutMs,
       fetchImpl,
+      // 🔴 `undefined`는 그대로 넘긴다 — provider가 「안 넘김」으로 보고 process.env를 읽는다(Node 경로 불변).
+      thinking,
       errors: { RefineCallError, classifyHttpFailure, parseJsonContent },
     });
   } catch (error) {

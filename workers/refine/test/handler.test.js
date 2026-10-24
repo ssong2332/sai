@@ -203,14 +203,73 @@ test('🔴 Zero Retention — 성공·폴백·401·400 어느 경로에서도 �
   }
 });
 
-test('🔴 사고 스위치 — SAI_ANTHROPIC_THINKING=adaptive일 때만 켠다(실험용), /health도 같은 값을 보고한다', async () => {
+test('🔴 사고 스위치 — env SAI_ANTHROPIC_THINKING=adaptive일 때만 켠다(실험용), /health도 같은 값을 보고한다', async () => {
+  delete process.env.SAI_ANTHROPIC_THINKING;
   const { handle, fetchImpl } = setup();
   const env = { ...TEST_ENV, SAI_ANTHROPIC_THINKING: 'adaptive' };
   assert.equal((await handle(refineRequest(token, BASE_BODY), env)).status, 200);
   assert.equal('thinking' in fetchImpl.seen.bodies[0], false, 'adaptive면 thinking을 생략(모델 기본)해야 한다');
   const health = await (await handle(refineRequest(null, undefined, { method: 'GET', path: '/health' }), env)).json();
   assert.equal(health.thinking, 'adaptive');
-  process.env.SAI_ANTHROPIC_THINKING = 'disabled'; // 다른 테스트에 새지 않게
   const off = await (await handle(refineRequest(null, undefined, { method: 'GET', path: '/health' }), TEST_ENV)).json();
   assert.equal(off.thinking, 'disabled');
+  // 🔴 이전 방식(process.env로 옮김)과 달리 Worker 요청이 process.env를 남기지 않는다.
+  assert.equal(process.env.SAI_ANTHROPIC_THINKING, undefined, 'Worker가 process.env에 값을 써 넣었다');
+});
+
+test('🔴 사고 스위치 — Worker는 값을 명시해 넘긴다: process.env에 adaptive가 남아 있어도 env에 없으면 끔 (2026-10-24 L33)', async () => {
+  process.env.SAI_ANTHROPIC_THINKING = 'adaptive';
+  try {
+    for (const [envValue, expected] of [[undefined, { type: 'disabled' }], ['typo', { type: 'disabled' }], ['adaptive', '(생략)']]) {
+      const { handle, fetchImpl } = setup();
+      const env = envValue === undefined ? TEST_ENV : { ...TEST_ENV, SAI_ANTHROPIC_THINKING: envValue };
+      assert.equal((await handle(refineRequest(token, BASE_BODY), env)).status, 200);
+      const sent = fetchImpl.seen.bodies[0];
+      assert.deepEqual('thinking' in sent ? sent.thinking : '(생략)', expected, `env=${envValue}`);
+    }
+  } finally {
+    delete process.env.SAI_ANTHROPIC_THINKING;
+  }
+});
+
+test('🔴 요청 경로는 globalThis.process를 읽지 않는다 — 첫 접근이 Node 호환 내부를 늦게 불러 콜드 +3ms (2026-10-24 L33)', async () => {
+  const { handle } = setup();
+  // 전역 `process`를 세는 getter로 잠시 바꾼다 — 교정 1건(가짜 Claude까지)·/health 동안 몇 번 읽는지 본다.
+  const realProcess = globalThis.process;
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'process');
+  let reads = 0;
+  Object.defineProperty(globalThis, 'process', {
+    configurable: true,
+    enumerable: descriptor?.enumerable ?? false,
+    get() {
+      reads += 1;
+      return realProcess;
+    },
+    set(value) {
+      Object.defineProperty(globalThis, 'process', { ...descriptor, value });
+    },
+  });
+  let status;
+  let healthStatus;
+  try {
+    status = (await handle(refineRequest(token, { ...BASE_BODY, bypassCache: true }), TEST_ENV)).status;
+    healthStatus = (await handle(refineRequest(null, undefined, { method: 'GET', path: '/health' }), TEST_ENV)).status;
+  } finally {
+    Object.defineProperty(globalThis, 'process', descriptor);
+  }
+  assert.equal(status, 200);
+  assert.equal(healthStatus, 200);
+  assert.equal(reads, 0, `요청 처리 중 globalThis.process를 ${reads}번 읽었다`);
+});
+
+test('🔴 성공(폴백 아님) 교정은 로그를 쓰지 않는다, 폴백은 쓴다 — CPU 한도(2026-10-24 L33)', async () => {
+  const ok = setup();
+  assert.equal((await ok.handle(refineRequest(token, BASE_BODY), TEST_ENV)).status, 200);
+  assert.equal((await ok.handle(refineRequest(token, BASE_BODY), TEST_ENV)).status, 200); // 캐시 적중도 성공
+  assert.deepEqual(ok.logger.lines, [], '성공 교정이 로그를 남겼다');
+
+  const failed = setup({ fetchImpl: fakeAnthropicFetch(undefined, { status: 429 }) });
+  assert.equal((await failed.handle(refineRequest(token, BASE_BODY), TEST_ENV)).status, 200);
+  assert.equal(failed.logger.lines.length, 1, failed.logger.lines.join(' | '));
+  assert.match(failed.logger.lines[0], /^\[refine\] provider=anthropic urgency=\S+ intent=\S+ cache=miss fallback=quota \d+ms$/);
 });

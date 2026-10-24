@@ -157,6 +157,38 @@ test('🔴 사고 스위치 — 기본은 끈다, SAI_ANTHROPIC_THINKING=adaptiv
   }
 });
 
+test('🔴 사고 스위치 — `deps.thinking`을 넘기면 그 값이 이기고 process.env는 안 본다, 생략하면 process.env(Node 경로 불변) (2026-10-24 L33)', async () => {
+  const before = process.env.SAI_ANTHROPIC_THINKING;
+  const sentThinking = async (envValue, option) => {
+    if (envValue === undefined) delete process.env.SAI_ANTHROPIC_THINKING;
+    else process.env.SAI_ANTHROPIC_THINKING = envValue;
+    const fetchImpl = fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }]));
+    await refine(BASE_REQUEST, {
+      apiKey: 'test-key', provider: 'anthropic', cache: new MemoryCacheStore(), fetchImpl,
+      ...(option === 'omit' ? {} : { thinking: option }),
+    });
+    return 'thinking' in fetchImpl.seen.body ? fetchImpl.seen.body.thinking : '(생략)';
+  };
+  try {
+    // [환경변수 값, deps.thinking('omit' = 안 넘김), 보내는 것]
+    const rows = [
+      ['adaptive', 'disabled', { type: 'disabled' }], // 🔴 명시가 이긴다 — 남은 환경변수가 켜지 않는다
+      [undefined, 'adaptive', '(생략)'], //            명시 켬
+      ['adaptive', 'enabled', { type: 'disabled' }], // 모르는 값은 끔(오타)
+      ['adaptive', null, { type: 'disabled' }], //     null도 「넘김」 — 끔
+      ['adaptive', undefined, '(생략)'], //            undefined = 안 넘김 → process.env
+      ['adaptive', 'omit', '(생략)'], //               Node 경로(프록시·Functions·회귀 러너)
+      [undefined, 'omit', { type: 'disabled' }],
+    ];
+    for (const [envValue, option, expected] of rows) {
+      assert.deepEqual(await sentThinking(envValue, option), expected, `env=${envValue} option=${option}`);
+    }
+  } finally {
+    if (before === undefined) delete process.env.SAI_ANTHROPIC_THINKING;
+    else process.env.SAI_ANTHROPIC_THINKING = before;
+  }
+});
+
 test('실사용 토큰 누계 — 응답 usage를 숫자만 더한다(L30 비용 측정)', async () => {
   const { anthropicUsage } = await import('../src/core/refine/providers/anthropic.js');
   const before = { ...anthropicUsage };

@@ -55,20 +55,17 @@ import { createNoopUsageStore } from './usageStore.js';
 const NOT_IMPLEMENTED_MODES = new Set(['decode', 'decisions', 'reply']);
 
 /**
- * 🔴 사고(thinking) 스위치 전달 — 코어 `providers/anthropic.js`는 `globalThis.process?.env?.SAI_ANTHROPIC_THINKING`을
- *    읽는다(Node 경로). Worker 설정은 `env`로 오므로 그 값을 `process.env`에 옮겨 준다 — **코어를 고치지 않으려고**.
- *    `nodejs_compat`(compat date ≥ 2025-04-01)에서는 vars가 `process.env`에 자동으로 들어온다고 알려져 있지만
- *    (🔴 추정 — 배포 후 `/health`의 `thinking`·요청 본문으로 확인), 의존하지 않고 명시적으로 넣는다.
- * 🔴 2026-10-23부터 **기본이 끔**이다(코어 판정표). 켜려면(실험) `SAI_ANTHROPIC_THINKING = "adaptive"`.
- * 🔴 값이 없어도 `disabled`를 **매번 써 넣는다** — 「없으면 안 건드림」이면 isolate 안에서 이전 요청이 넣은
- *    `adaptive`가 남아, 설정을 지운 뒤에도 사고가 켜진 채로 돈다.
- * @returns {boolean} 옮겼는지(`process.env`가 없으면 false — 그때도 코어 기본(끔)으로 간다).
+ * 🔴 사고(thinking) 스위치 — 코어 `refine()`에 **값으로 넘긴다**(`deps.thinking`, 2026-10-24 L33).
+ *    이전에는 `env` 값을 `process.env`에 옮겼는데(`applyThinkingSwitch`), 요청 중 `globalThis.process` 첫 접근이
+ *    Node 호환 내부를 늦게 불러 콜드 요청에 +3ms(로컬 workerd 실측)였다. 이제 요청 경로는 `process`를 건드리지 않는다
+ *    (`test/handler.test.js`가 잠근다). 🔴 값은 **항상 명시**한다 — `undefined`면 코어가 `process.env`로 내려간다.
+ * | `SAI_ANTHROPIC_THINKING`(env) | 넘기는 값 |
+ * |---|---|
+ * | `adaptive` | `'adaptive'`(켬 — 실험 전용) |
+ * | 없음 · 그 밖의 값 | `'disabled'`(끔 — 기본, 오타도 끔) |
  */
-export function applyThinkingSwitch(value) {
-  const env = globalThis.process?.env;
-  if (!env) return false;
-  env.SAI_ANTHROPIC_THINKING = value ?? 'disabled';
-  return true;
+export function thinkingSwitch(value) {
+  return value === 'adaptive' ? 'adaptive' : 'disabled';
 }
 
 /** 위 판정표. @returns {{provider: string, apiKey: string} | null} */
@@ -145,7 +142,7 @@ export function createHandler(deps = {}) {
         missingConfig: config.missing,
         model: config.anthropicModel ?? null,
         // 코어 판정표와 같게 — `adaptive`만 켬, 나머지(없음 포함)는 끔.
-        thinking: config.thinking === 'adaptive' ? 'adaptive' : 'disabled',
+        thinking: thinkingSwitch(config.thinking),
         usageStore: usageStore.kind ?? 'custom',
       });
     }
@@ -208,7 +205,7 @@ export function createHandler(deps = {}) {
       return json(500, { error: 'no provider configured' });
     }
 
-    applyThinkingSwitch(config.thinking);
+    const thinking = thinkingSwitch(config.thinking);
 
     /** 한 단계 호출. 🔴 `ANTHROPIC_MODEL`은 anthropic 단계에만 — 사슬 단계 모델이 있으면 그게 이긴다. */
     const runStep = ({ provider, apiKey }, stepModel) => {
@@ -218,14 +215,20 @@ export function createHandler(deps = {}) {
         provider,
         model,
         cache,
+        thinking,
         ...(fetchImpl ? { fetchImpl } : {}),
         now,
-        logger: (event) =>
+        // 🔴 성공(폴백 아님) 이벤트는 로그를 쓰지 않는다 (2026-10-24 L33). 무료 플랜 CPU 한도 10ms에 실측 콜드 22ms —
+        //    로컬 workerd에서 console.log 한 줄이 첫 요청 +10ms·데운 요청 +3ms였다. 성공 건수·지연은 Cloudflare
+        //    자체 요청 지표로 본다. 폴백일 때만 남긴다(사유 진단용). 폴오버·warn·error 로그는 그대로다.
+        logger: (event) => {
+          if (!event.fallback) return;
           logger.log(
             `[refine] provider=${stepLabel({ provider, model })} urgency=${event.urgency ?? '-'} ` +
               `intent=${event.detectedIntent ?? '-'} cache=${event.cacheHit ? 'hit' : 'miss'} ` +
-              `fallback=${event.fallback ? (event.fallbackReason ?? 'yes') : 'no'} ${event.latencyMs}ms`,
-          ),
+              `fallback=${event.fallbackReason ?? 'yes'} ${event.latencyMs}ms`,
+          );
+        },
       });
     };
 
