@@ -34,8 +34,8 @@ export default function Legal({ doc }) {
   };
 
   return (
-    <main id="main" className="legal">
-      <div className="container legal-inner">
+    <main id="main" className="legal page-pad">
+      <div className="wrap legal-inner">
         {isDraft && (
           <p className="legal-draft" role="note">
             <b>초안</b> — 시행일 등 【 】로 표시한 항목은 아직 정해지지 않았습니다. 공개 출시 전에 확정합니다.

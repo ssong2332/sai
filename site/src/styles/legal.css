@@ -1,36 +1,52 @@
-.legal {
-  padding-top: clamp(32px, 6vw, 72px);
-}
+/* 개인정보처리방침 · 이용약관 — 스타일만(본문은 dashboard/public/*.html 그대로). 시안 A2 타이포. */
 .legal-inner {
-  max-width: calc(800px + 2 * var(--gutter));
+  max-width: calc(820px + 2 * var(--gutter));
+}
+.legal-title {
+  font-size: clamp(40px, 6vw, 72px);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  font-weight: 800;
+}
+.legal-lede {
+  margin-top: 16px;
+  font-size: 19px;
+  color: var(--sub);
+}
+.legal-lede a {
+  font-weight: 700;
+  text-underline-offset: 3px;
 }
 .legal-draft {
-  margin-bottom: 28px;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  border: 1px dashed var(--line-strong);
-  background: var(--surface);
-  color: var(--sub);
-  font-size: var(--t-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 32px;
+  padding: 14px 18px;
+  border-radius: var(--r-sm);
+  background: var(--check-tint);
+  color: var(--ink);
+  font-size: 15px;
+}
+.legal-draft b {
+  color: var(--check-ink);
 }
 .legal-doc {
-  font-size: 1rem;
+  font-size: 17px;
   line-height: 1.8;
 }
 .legal-doc h1 {
-  font-family: var(--font-display);
-  font-weight: 560;
-  font-size: var(--t-2xl);
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  font-size: clamp(36px, 5.4vw, 64px);
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  font-weight: 800;
 }
 .legal-doc h2 {
-  margin: 48px 0 12px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-  font-size: var(--t-lg);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  margin: 56px 0 12px;
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
 }
 .legal-doc p,
 .legal-doc ul {
@@ -44,43 +60,56 @@
   margin-top: 6px;
 }
 .legal-doc .meta {
+  margin-top: 14px;
   color: var(--mut);
-  font-family: var(--font-mono);
-  font-size: var(--t-xs);
-  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .legal-doc .key {
-  margin: 28px 0;
-  padding: 18px 20px;
-  border-radius: var(--radius);
+  margin: 32px 0;
+  padding: 22px 24px;
+  border-radius: var(--r);
   background: var(--surface);
-  border-left: 4px solid var(--fact);
+  box-shadow: var(--e1);
+  position: relative;
+  overflow: hidden;
+}
+.legal-doc .key::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--seam);
 }
 .legal-doc .table-wrap {
   overflow-x: auto;
   margin: 16px 0;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
+  border-radius: var(--r);
   background: var(--surface);
+  box-shadow: var(--e1);
 }
 .legal-doc table {
   width: 100%;
   min-width: 600px;
   border-collapse: collapse;
-  font-size: var(--t-sm);
+  font-size: 15px;
   line-height: 1.6;
 }
 .legal-doc th,
 .legal-doc td {
-  padding: 10px 12px;
+  padding: 12px 14px;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--line);
 }
 .legal-doc th {
   background: var(--sunken);
-  font-weight: 650;
-  font-size: var(--t-xs);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--sub);
 }
 .legal-doc tr:last-child td {
   border-bottom: 0;
@@ -88,16 +117,17 @@
 .legal-doc td:first-child,
 .legal-doc th:first-child {
   white-space: nowrap;
+  font-weight: 700;
 }
 .legal-doc a {
   color: var(--ink);
+  font-weight: 600;
   text-underline-offset: 3px;
-  text-decoration-color: var(--action);
+  text-decoration-color: var(--dusk);
 }
 .legal-doc code {
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  padding: 1px 5px;
-  border-radius: 4px;
+  font-size: 0.88em;
+  padding: 1px 6px;
+  border-radius: 6px;
   background: var(--sunken);
 }

@@ -14,10 +14,10 @@ import Legal from './pages/Legal.jsx';
 
 function NotFound() {
   return (
-    <main id="main" className="legal">
-      <div className="container legal-inner">
-        <h1 className="section-title">없는 페이지예요</h1>
-        <p className="section-lede">
+    <main id="main" className="legal page-pad">
+      <div className="wrap legal-inner">
+        <h1 className="legal-title">없는 페이지예요</h1>
+        <p className="legal-lede">
           주소를 확인하거나 <Link to="/">처음 화면</Link>으로 가세요.
         </p>
       </div>
@@ -49,9 +49,9 @@ function App() {
       <a className="skip-link" href="#main">
         본문으로 건너뛰기
       </a>
-      <Header theme={theme} onToggleTheme={toggle} assemble={landing} landing={landing} />
+      <Header theme={theme} onToggleTheme={toggle} landing={landing} />
       {page}
-      <Footer />
+      <Footer landing={landing} />
     </>
   );
 }
