@@ -1,464 +1,889 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '../router.jsx';
-import { useInView, useScrollTrack } from '../motion.js';
-import HeroStage from './HeroStage.jsx';
+import { prefersReducedMotion, useCountUp, useInView, useReducedMotion, useScrollFrame } from '../motion.js';
+import SaiMark from '../components/SaiMark.jsx';
+import Segmented from '../components/Segmented.jsx';
 
-/** 로고 바 하나가 섹션 너비로 뻗어 나가는 트랙. variant: a(그라파이트) · b(어긋난 그라파이트) · c(레드). */
-function Track({ variant, label }) {
-  const ref = useRef(null);
-  useScrollTrack(ref);
-  return (
-    <div ref={ref} className={`track track-${variant}`} aria-hidden="true">
-      <div className="container">
-        <span className="track-label mono">{label}</span>
-      </div>
-      <span className="track-bar" />
-    </div>
-  );
-}
+/**
+ * 소개 페이지 — 시안 A2(docs/design/reference-a2.html)를 옮긴 것.
+ * 🔴 예시 문장·시각은 미리 써 둔 것이다(실제 교정 결과가 아니다). 통계·후기·스토어 링크를 넣지 않는다.
+ * 🔴 움직임은 transform·opacity만. 스크롤 핸들러는 motion.js의 rAF 묶음 하나를 쓴다.
+ */
 
-/* ── 쓸 때 ─────────────────────────────────────────────── */
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
-const SOURCE_KO = [
-  { f: '금요일 오후 3시' },
-  '까지 ',
-  { f: 'v2.4' },
-  ' ',
-  { t: '배포' },
-  ' 끝내야 해서요, 리뷰 오늘 안에 가능할까요?',
-];
+/* ── 작은 부품 ─────────────────────────────────────────── */
 
-const URGENCY_OUTPUTS = {
-  Critical: {
-    en: ['Urgent: we have to finish the ', { f: 'v2.4' }, ' ', { t: 'deploy' }, ' by ', { f: 'Friday 3 PM' }, '. Please review this today.'],
-    back: '긴급: 금요일 오후 3시까지 v2.4 배포를 끝내야 해요. 오늘 리뷰해 주세요.',
-  },
-  Normal: {
-    en: ['We need to finish the ', { f: 'v2.4' }, ' ', { t: 'deploy' }, ' by ', { f: 'Friday 3 PM' }, '. Could you review this today?'],
-    back: '금요일 오후 3시까지 v2.4 배포를 마쳐야 해요. 오늘 리뷰해 주실 수 있을까요?',
-  },
-  Low: {
-    en: [
-      'No pressure, but we are aiming to finish the ',
-      { f: 'v2.4' },
-      ' ',
-      { t: 'deploy' },
-      ' by ',
-      { f: 'Friday 3 PM' },
-      '. Would you be able to review this today?',
-    ],
-    back: '부담 갖지 않으셔도 되지만, 금요일 오후 3시까지 v2.4 배포를 마치려고 해요. 오늘 리뷰가 가능할까요?',
-  },
-};
-
+/** f: 바뀌지 않는 사실(빨강) · t: 용어집 단어(초록) · b: 굵게 */
 function Rich({ parts }) {
   return parts.map((part, i) => {
     if (typeof part === 'string') return <span key={i}>{part}</span>;
-    if (part.f) return <mark key={i} className="m-fact">{part.f}</mark>;
-    return <mark key={i} className="m-term">{part.t}</mark>;
+    if (part.f) return <span key={i} className="fact">{part.f}</span>;
+    if (part.t) return <span key={i} className="term">{part.t}</span>;
+    return <b key={i}>{part.b}</b>;
   });
 }
 
-function WriteDemo() {
-  const [urgency, setUrgency] = useState('Normal');
-  const out = URGENCY_OUTPUTS[urgency];
+function Reveal({ as: Tag = 'div', className = '', delay = 0, children, ...rest }) {
+  const ref = useRef(null);
+  const seen = useInView(ref, { threshold: 0.2 });
   return (
-    <div className="demo-card">
-      <div className="demo-row">
-        <p className="demo-label mono">내가 쓴 문장</p>
-        <p className="demo-source" lang="ko">
-          <Rich parts={SOURCE_KO} />
-        </p>
-      </div>
+    <Tag ref={ref} className={`reveal${delay ? ` d${delay}` : ''}${seen ? ' in' : ''} ${className}`.trim()} {...rest}>
+      {children}
+    </Tag>
+  );
+}
 
-      <div className="demo-row demo-row-control">
-        <p className="demo-label mono" id="urgency-label">
-          긴급도 <span className="demo-label-note">사이 판정 Normal · 직접 바꿀 수 있어요</span>
-        </p>
-        <div className="segmented" role="radiogroup" aria-labelledby="urgency-label">
-          {Object.keys(URGENCY_OUTPUTS).map((key) => (
-            <button key={key} type="button" role="radio" aria-checked={urgency === key} onClick={() => setUrgency(key)}>
-              {key}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="demo-row demo-output" aria-live="polite">
-        <p className="demo-label mono">다듬은 문장 · English</p>
-        <p className="demo-en" lang="en" key={urgency}>
-          <Rich parts={out.en} />
-        </p>
-        <p className="demo-back mono" lang="ko" key={`b-${urgency}`}>
-          <span className="gloss-label">역번역</span> {out.back}
-        </p>
-      </div>
+function PopHead({ tag = '다듬기', decode = false }) {
+  return (
+    <div className="pop-h">
+      <SaiMark size={26} title="" />
+      <b>사이</b>
+      <span className={`tag${decode ? ' dec' : ''}`}>{tag}</span>
+      <span className="x" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <path d="M2 2l8 8M10 2l-8 8" />
+        </svg>
+      </span>
     </div>
   );
 }
 
-const CHECKS = [
-  { head: '숫자 확인 필요', body: '원문의 숫자가 다듬은 문장에서 빠지거나 달라졌을 때' },
-  { head: '이름 표기를 확인해 주세요', body: '사람 이름의 표기가 원문과 다르게 옮겨졌을 때' },
-  { head: '용어집 확인 필요', body: '용어집에 등록한 말이 다듬은 문장에 없을 때' },
+/** 두 막대 — 기다리는 동안 오가고(busy), 끝나면 맞물린다(done). */
+function Bars({ state }) {
+  return (
+    <div className={`bars${state ? ` ${state}` : ''}`} aria-hidden="true">
+      <i />
+      <i />
+    </div>
+  );
+}
+
+function Who() {
+  return (
+    <div className="who">
+      <span className="av" aria-hidden="true">
+        M
+      </span>
+      <b>Miguel</b>
+      <span className="t num">상대 11:35</span>
+    </div>
+  );
+}
+
+/**
+ * 숫자 굴리기 — 자리마다 0~9 띠가 한 바퀴 돌고 멈춘다(transform만).
+ * 화면 읽기 프로그램에는 `text`가 그대로 읽힌다.
+ */
+function Roll({ text, run, delay = 0, step = 70 }) {
+  let n = 0;
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span className="roll" aria-hidden="true">
+        {[...text].map((ch, i) => {
+          if (!/\d/.test(ch)) {
+            return (
+              <span key={i} className="roll-sep">
+                {ch}
+              </span>
+            );
+          }
+          const d = Number(ch);
+          const wait = delay + n++ * step;
+          return (
+            <span key={i} className="roll-col">
+              <span
+                className="roll-strip"
+                style={{ transform: `translateY(${run ? -(10 + d) * 5 : 0}%)`, transitionDelay: `${wait}ms` }}
+              >
+                {Array.from({ length: 20 }, (_, k) => (
+                  <span key={k}>{k % 10}</span>
+                ))}
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    </>
+  );
+}
+
+/* ── 히어로 ────────────────────────────────────────────── */
+
+const HERO_WORDS = [
+  { w: '보내기', d: 0.05 },
+  { w: '전에,', d: 0.13, br: true },
+  { w: '한 번 더', d: 0.24, cls: 'thin' },
+  { w: '맞춥니다.', d: 0.36, cls: 'hl' },
 ];
+
+const LIFT_RESULT = ['We need to finish the ', { f: 'v2.4' }, ' ', { t: 'deploy' }, ' by ', { f: 'Friday 3 PM' }, '. Could you review this today?'];
+
+function Hero() {
+  const lift = useRef(null);
+  const reduced = useReducedMotion();
+  useScrollFrame(() => {
+    const el = lift.current;
+    if (!el) return;
+    const vh = window.innerHeight || 800;
+    const top = el.getBoundingClientRect().top;
+    el.style.setProperty('--p', clamp01((vh - top) / (vh * 0.9)).toFixed(3));
+  }, !reduced);
+
+  return (
+    <section className="hero" aria-labelledby="hero-title">
+      <div className="wrap">
+        <span className="eyebrow">
+          <b aria-hidden="true" />
+          해외 동료와 일하는 개발자를 위한 Chrome 확장
+        </span>
+        <h1 id="hero-title" className="h1">
+          <span className="sr-only">보내기 전에, 한 번 더 맞춥니다.</span>
+          <span aria-hidden="true">
+            {HERO_WORDS.map((x) => (
+              <span key={x.w}>
+                <span className={`w${x.cls ? ` ${x.cls}` : ''}`} style={{ animationDelay: `${x.d}s` }}>
+                  {x.w}
+                </span>
+                {x.br ? <br /> : ' '}
+              </span>
+            ))}
+          </span>
+        </h1>
+        <p className="lede">
+          한국어로 쓰면 상대 언어와 긴급도에 맞게 다듬고, 받은 글은 숨은 의도까지 풀어 줘요. 숫자·날짜·이름은 다시
+          쓰지 않고, 그대로인지 확인만 해요.
+        </p>
+        <div className="ctas">
+          <p className="btn primary soon" role="status">
+            <span className="soon-dot" aria-hidden="true" />
+            Chrome 웹 스토어 · 출시 준비 중
+          </p>
+          <a href="#write" className="btn ghost press">
+            어떻게 동작하나요
+          </a>
+        </div>
+      </div>
+
+      <div className="lift" ref={lift} aria-hidden="true">
+        <div className="device">
+          <div className="page">
+            <div className="chrome">
+              <i />
+              <i />
+              <i />
+              <span>업무 메신저 · #release</span>
+            </div>
+            <div className="doc">
+              <div className="thread">
+                <div className="bubble">
+                  <b>Miguel</b> · 11:20
+                  <br />
+                  Hey! Any update on the release?
+                </div>
+                <div className="bubble me">곧 공유할게요!</div>
+                <div className="compose">
+                  <mark>금요일 오후 3시까지 v2.4 배포 끝내야 해서요, 리뷰 오늘 안에 가능할까요?</mark>
+                </div>
+              </div>
+              <div className="pop">
+                <PopHead />
+                <Bars state="done" />
+                <div className="result" lang="en">
+                  <Rich parts={LIFT_RESULT} />
+                </div>
+                <div className="foot">
+                  <span className="btn">다시</span>
+                  <span className="btn primary">적용하기</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── 쓸 때 — 스크롤로 장면이 바뀐다 ───────────────────── */
+
+const STEPS = [
+  { t: '지켜야 할 것부터 찾아요', s: '마감 시각·버전 번호는 빨강, 용어집 단어는 초록' },
+  { t: '긴급도에 맞게 다듬어요', s: 'Critical·Normal·Low에 따라 문장의 무게가 달라져요' },
+  { t: '그대로 옮겼는지 대조해요', s: '빠진 숫자나 바뀐 이름이 있으면 알려만 줘요' },
+];
+const STATUS = ['문장을 읽고 있어요', '지켜야 할 것 3개를 찾았어요', '긴급도 Normal로 다듬는 중이에요', '다 됐어요 — 숫자·날짜 그대로예요'];
+/** 데스크톱: 섹션 진행도(0~1) 경계 · 단계를 눌렀을 때 옮겨 갈 진행도 */
+const STAGE_AT = [0.12, 0.4, 0.7];
+const STAGE_GO = [0.26, 0.55, 0.86];
+/** 모바일(고정 없음): 팝업 윗변이 화면 높이의 몇 % 위치에 오면 그 단계인가 */
+const MOBILE_AT = [0.85, 0.62, 0.4];
+const MOBILE_GO = [0.74, 0.5, 0.26];
+
+function isStacked() {
+  return window.matchMedia?.('(max-width: 960px)').matches;
+}
+
+function StoryWrite() {
+  const reduced = useReducedMotion();
+  const track = useRef(null);
+  const pop = useRef(null);
+  const [stage, setStage] = useState(() => (prefersReducedMotion() ? 3 : 0));
+
+  useScrollFrame(() => {
+    const el = track.current;
+    const p = pop.current;
+    if (!el || !p) return;
+    const vh = window.innerHeight || 800;
+    let next;
+    if (isStacked()) {
+      const r = p.getBoundingClientRect().top / vh;
+      next = r > MOBILE_AT[0] ? 0 : r > MOBILE_AT[1] ? 1 : r > MOBILE_AT[2] ? 2 : 3;
+    } else {
+      const total = el.offsetHeight - vh;
+      const sp = clamp01(-el.getBoundingClientRect().top / (total || 1));
+      next = sp < STAGE_AT[0] ? 0 : sp < STAGE_AT[1] ? 1 : sp < STAGE_AT[2] ? 2 : 3;
+    }
+    setStage((prev) => (prev === next ? prev : next));
+  }, !reduced);
+
+  useEffect(() => {
+    if (reduced) setStage(3);
+  }, [reduced]);
+
+  const go = (i) => {
+    const el = track.current;
+    if (!el) return;
+    const vh = window.innerHeight || 800;
+    let y;
+    if (isStacked()) {
+      y = window.scrollY + pop.current.getBoundingClientRect().top - MOBILE_GO[i] * vh;
+    } else {
+      const top = window.scrollY + el.getBoundingClientRect().top;
+      y = top + STAGE_GO[i] * (el.offsetHeight - vh);
+    }
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  };
+
+  const active = Math.max(1, stage);
+  const bars = stage === 2 ? 'busy' : stage === 3 ? 'done' : '';
+
+  return (
+    <section className={`story${reduced ? ' static' : ''}`} id="write" data-stage={stage} aria-labelledby="write-title">
+      <div className="story-track" ref={track}>
+        <div className="stick">
+          <div className="wrap grid">
+            <div className="story-copy">
+              <p className="kick">쓸 때</p>
+              <h2 className="h2" id="write-title">
+                한국어로 쓰면,
+                <br />
+                <span className="thin">상대 말투로</span> 보내요
+              </h2>
+              <ol className="steps">
+                {STEPS.map((s, i) => {
+                  const on = reduced || active === i + 1;
+                  const body = (
+                    <>
+                      <b className="num">{i + 1}</b>
+                      <span className="step-text">
+                        <strong>{s.t}</strong>
+                        <span>{s.s}</span>
+                      </span>
+                    </>
+                  );
+                  return (
+                    <li key={s.t}>
+                      {reduced ? (
+                        <div className="step on">{body}</div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`step${on ? ' on' : ''}`}
+                          aria-current={on ? 'step' : undefined}
+                          onClick={() => go(i)}
+                        >
+                          {body}
+                          <span className="step-meter" aria-hidden="true" />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+
+            <div className="pop story-pop" ref={pop}>
+              <PopHead />
+              <Who />
+              <p className="cap">내가 쓴 문장</p>
+              <p className="orig">
+                <span className="fact">금요일 오후 3시</span>까지 <span className="fact">v2.4</span>{' '}
+                <span className="term">배포</span> 끝내야 해서요, 리뷰 오늘 안에 가능할까요?
+              </p>
+              <Bars state={bars} />
+              <p className="status">
+                <span className={`status-dot s${stage}`} aria-hidden="true" />
+                <span key={stage} className="status-text">
+                  {STATUS[stage]}
+                </span>
+              </p>
+              <div className="refined-cell">
+                <div className="skeleton" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </div>
+                <div className="refined">
+                <p className="result" lang="en">
+                  <Rich parts={LIFT_RESULT} />
+                </p>
+                <div className="chips">
+                  <span className="chip f">
+                    <i />
+                    Friday 3 PM 그대로
+                  </span>
+                  <span className="chip f">
+                    <i />
+                    v2.4 그대로
+                  </span>
+                  <span className="chip k">
+                    <i />
+                    배포 → deploy
+                  </span>
+                </div>
+              </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /* ── 받을 때 ───────────────────────────────────────────── */
 
-const LEVELS = ['Low', 'Normal', 'High'];
+const REPLY_DIRS = [
+  { id: 'ok', label: '진행 확인' },
+  { id: 'schedule', label: '일정 조율' },
+  { id: 'detail', label: '세부 코멘트 요청', rec: true },
+];
 
-function UrgencyGauge() {
+function Gauge({ surface, actual, surfaceLabel, actualLabel, on }) {
+  return (
+    <div className={`gauge${on ? ' in' : ''}`}>
+      <p className="cap">체감 긴급도</p>
+      <div className="g-row" style={{ '--v': `${surface}%` }}>
+        <span>표면</span>
+        <div className="track">
+          <div className="fill" />
+        </div>
+        <span className="lvl">{surfaceLabel}</span>
+      </div>
+      <div className="g-row actual" style={{ '--v': `${actual}%` }}>
+        <span>실제</span>
+        <div className="track">
+          <div className="fill" />
+        </div>
+        <span className="lvl">{actualLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+function ReadSection() {
   const ref = useRef(null);
-  const seen = useInView(ref, { threshold: 0.6 });
+  const on = useInView(ref, { threshold: 0.35 });
+  const [dir, setDir] = useState('detail');
   return (
-    <div ref={ref} className={`gauge${seen ? ' is-in' : ''}`}>
-      <div className="gauge-head">
-        <span className="demo-label mono">체감 긴급도</span>
-        <span className="gauge-value mono">표면 Low → 실제 Normal</span>
+    <section className={`read${on ? ' in' : ''}`} id="read" ref={ref} aria-labelledby="read-title">
+      <div className="wrap grid">
+        <Reveal>
+          <p className="kick dusk">받을 때</p>
+          <h2 className="quote" id="read-title">
+            「
+            <s className="strike">
+              <span>사소한</span>
+            </s>{' '}
+            코멘트」는
+            <br />
+            사소하지 않을 수 있어요
+          </h2>
+          <p className="read-lede">
+            직역만으로는 놓치는 완곡한 표현을 짚어 주고, 표면 긴급도와 실제 긴급도를 나란히 보여 줘요.
+          </p>
+        </Reveal>
+        <Reveal className="pop" delay={2}>
+          <PopHead tag="뜻 풀기" decode />
+          <div>
+            <p className="cap">직역</p>
+            <p className="literal">
+              업데이트 고마워요! 사소한 코멘트가 몇 개 있어요 — 시간 될 때 전체 접근 방식을 다시 볼 수도 있겠네요.
+            </p>
+          </div>
+          <div className="intent">
+            <p className="cap">실제 의도</p>
+            <p>접근 방식을 전면 재검토하자는 요청일 가능성이 높아요.</p>
+          </div>
+          <Gauge surface={26} actual={86} surfaceLabel="Low" actualLabel="High" on={on} />
+          <div>
+            <p className="cap" id="dirs-label">
+              어떻게 답할까요
+            </p>
+            <div className="dirs" role="group" aria-labelledby="dirs-label">
+              {REPLY_DIRS.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className={`press${dir === d.id ? ' sel' : ''}`}
+                  aria-pressed={dir === d.id}
+                  onClick={() => setDir(d.id)}
+                >
+                  {d.label}
+                  {d.rec && <span className="rec-tag"> · 추천</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Reveal>
       </div>
-      <div className="gauge-track" role="img" aria-label="체감 긴급도: 표면은 Low, 실제는 Normal">
-        <span className="gauge-fill" />
-        <span className="gauge-dot gauge-dot-surface" />
-        <span className="gauge-dot gauge-dot-actual" />
-      </div>
-      <div className="gauge-scale mono" aria-hidden="true">
-        {LEVELS.map((l) => (
-          <span key={l}>{l}</span>
-        ))}
-      </div>
-    </div>
+    </section>
   );
 }
 
-/* ── 보낼 때 ───────────────────────────────────────────── */
+/* ── 보낼 때 — 유일하게 어두운 장면 ───────────────────── */
 
-/**
- * 예시 시각(고정): 서울 UTC+9 · 베를린 UTC+1(11월 기준) — 8시간 차.
- * 상대의 업무 시간 밖(18:00~09:00)을 칠한다. 서울 시각 기준 하루(0~24시) 위에 두 줄을 겹친다.
- */
-const NOW_SEOUL = 15 + 20 / 60;
-const SEND_SEOUL = 17; // 베를린 09:00
-const DIFF = 8;
-const pct = (h) => `${(h / 24) * 100}%`;
+/** 예시 시각(고정): 서울 19:35(UTC+9) = 샌프란시스코 03:35(2026-10-24 PDT, UTC−7) — 16시간 차.
+ *  띠 위 핀은 각자 현지 시각(03:35 → 14.93%, 19:35 → 81.6%), 보내기 점은 Dana의 09:00(37.5%) = 서울 다음 날 01:00. */
 
-function DualClock() {
-  const [scheduled, setScheduled] = useState(false);
-  const berlinHour = (h) => (((h - DIFF) % 24) + 24) % 24;
-  // 베를린 18:00~09:00 = 서울 02:00~17:00
-  const offStart = 2;
-  const offEnd = 17;
-  const ticks = [0, 3, 6, 9, 12, 15, 18, 21];
-  const markerAt = scheduled ? SEND_SEOUL : NOW_SEOUL;
-
+function NightSection() {
+  const ref = useRef(null);
+  const bandRef = useRef(null);
+  const clocksRef = useRef(null);
+  const on = useInView(ref, { threshold: 0.2 });
+  const clocksOn = useInView(clocksRef, { threshold: 0.5 });
+  const bandOn = useInView(bandRef, { threshold: 0.4 });
   return (
-    <div className="clock-card">
-      <div className="clock" style={{ '--marker': (markerAt / 24) * 100 }}>
-        <div className="clock-row">
-          <div className="clock-city">
-            <span className="clock-name">서울</span>
-            <span className="clock-role mono">나</span>
+    <section className={`night${bandOn ? ' in' : ''}`} id="send" ref={ref} aria-labelledby="send-title">
+      <div className="wrap">
+        <Reveal>
+          <p className="kick">보낼 때</p>
+          <h2 className="h2" id="send-title">
+            상대는 지금
+            <br />
+            <span className="thin">퇴근했을지도 몰라요</span>
+          </h2>
+        </Reveal>
+        <div className="clocks" ref={clocksRef}>
+          <Reveal className="clock me" delay={1}>
+            <p className="city">나 · 서울</p>
+            <p className="time num">
+              <Roll text="19:35" run={clocksOn && on} />
+            </p>
+            <span className="state">저녁</span>
+          </Reveal>
+          <Reveal className="mid" delay={2}>
+            <span aria-hidden="true">⟷</span> 16시간
+          </Reveal>
+          <Reveal className="clock them" delay={3}>
+            <p className="city">Dana · 샌프란시스코</p>
+            <p className="time num">
+              <Roll text="03:35" run={clocksOn && on} delay={180} />
+            </p>
+            <span className="state">자는 시간</span>
+          </Reveal>
+        </div>
+        <div className="band-wrap" ref={bandRef}>
+          <div
+            className="band"
+            role="img"
+            aria-label="하루 24시간 띠: Dana는 새벽 3시 35분, 나는 19시 35분. Dana의 오전 9시가 보내기 좋은 때예요."
+          >
+            <span className="pin-rail" style={{ '--x': bandOn ? '14.93%' : '0%' }}>
+              <span className="pin them">Dana 03:35</span>
+            </span>
+            <span className="pin-rail me" style={{ '--x': bandOn ? '81.6%' : '0%' }}>
+              <span className="pin me">나 19:35</span>
+            </span>
+            <span className="send-rail">
+              <span className="send" />
+            </span>
           </div>
-          <div className="clock-line">
-            {ticks.map((h) => (
-              <span key={h} className={`clock-tick mono${h === 0 ? ' clock-tick-first' : ''}${h % 6 ? ' clock-tick-minor' : ''}`} style={{ left: pct(h) }}>
-                {String(h).padStart(2, '0')}
-              </span>
-            ))}
+          <div className="band-cap num" aria-hidden="true">
+            <span>00시</span>
+            <span>06시</span>
+            <span>12시</span>
+            <span>18시</span>
+            <span>24시</span>
           </div>
         </div>
-        <div className="clock-row">
-          <div className="clock-city">
-            <span className="clock-name">베를린</span>
-            <span className="clock-role mono">상대</span>
-          </div>
-          <div className="clock-line">
-            <span
-              className="clock-off"
-              style={{ left: pct(offStart), width: pct(offEnd - offStart) }}
-              aria-hidden="true"
-            />
-            {ticks.map((h) => (
-              <span key={h} className={`clock-tick mono${h === 0 ? ' clock-tick-first' : ''}${h % 6 ? ' clock-tick-minor' : ''}`} style={{ left: pct(h) }}>
-                {String(berlinHour(h)).padStart(2, '0')}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="clock-marker-layer" aria-hidden="true">
-          <span className={`clock-marker${scheduled ? ' is-scheduled' : ''}`}>
-            <span className="clock-marker-label mono">{scheduled ? '예약 17:00 / 09:00' : '지금 15:20 / 07:20'}</span>
+        <Reveal className="sendcard">
+          <span className="send-mini" aria-hidden="true" />
+          <span>
+            <b>Dana의 오전 9:00</b>(서울 새벽 1:00)에 알림으로 다시 알려 드려요 — 보내기는 직접 해요
           </span>
-        </div>
+        </Reveal>
       </div>
-
-      <p className="clock-legend mono">
-        <span className="clock-legend-swatch" aria-hidden="true" /> 상대의 업무 시간 밖(18:00~09:00) · 예시 시각, 서울 UTC+9 · 베를린 UTC+1
-      </p>
-
-      <div className="clock-actions">
-        <p className="clock-status" aria-live="polite">
-          {scheduled
-            ? '서울 화 17:00, 베를린 오전 9:00에 크롬 알림으로 다시 알려 드려요. 알림을 보고 직접 보내세요.'
-            : '지금 베를린은 화 07:20, 업무 시작 전이에요.'}
-        </p>
-        <button
-          type="button"
-          className={scheduled ? 'btn btn-small' : 'btn btn-small btn-action'}
-          onClick={() => setScheduled((s) => !s)}
-        >
-          {scheduled ? '예약 취소' : '상대 오전 9:00로 예약'}
-        </button>
-      </div>
-    </div>
+    </section>
   );
 }
 
-/* ── 페이지 ────────────────────────────────────────────── */
+/* ── 남는 것과 남지 않는 것 ───────────────────────────── */
+
+const KEPT = ['온보딩 설정', '학습 횟수 (숫자만)', '팀 지표 횟수 (숫자만)'];
+const NOT_KEPT = ['메시지 본문 · 다듬은 문장', '저장 문구 (이 컴퓨터에만)', '예약 알림 (이 컴퓨터에만)'];
+
+function Check() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+      <path d="M5 11.5l4 4 8-9" fill="none" stroke="var(--kept)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function Cross() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+      <path d="M6 6l10 10" fill="none" stroke="var(--seam)" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M16 6L6 16" fill="none" stroke="var(--seam)" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function KeepSection() {
+  const ref = useRef(null);
+  const on = useInView(ref, { threshold: 0.3 });
+  return (
+    <section className="keep" id="keep" aria-labelledby="keep-title">
+      <div className="wrap">
+        <Reveal>
+          <p className="kick kept">남는 것과 남지 않는 것</p>
+          <h2 className="h2" id="keep-title">
+            메시지 본문은
+            <br />
+            <span className="thin">어디에도 남기지 않아요</span>
+          </h2>
+        </Reveal>
+        <div className={`cols${on ? ' in' : ''}`} ref={ref}>
+          <Reveal className="col" delay={1}>
+            <h3>
+              <i className="dot kept" aria-hidden="true" />
+              계정에 올라가는 것
+            </h3>
+            <p className="col-when">로그인하고 동기화할 때만</p>
+            <ul>
+              {KEPT.map((t, i) => (
+                <li key={t} style={{ '--i': i }}>
+                  <Check />
+                  <span className="sr-only">올라감: </span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+          <Reveal className="col" delay={2}>
+            <h3>
+              <i className="dot seam" aria-hidden="true" />
+              올라가지 않는 것
+            </h3>
+            <p className="col-when">사이 서버·데이터베이스에 남지 않아요</p>
+            <ul>
+              {NOT_KEPT.map((t, i) => (
+                <li key={t} style={{ '--i': i + 3 }}>
+                  <Cross />
+                  <span className="sr-only">올라가지 않음: </span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        </div>
+        <Reveal as="p" className="note">
+          교정 요청은 AI 서비스로 보내 처리하고, 결과를 돌려받은 뒤 서버에는 남기지 않아요.{' '}
+          <Link to="/privacy" className="note-link">
+            개인정보처리방침 보기
+          </Link>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ── 확장 안에서 — 눌러 보는 부품 ─────────────────────── */
+
+const URGENCY = [
+  { id: 'critical', label: 'Critical' },
+  { id: 'normal', label: 'Normal' },
+  { id: 'low', label: 'Low' },
+];
+const OUT = {
+  critical: {
+    en: [{ b: '[URGENT]' }, ' We must ship ', { f: 'v2.4' }, ' by ', { f: 'Friday 3 PM' }, ' — please review the ', { t: 'deploy' }, ' PR today.'],
+    ko: '[긴급] 금요일 오후 3시까지 v2.4를 반드시 내보내야 해요 — 오늘 배포 PR 리뷰 부탁드려요.',
+  },
+  normal: {
+    en: LIFT_RESULT,
+    ko: '금요일 오후 3시까지 v2.4 배포를 마쳐야 해요. 오늘 리뷰해 주실 수 있을까요?',
+  },
+  low: {
+    en: ['When you have a moment today, could you take a look? We’re aiming to wrap up the ', { f: 'v2.4' }, ' ', { t: 'deploy' }, ' by ', { f: 'Friday 3 PM' }, '.'],
+    ko: '오늘 시간 되실 때 한번 봐 주실 수 있을까요? 금요일 오후 3시까지 v2.4 배포를 마무리하려고 해요.',
+  },
+};
+
+function UrgencyPopup() {
+  const [picked, setPicked] = useState('normal');
+  const [shown, setShown] = useState('normal');
+  const [busy, setBusy] = useState(false);
+  const timer = useRef(0);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const pick = (u) => {
+    if (u === picked) return;
+    setPicked(u);
+    clearTimeout(timer.current);
+    if (prefersReducedMotion()) {
+      setShown(u);
+      return;
+    }
+    setBusy(true);
+    timer.current = setTimeout(() => {
+      setShown(u);
+      setBusy(false);
+    }, 650);
+  };
+
+  return (
+    <Reveal className="pop" delay={1}>
+      <PopHead />
+      <Segmented options={URGENCY} value={picked} onChange={pick} mode="pressed" label="긴급도" />
+      <Who />
+      <Bars state={busy ? 'busy' : 'done'} />
+      <div className={`result${busy ? ' changing' : ''}`} lang="en" aria-live="polite" aria-busy={busy}>
+        <span className="swap">
+          <Rich parts={OUT[shown].en} />
+        </span>
+      </div>
+      <p className={`back${busy ? ' changing' : ''}`}>
+        <span className="back-l">역번역</span> {OUT[shown].ko}
+      </p>
+      <div className="foot">
+        <span className="btn">다시</span>
+        <span className="btn primary">적용하기</span>
+      </div>
+    </Reveal>
+  );
+}
+
+function DecodePopup() {
+  return (
+    <Reveal className="pop" delay={2}>
+      <PopHead tag="뜻 풀기" decode />
+      <div className="intent">
+        <p className="cap">실제 의도</p>
+        <p>오늘 안에 답이 필요하다는 뜻이에요.</p>
+      </div>
+      <p className="quote-sm" lang="en">
+        &ldquo;No rush, but it&rsquo;d be great to have this before tomorrow&rsquo;s sync.&rdquo;
+      </p>
+      <Gauge surface={20} actual={62} surfaceLabel="Low" actualLabel="Normal" on />
+      <div className="chips">
+        <span className="chip c">
+          <i />
+          &ldquo;No rush&rdquo;는 예의 표현
+        </span>
+        <span className="chip f">
+          <i />
+          기한: 내일 회의 전
+        </span>
+      </div>
+    </Reveal>
+  );
+}
+
+const TABS = [
+  { id: 'home', label: '홈' },
+  { id: 'team', label: '팀' },
+  { id: 'archive', label: '보관함' },
+  { id: 'profile', label: '프로필' },
+];
+const TODAY = [
+  { n: '4', l: '다듬기' },
+  { n: '2', l: '뜻 풀기' },
+  { n: '1', l: '예약 알림' },
+];
+
+function Count({ n, run, delay }) {
+  const v = useCountUp(Number(n), run, 900 + delay);
+  return (
+    <b className="num">
+      <span className="sr-only">{n}</span>
+      <span aria-hidden="true">{v}</span>
+    </b>
+  );
+}
+
+function SidePanel() {
+  const ref = useRef(null);
+  const on = useInView(ref, { threshold: 0.5 });
+  const [tab, setTab] = useState('home');
+  const [back, setBack] = useState(true);
+  const [why, setWhy] = useState(false);
+  return (
+    <Reveal className="panel" delay={3}>
+      <div className="ptop">
+        <SaiMark size={26} live title="" />
+        사이
+        <span className="sp" />
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--mut)" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z" />
+        </svg>
+      </div>
+      <Segmented options={TABS} value={tab} onChange={setTab} mode="pressed" label="사이드 패널 탭" className="ptabs" />
+      <div className="pbody" ref={ref}>
+        <div className="pcard">
+          <h4>
+            오늘의 사이 <small>오늘 0시부터</small>
+          </h4>
+          <div className="stat3">
+            {TODAY.map((t, i) => (
+              <div key={t.l}>
+                <Count n={t.n} run={on} delay={i * 120} />
+                <span>{t.l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="pcard">
+          <h4>
+            회의하기 좋은 시간 <small>Miguel</small>
+          </h4>
+          <div className="slot best">
+            <span className="num">내일 17:00</span>
+            <span className="num">상대 09:00</span>
+          </div>
+          <div className="slot">
+            <span className="num">내일 18:00</span>
+            <span className="num">상대 10:00</span>
+          </div>
+        </div>
+        <div className="pcard">
+          <h4>보기 설정</h4>
+          <div className="toggle">
+            <span id="demo-back">역번역 보기</span>
+            <button
+              type="button"
+              className="sw"
+              role="switch"
+              aria-checked={back}
+              aria-labelledby="demo-back"
+              onClick={() => setBack((v) => !v)}
+            />
+          </div>
+          <div className="toggle">
+            <span id="demo-why">변경 이유 보기</span>
+            <button
+              type="button"
+              className="sw"
+              role="switch"
+              aria-checked={why}
+              aria-labelledby="demo-why"
+              onClick={() => setWhy((v) => !v)}
+            />
+          </div>
+        </div>
+      </div>
+    </Reveal>
+  );
+}
+
+function Showcase() {
+  return (
+    <section className="showcase" id="ext" aria-labelledby="ext-title">
+      <div className="wrap">
+        <Reveal>
+          <p className="kick ink">확장 안에서는</p>
+          <h2 className="h2" id="ext-title">
+            눌러 보세요<span className="thin"> — 실제 팝업과 같은 부품이에요</span>
+          </h2>
+        </Reveal>
+        <div className="show-grid">
+          <UrgencyPopup />
+          <DecodePopup />
+          <SidePanel />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── 시작하기 ─────────────────────────────────────────── */
+
+function Start() {
+  return (
+    <section className="start" id="start" aria-labelledby="start-title">
+      <div className="wrap">
+        <Reveal>
+          <p className="kick ink">시작하기</p>
+          <h2 className="h2" id="start-title">
+            세 단계면 <span className="thin">됩니다</span>
+          </h2>
+        </Reveal>
+        <ol className="start-grid">
+          <Reveal as="li" className="start-card" delay={1}>
+            <b className="num" aria-hidden="true">
+              1
+            </b>
+            <h3>설치</h3>
+            <p>Chrome 웹 스토어 출시를 준비하고 있어요. 공개되면 이 자리에 설치 링크를 둡니다.</p>
+            <span className="soon-pill">
+              <span className="soon-dot" aria-hidden="true" />
+              출시 준비 중
+            </span>
+          </Reveal>
+          <Reveal as="li" className="start-card" delay={2}>
+            <b className="num" aria-hidden="true">
+              2
+            </b>
+            <h3>언어 고르기</h3>
+            <p>
+              툴바의 사이 아이콘이나 <kbd>Alt</kbd>+<kbd>S</kbd>로 사이드 패널을 열면 내 언어, 주 협업 지역, 기본 톤 세
+              가지를 물어요.
+            </p>
+          </Reveal>
+          <Reveal as="li" className="start-card" delay={3}>
+            <b className="num" aria-hidden="true">
+              3
+            </b>
+            <h3>글을 선택하고 사이 버튼</h3>
+            <p>
+              보낼 글이나 받은 글을 드래그하면 옆에 사이 버튼이 떠요. 누르거나 <kbd>Alt</kbd>+<kbd>D</kbd>를 누르면 됩니다.
+            </p>
+          </Reveal>
+        </ol>
+        <Reveal className="start-cta">
+          <Link to="/settings?demo=1" className="btn primary press">
+            설정 화면 미리보기
+          </Link>
+          <span className="start-cta-note">예시 데이터로 열려요. 아무것도 저장되지 않아요.</span>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
 
 export default function Landing() {
   return (
-    <main id="main">
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="container hero-grid">
-          <div className="hero-copy">
-          <p className="hero-kicker mono rise" style={{ '--d': '60ms' }}>
-            크롬 확장 프로그램 · 해외 동료와 주고받는 업무 메시지
-          </p>
-          <h1 id="hero-title" className="hero-title">
-            <span className="rise" style={{ '--d': '120ms' }}>
-              어긋난 문장을
-            </span>{' '}
-            <span className="rise" style={{ '--d': '220ms' }}>
-              보내기 전에 맞춥니다
-            </span>
-          </h1>
-          <p className="hero-lede rise" style={{ '--d': '320ms' }}>
-            사이는 메시지를 쓰던 자리에서 일합니다. 보낼 글은 상대 언어와 긴급도에 맞게 다듬고, 받은 글은
-            직역과 실제 의도를 나눠 보여 줍니다. 숫자·날짜·이름은 다시 쓰지 않고 원문과 대조합니다.
-          </p>
-          <div className="hero-cta rise" style={{ '--d': '420ms' }}>
-            <p className="store-status">
-              <span className="store-dot" aria-hidden="true" />
-              Chrome 웹 스토어 출시 준비 중
-            </p>
-            <Link to="/settings?demo=1" className="btn">
-              설정 화면 미리보기
-            </Link>
-          </div>
-          </div>
-          <HeroStage />
-        </div>
-      </section>
-
-      <section id="write" className="feature" aria-labelledby="write-title">
-        <Track variant="a" label="쓸 때 · 작성 교정" />
-        <div className="container feature-grid">
-          <div className="feature-text">
-            <h2 id="write-title" className="section-title">
-              긴급도를 고르면
-              <br />
-              문장의 무게가 바뀝니다
-            </h2>
-            <p className="section-lede">
-              입력창의 글을 선택하고 사이 버튼을 누르면 상대 언어로 다듬은 문장이 나옵니다. 긴급도는 사이가
-              먼저 판정하고, Critical · Normal · Low 중 직접 바꿀 수 있어요. 다듬은 문장 아래에는 상대에게
-              어떻게 읽히는지 한국어로 되돌린 역번역이 붙습니다.
-            </p>
-            <div className="checks">
-              <h3 className="checks-title">고쳐 쓰지 않고 알려만 줍니다</h3>
-              <ul>
-                {CHECKS.map((c) => (
-                  <li key={c.head}>
-                    <span className="check-head">{c.head}</span>
-                    <span className="check-body">{c.body}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="checks-note">경고가 떠도 적용은 그대로 할 수 있어요. 고칠지는 직접 정합니다.</p>
-            </div>
-          </div>
-          <WriteDemo />
-        </div>
-      </section>
-
-      <section id="read" className="feature" aria-labelledby="read-title">
-        <Track variant="b" label="받을 때 · 수신 해독" />
-        <div className="container feature-grid feature-grid-flip">
-          <div className="feature-text">
-            <h2 id="read-title" className="section-title">
-              직역과 실제 의도를
-              <br />
-              나눠서 보여 줍니다
-            </h2>
-            <p className="section-lede">
-              받은 메시지를 선택하면 말 그대로의 뜻, 완곡하게 돌려 말한 실제 의도, 체감 긴급도, 내가 해야 할
-              일을 따로 보여 줍니다. 해석은 사이의 제안이에요. 판단은 직접 합니다.
-            </p>
-          </div>
-          <div className="demo-card">
-            <div className="demo-row">
-              <p className="demo-label mono">받은 메시지 · English</p>
-              <p className="demo-en" lang="en">
-                Thanks! I have a few minor comments — no rush, but could you take a look before{' '}
-                <mark className="m-fact">Thursday&apos;s release</mark>?
-              </p>
-            </div>
-            <div className="decode-split">
-              <div className="decode-col">
-                <p className="demo-label mono">직역</p>
-                <p lang="ko">고마워요! 사소한 코멘트가 몇 개 있어요. 급하진 않지만 목요일 릴리스 전에 봐 주실래요?</p>
-              </div>
-              <div className="decode-col decode-col-actual">
-                <p className="demo-label mono">실제 의도</p>
-                <p lang="ko">
-                  「급하지 않다」고 했지만 기한이 <mark className="m-fact">목요일 릴리스</mark> 전이에요. 그 전에 코멘트를
-                  반영해 달라는 요청에 가까워요.
-                </p>
-              </div>
-            </div>
-            <UrgencyGauge />
-            <div className="demo-row">
-              <p className="demo-label mono">요구 행동</p>
-              <ul className="todo">
-                <li>코멘트 확인하고 수정하기</li>
-                <li>목요일 릴리스 전에 다시 리뷰 요청하기</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="send" className="feature feature-quiet" aria-labelledby="send-title">
-        <div className="container feature-grid">
-          <div className="feature-text">
-            <p className="eyebrow mono">보낼 때 · 시차</p>
-            <h2 id="send-title" className="section-title">
-              상대의 아침에
-              <br />
-              닿도록 미룹니다
-            </h2>
-            <p className="section-lede">
-              상대가 업무 시간 밖이면 사이가 상대의 오전 9시에 보내도록 예약을 제안합니다. 사이는 메시지를
-              대신 보내지 않아요. 그 시각이 되면 크롬 알림으로 다시 알려 드리고, 보내는 건 직접 합니다.
-            </p>
-            <p className="section-note">
-              긴급도를 Low로 고른 메시지는 상대의 업무 시간 밖에 바로 넣지 않고 예약을 먼저 물어요.
-            </p>
-          </div>
-          <DualClock />
-        </div>
-      </section>
-
-      <section id="data" className="feature feature-data" aria-labelledby="data-title">
-        <Track variant="c" label="남는 것과 남지 않는 것" />
-        <div className="container">
-          <div className="data-intro">
-            <h2 id="data-title" className="section-title">
-              레드는
-              <br />
-              바뀌지 않는 것입니다
-            </h2>
-            <p className="section-lede">
-              로고 맨 아래 레드 바가 뜻하는 두 가지. 내 문장 속의 사실은 다시 쓰지 않고, 내 메시지 본문은
-              사이 서버에 남지 않습니다.
-            </p>
-          </div>
-
-          <div className="data-facts">
-            <h3 className="data-h3">문장 속의 사실</h3>
-            <p>
-              숫자·날짜·사람 이름·용어집 단어는 원문과 대조만 합니다. 빠지거나 달라지면 「숫자 확인 필요」처럼
-              알려 주고, 문장을 몰래 고치지 않아요.
-            </p>
-          </div>
-
-          <div className="data-columns">
-            <div className="data-col">
-              <h3 className="data-h3">서버로 올라가는 것</h3>
-              <p className="data-when mono">로그인하고 「지금 동기화」를 눌렀을 때만</p>
-              <ul className="data-list">
-                <li>
-                  <b>온보딩 설정</b> — 내 언어, 주 협업 지역, 기본 톤
-                </li>
-                <li>
-                  <b>학습 횟수</b> — 어떤 종류의 수정을 몇 번 했는지, 숫자만
-                </li>
-                <li>
-                  <b>팀 협업 지표 횟수</b> — 팀에 속했을 때만, 누가 냈는지는 남지 않아요
-                </li>
-              </ul>
-            </div>
-            <div className="data-col data-col-local">
-              <h3 className="data-h3">올라가지 않는 것</h3>
-              <p className="data-when mono">이 기기의 크롬 확장 안에만</p>
-              <ul className="data-list">
-                <li>
-                  <b>저장 문구</b> — 직접 저장한 문장
-                </li>
-                <li>
-                  <b>예약</b> — 예약해 둔 메시지
-                </li>
-                <li>
-                  <b>메시지 본문</b> — 쓰거나 받은 글 자체
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="data-note">
-            <p>
-              교정·해석을 하려면 선택한 문장을 AI 서비스로 보내야 합니다. 사이 서버는 그 문장을 데이터베이스나
-              로그에 저장하지 않습니다. API 키·카드번호 같은 민감정보는 보내기 전에 이 기기에서 찾아 막거나
-              가립니다.
-            </p>
-            <Link to="/privacy" className="data-link">
-              개인정보처리방침에서 자세히 보기
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section id="start" className="feature feature-quiet" aria-labelledby="start-title">
-        <div className="container">
-          <p className="eyebrow mono">시작하기</p>
-          <h2 id="start-title" className="section-title">
-            세 단계면 됩니다
-          </h2>
-          <ol className="steps">
-            <li className="step">
-              <span className="step-n mono" aria-hidden="true">
-                1
-              </span>
-              <h3 className="step-title">설치</h3>
-              <p>Chrome 웹 스토어 출시를 준비하고 있어요. 공개되면 이 자리에 설치 링크를 둡니다.</p>
-              <p className="store-status store-status-inline">
-                <span className="store-dot" aria-hidden="true" />
-                출시 준비 중
-              </p>
-            </li>
-            <li className="step">
-              <span className="step-n mono" aria-hidden="true">
-                2
-              </span>
-              <h3 className="step-title">언어 고르기</h3>
-              <p>
-                툴바의 사이 아이콘이나 <kbd>Alt</kbd>+<kbd>S</kbd>로 사이드 패널을 열면 내 언어, 주 협업 지역,
-                기본 톤 세 가지를 물어요.
-              </p>
-            </li>
-            <li className="step">
-              <span className="step-n mono" aria-hidden="true">
-                3
-              </span>
-              <h3 className="step-title">글을 선택하고 사이 버튼</h3>
-              <p>
-                보낼 글이나 받은 글을 드래그하면 옆에 사이 버튼이 떠요. 누르거나 <kbd>Alt</kbd>+<kbd>D</kbd>를
-                누르면 됩니다.
-              </p>
-            </li>
-          </ol>
-        </div>
-      </section>
+    <main id="main" className="landing">
+      <Hero />
+      <StoryWrite />
+      <ReadSection />
+      <NightSection />
+      <KeepSection />
+      <Showcase />
+      <Start />
     </main>
   );
 }
