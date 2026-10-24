@@ -455,6 +455,9 @@ function ReadSection() {
 
 /* ── 보낼 때 — 유일하게 어두운 장면 ───────────────────── */
 
+/** 예시 시각(고정): 서울 19:35(UTC+9) = 샌프란시스코 03:35(2026-10-24 PDT, UTC−7) — 16시간 차.
+ *  띠 위 핀은 각자 현지 시각(03:35 → 14.93%, 19:35 → 81.6%), 보내기 점은 Dana의 09:00(37.5%) = 서울 다음 날 01:00. */
+
 function NightSection() {
   const ref = useRef(null);
   const bandRef = useRef(null);
@@ -482,24 +485,24 @@ function NightSection() {
             <span className="state">저녁</span>
           </Reveal>
           <Reveal className="mid" delay={2}>
-            <span aria-hidden="true">⟷</span> 8시간
+            <span aria-hidden="true">⟷</span> 16시간
           </Reveal>
           <Reveal className="clock them" delay={3}>
-            <p className="city">Miguel · 리스본</p>
+            <p className="city">Dana · 샌프란시스코</p>
             <p className="time num">
-              <Roll text="11:35" run={clocksOn && on} delay={180} />
+              <Roll text="03:35" run={clocksOn && on} delay={180} />
             </p>
-            <span className="state">오전 근무 중</span>
+            <span className="state">자는 시간</span>
           </Reveal>
         </div>
         <div className="band-wrap" ref={bandRef}>
           <div
             className="band"
             role="img"
-            aria-label="하루 24시간 띠: Miguel은 11시 35분, 나는 19시 35분. 상대 오전 9시가 보내기 좋은 때예요."
+            aria-label="하루 24시간 띠: Dana는 새벽 3시 35분, 나는 19시 35분. Dana의 오전 9시가 보내기 좋은 때예요."
           >
-            <span className="pin-rail" style={{ '--x': bandOn ? '48.3%' : '0%' }}>
-              <span className="pin them">Miguel 11:35</span>
+            <span className="pin-rail" style={{ '--x': bandOn ? '14.93%' : '0%' }}>
+              <span className="pin them">Dana 03:35</span>
             </span>
             <span className="pin-rail me" style={{ '--x': bandOn ? '81.6%' : '0%' }}>
               <span className="pin me">나 19:35</span>
@@ -519,7 +522,7 @@ function NightSection() {
         <Reveal className="sendcard">
           <span className="send-mini" aria-hidden="true" />
           <span>
-            퇴근한 상대라면 <b>상대 오전 9:00</b>에 알림으로 다시 알려 드려요 — 보내기는 직접 해요
+            <b>Dana의 오전 9:00</b>(서울 새벽 1:00)에 알림으로 다시 알려 드려요 — 보내기는 직접 해요
           </span>
         </Reveal>
       </div>
