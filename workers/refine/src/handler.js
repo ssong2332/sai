@@ -1,7 +1,8 @@
 /**
- * Worker 요청 처리 — `functions/index.js` `refineV1`의 **refine 모드만** 옮긴 1단계 시험판(L33).
+ * Worker 요청 처리 — `functions/index.js` `refineV1`을 옮긴 1단계 시험판(L33). 네 mode(refine·decode·decisions·reply)를
+ * 모두 처리한다(2026-10-24 — 그전에는 refine만, 나머지는 501).
  *
- * 🔴 이 파일은 **얇은 껍데기**다. 프롬프트·판정·캐시·폴백·**폴오버 사슬**은 공유 코어 `src/core/refine/`를
+ * 🔴 이 파일은 **얇은 껍데기**다. 프롬프트·판정·캐시·폴백·**폴오버 사슬**은 공유 코어 `src/core/{refine,decode,decisions,reply}/`를
  *    **복사 없이 직접** 부른다(wrangler/esbuild가 번들한다). `functions/`처럼 sync-core 복사본을 두지 않는다 —
  *    복사본이 하나 더 생기면 갈라질 곳이 하나 더 생긴다.
  *
@@ -10,15 +11,17 @@
  * |---|---|
  * | `OPTIONS *` | CORS 사전 요청 — `cors.js` 판정표 |
  * | `GET /health` | 설정 상태(키 **이름·유무**만, 값 없음) |
- * | `POST /v1/refine` + `mode` 없음·`refine`·모르는 값 | 교정 — 기존 서버와 같이 모르는 mode는 refine으로 본다 |
- * | `POST /v1/refine` + `mode` = `decode`·`decisions`·`reply` | **501** `{error:'not implemented', mode}` — 🔴 1단계 범위 밖(LLM·상한 안 씀) |
+ * | `POST /v1/refine` + `mode` 없음·`refine`·모르는 값 | 교정 `refine()` — 기존 서버와 같이 모르는 mode는 refine으로 본다 |
+ * | `POST /v1/refine` + `mode` = `decode` | 수신 해독 `decode()` |
+ * | `POST /v1/refine` + `mode` = `decisions` | 결정 요약 `summarizeDecisions()` |
+ * | `POST /v1/refine` + `mode` = `reply` | 회신 초안 `reply()` |
  * | `/v1/refine` 그 밖 메서드 | 405 `{error:'method not allowed'}` (기존과 같다) |
  * | 그 밖 경로 | 404 |
  *
- * 요청 처리 순서 (기존 refineV1과 같은 순서 — 🔴 차이는 ①·⑤만)
+ * 요청 처리 순서 (기존 refineV1과 같은 순서 — 🔴 차이는 ①만)
  * ① Origin 판정(다른 오리진 403) → 설정 누락 500 → 토큰 401 `{error:'unauthorized', reason}` → 본문 JSON(깨지면 400)
- * → ⑤ 1단계 미지원 mode 501(상한을 쓰기 전에 끊는다) → 일일 상한 429 — 🔴 1단계는 스텁(`usageStore.js`)이라 항상 통과
- * → provider 판정(아래 표) → 코어 `refine()` + 폴오버 → 던지면 400 `{error: message}` → 지표 기록 → 200
+ * → 일일 상한 429 — 🔴 1단계는 스텁(`usageStore.js`)이라 항상 통과
+ * → provider 판정(아래 표) → mode 코어(위 표) + 폴오버 → 던지면 400 `{error: message}` → 지표 기록(mode별) → 200
  *
  * provider 판정표 (2026-10-23 — `functions/index.js` `resolveProviderAndKey`와 같은 규칙, 임시 기본만 없다)
  * | `body.provider` | 그 provider 키 | 사슬 키(ANTHROPIC → GROQ 순) | 선택 |
@@ -39,6 +42,9 @@
  */
 
 import { refine, MemoryCacheStore, PROVIDERS } from '../../../src/core/refine/index.js';
+import { decode } from '../../../src/core/decode/index.js';
+import { summarizeDecisions } from '../../../src/core/decisions/index.js';
+import { reply } from '../../../src/core/reply/index.js';
 import {
   DEFAULT_PROVIDER_ORDER,
   pickDefaultProvider,
@@ -52,7 +58,44 @@ import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
 
-const NOT_IMPLEMENTED_MODES = new Set(['decode', 'decisions', 'reply']);
+/**
+ * 🔴 `mode` 라우팅 표 — `functions/index.js` `MODES`와 **같은 코어·같은 로그 필드**다(2026-10-24 이식).
+ *    차이는 하나: 여기서는 **폴백일 때만** 로그를 쓴다(아래 `runStep` 주석 — 무료 플랜 CPU 한도).
+ *    모드를 추가할 때는 Functions·프록시와 함께 고친다. 표에 없는 mode는 refine으로 본다(기존과 같다).
+ * 🔴 로그 필드는 건수·키·플래그뿐이다 — 결정 문구·담당자 이름·초안 본문은 싣지 않는다(Spec 필수 5).
+ * | mode | 코어 | 폴백 로그에 남는 값 |
+ * |---|---|---|
+ * | `refine` | `refine()` | 긴급도·의도·캐시·사유·시간 |
+ * | `decode` | `decode()` | 표면/실제 긴급도·격차·캐시·사유·시간 |
+ * | `decisions` | `summarizeDecisions()` | 결정/미결/권한 불명 건수·캐시·사유·시간 |
+ * | `reply` | `reply()` | 의도 키·초안 길이·캐시·사유·시간 |
+ */
+const MODES = {
+  refine: {
+    run: refine,
+    describe: (event) => `urgency=${event.urgency ?? '-'} intent=${event.detectedIntent ?? '-'}`,
+  },
+  decode: {
+    run: decode,
+    describe: (event) =>
+      `surface=${event.surfaceUrgency ?? '-'} actual=${event.actualUrgency ?? '-'} gap=${event.urgencyGap ?? '-'}`,
+  },
+  decisions: {
+    run: summarizeDecisions,
+    describe: (event) =>
+      `decisions=${event.decisionCount ?? '-'} unresolved=${event.unresolvedCount ?? '-'} ` +
+      `unknownAuthority=${event.unknownAuthorityCount ?? '-'}`,
+  },
+  reply: {
+    run: reply,
+    describe: (event) => `intent=${event.intent ?? '-'} len=${event.draftLength ?? '-'}`,
+  },
+};
+
+/** 표에 있는 mode면 그 이름, 아니면 `refine`(모르는 값·없음 포함 — 기존 서버와 같다). */
+export function resolveMode(mode) {
+  return typeof mode === 'string' && Object.hasOwn(MODES, mode) ? mode : 'refine';
+}
 
 /**
  * 🔴 사고(thinking) 스위치 — 코어 `refine()`에 **값으로 넘긴다**(`deps.thinking`, 2026-10-24 L33).
@@ -82,7 +125,8 @@ export function resolveProvider(requested, keys) {
  * @param {Function} [deps.jwks] jose 키 묶음(테스트는 `createLocalJWKSet`).
  * @param {object} [deps.usageStore] `usageStore.js` 인터페이스.
  * @param {typeof fetch} [deps.fetchImpl] provider 호출에 넘길 fetch(테스트는 가짜 응답 — 모든 provider 공용).
- * @param {object} [deps.cache] 코어 캐시 스토어.
+ * @param {object} [deps.cache] refine 코어 캐시 스토어.
+ * @param {{decode?: object, decisions?: object, reply?: object}} [deps.caches] 나머지 mode의 캐시 스토어.
  * @param {() => number} [deps.now]
  * @param {{log: Function, warn: Function, error: Function}} [deps.logger] 기본 console.
  */
@@ -93,9 +137,17 @@ export function createHandler(deps = {}) {
     fetchImpl,
     // 🔴 isolate 메모리 전용(Zero Retention 경계 — 코어 cache.js와 같다). isolate가 여러 개라 적중률은 낮다.
     cache = new MemoryCacheStore(),
+    caches = {},
     now = () => Date.now(),
     logger = console,
   } = deps;
+  // mode마다 스토어 하나 — Functions(`refineCache`·`decodeCache`·…)와 같다. 같은 isolate 메모리 전용 클래스다.
+  const modeCaches = {
+    refine: cache,
+    decode: caches.decode ?? new MemoryCacheStore(),
+    decisions: caches.decisions ?? new MemoryCacheStore(),
+    reply: caches.reply ?? new MemoryCacheStore(),
+  };
 
   return async function handle(request, env = {}) {
     const config = readConfig(env);
@@ -181,10 +233,9 @@ export function createHandler(deps = {}) {
     }
     if (body === null || typeof body !== 'object' || Array.isArray(body)) return json(400, { error: 'bad request' });
 
-    // ⑤ 1단계 범위 밖 mode — 상한·LLM을 쓰기 전에 끊는다.
-    if (NOT_IMPLEMENTED_MODES.has(body.mode)) {
-      return json(501, { error: 'not implemented', mode: body.mode });
-    }
+    // ⑤ mode — 위 `MODES` 표. 모르는 값은 refine(2026-10-24부터 501 없음).
+    const modeName = resolveMode(body.mode);
+    const mode = MODES[modeName];
 
     // ⑥ 일일 상한 — 🔴 1단계 스텁. 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**.
     try {
@@ -210,11 +261,12 @@ export function createHandler(deps = {}) {
     /** 한 단계 호출. 🔴 `ANTHROPIC_MODEL`은 anthropic 단계에만 — 사슬 단계 모델이 있으면 그게 이긴다. */
     const runStep = ({ provider, apiKey }, stepModel) => {
       const model = stepModel ?? (provider === 'anthropic' ? config.anthropicModel : undefined);
-      return refine(body, {
+      return mode.run(body, {
         apiKey,
         provider,
         model,
-        cache,
+        cache: modeCaches[modeName],
+        // 🔴 네 코어 모두 이 값을 provider에 그대로 넘긴다 — Worker 요청 경로가 `process`를 건드리지 않게.
         thinking,
         ...(fetchImpl ? { fetchImpl } : {}),
         now,
@@ -224,15 +276,14 @@ export function createHandler(deps = {}) {
         logger: (event) => {
           if (!event.fallback) return;
           logger.log(
-            `[refine] provider=${stepLabel({ provider, model })} urgency=${event.urgency ?? '-'} ` +
-              `intent=${event.detectedIntent ?? '-'} cache=${event.cacheHit ? 'hit' : 'miss'} ` +
-              `fallback=${event.fallbackReason ?? 'yes'} ${event.latencyMs}ms`,
+            `[${modeName}] provider=${stepLabel({ provider, model })} ${mode.describe(event)} ` +
+              `cache=${event.cacheHit ? 'hit' : 'miss'} fallback=${event.fallbackReason ?? 'yes'} ${event.latencyMs}ms`,
           );
         },
       });
     };
 
-    // ⑧ 코어 + 폴오버 — `functions/index.js` `runWithFailover`와 같은 흐름.
+    // ⑧ 코어 + 폴오버 — `functions/index.js` `runWithFailover`와 같은 흐름(네 mode 공통 — 결과의 사유만 본다).
     let result;
     try {
       const start = { provider: selected.provider, model: null };
@@ -244,23 +295,23 @@ export function createHandler(deps = {}) {
           if (!shouldFailOver(result)) break;
           const apiKey = config.keys[step.provider];
           if (!apiKey) continue; // 그 provider의 키가 없다 — 건너뛴다(멈추지 않는다)
-          logger.log(`[refine] ${stepLabel(used)} ${result.fallbackReason} — ${stepLabel(step)}로 다시 시도합니다.`);
+          logger.log(`[${modeName}] ${stepLabel(used)} ${result.fallbackReason} — ${stepLabel(step)}로 다시 시도합니다.`);
           result = await runStep({ provider: step.provider, apiKey }, step.model ?? undefined);
           used = { provider: step.provider, model: step.model ?? null };
         }
       }
       if (!sameStep(used, start)) {
         if (result?.fallback) {
-          logger.log(`[refine] ${stepLabel(used)}도 실패(${result.fallbackReason}) — 폴백을 냅니다.`);
+          logger.log(`[${modeName}] ${stepLabel(used)}도 실패(${result.fallbackReason}) — 폴백을 냅니다.`);
         } else {
           result = { ...result, providerUsed: used.provider, modelUsed: used.model };
         }
       }
     } catch (error) {
-      // 🔴 코어의 RefineRequestError 문구는 우리 문구다(본문 없음). 그 밖 오류는 이름만 로그에.
-      logger.error(`[refine] 요청 거절: ${error?.name ?? 'error'}`);
+      // 🔴 코어의 *RequestError 문구는 우리 문구다(본문 없음). 그 밖 오류는 이름만 로그에.
+      logger.error(`[${modeName}] 요청 거절: ${error?.name ?? 'error'}`);
       await safeMetric(logger, () =>
-        usageStore.recordRequest({ mode: 'refine', rejected: true, latencyMs: now() - receivedAt }),
+        usageStore.recordRequest({ mode: modeName, rejected: true, latencyMs: now() - receivedAt }),
       );
       return json(400, { error: error?.message ?? 'bad request' });
     }
@@ -268,7 +319,7 @@ export function createHandler(deps = {}) {
     // ⑨ 지표 — 모드·성공 여부·사유 코드·시간뿐.
     await safeMetric(logger, () =>
       usageStore.recordRequest({
-        mode: 'refine',
+        mode: modeName,
         fallback: result?.fallback === true,
         fallbackReason: result?.fallbackReason,
         latencyMs: now() - receivedAt,

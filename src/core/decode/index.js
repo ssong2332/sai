@@ -98,6 +98,8 @@ function normalizeThreadContext(raw) {
  * @param {object} [deps.cache]
  * @param {typeof fetch} [deps.fetchImpl]
  * @param {number} [deps.timeoutMs]
+ * @param {string} [deps.thinking] anthropic 사고 스위치(`../refine/providers/anthropic.js` 판정표). 생략하면 provider가
+ *   `process.env.SAI_ANTHROPIC_THINKING`을 읽는다(Node 경로). Worker는 항상 넘긴다 — `process`를 건드리지 않게.
  * @param {(event: object) => void} [deps.logger]
  * @param {() => number} [deps.now]
  */
@@ -109,6 +111,7 @@ export async function decode(request, deps = {}) {
     cache = defaultCache,
     fetchImpl,
     timeoutMs,
+    thinking,
     logger = () => {},
     now = () => Date.now(),
   } = deps;
@@ -139,6 +142,8 @@ export async function decode(request, deps = {}) {
       model,
       timeoutMs,
       fetchImpl,
+      // 🔴 `undefined`는 그대로 넘긴다 — provider가 「안 넘김」으로 보고 process.env를 읽는다(Node 경로 불변).
+      thinking,
       errors: { RefineCallError, classifyHttpFailure, parseJsonContent },
     });
   } catch (error) {

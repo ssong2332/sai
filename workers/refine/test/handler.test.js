@@ -1,5 +1,5 @@
 /**
- * Worker 핸들러 — CORS·401 모양·성공 교정(가짜 Claude)·501·로그에 본문 없음.
+ * Worker 핸들러 — CORS·401 모양·성공 교정(가짜 Claude)·로그에 본문 없음. 나머지 mode는 `modes.test.js`.
  * 🔴 네트워크 없음: 토큰은 로컬 키, Claude는 `fakeAnthropicFetch`. 모든 refine 요청이 가짜 fetch를 거치는지
  *    `seen.calls`로 확인한다(안 거치면 SDK가 실제 API를 부른다).
  */
@@ -126,16 +126,13 @@ test('Origin 없음(curl) → CORS 헤더 없이 처리 — 무인증이면 401(
   assert.equal(res.headers.get('Access-Control-Allow-Origin'), null);
 });
 
-test('1단계 미지원 mode(decode·decisions·reply) → 501, 상한·LLM 안 씀', async () => {
-  const { handle, fetchImpl, usageStore } = setup();
+test('decode·decisions·reply는 더 이상 501이 아니다 (2026-10-24 이식 — 상세는 test/modes.test.js)', async () => {
   for (const mode of ['decode', 'decisions', 'reply']) {
-    const res = await handle(refineRequest(token, { ...BASE_BODY, mode }), TEST_ENV);
-    assert.equal(res.status, 501);
-    assert.deepEqual(await res.json(), { error: 'not implemented', mode });
+    const { handle } = setup();
+    // refine 모양 응답이라 코어가 형식 오류 폴백(200) 또는 요청 거절(400)을 낸다 — 어느 쪽이든 501은 아니다.
+    const res = await handle(refineRequest(token, { ...BASE_BODY, mode, intent: 'accept' }), TEST_ENV);
+    assert.notEqual(res.status, 501, `mode=${mode}`);
   }
-  assert.equal(fetchImpl.seen.calls, 0);
-  assert.equal(usageStore.requests.length, 0);
-  assert.equal(usageStore.dailyUsers.size, 0);
 });
 
 test('명시 provider(gemini)의 키가 없으면 대체하지 않고 500', async () => {
