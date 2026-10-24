@@ -177,3 +177,60 @@ export const FEATURES = {
  *    동작은 별개).
  */
 export const DASHBOARD_URL = 'https://sai-global-msg-2026.web.app';
+
+/**
+ * 관리용 웹사이트 (`site/`, 2026-10-24 — `docs/WebSplit.md` 「C — 로컬 브리지」).
+ *
+ * 웹이 `externally_connectable` 메시지로 확장에 직접 말을 건다 — **데이터는 `chrome.storage.local`에
+ * 남고 서버로 가지 않는다.** 처리는 `src/background/siteBridge.js`.
+ *
+ * | 빌드 | 명령 | `SITE_URL` | `externally_connectable` |
+ * |---|---|---|---|
+ * | 기본 (**공개 빌드**) | `npm run build` | `PRODUCTION_SITE_URL` (지금 `null` — 사이트 미배포) | 운영 오리진만 (없으면 블록 자체가 없음) |
+ * | 사이트 개발 | `npm run build:sitedev` (`SAI_SITE_DEV=1`) | `DEV_SITE_URL` | 운영 오리진 + `http://localhost:5180/*` |
+ *
+ * 🔴 **개발 오리진은 기본 빌드에 절대 들어가지 않는다** — 로컬 프록시 권한(`LOCAL_PROXY_HOST_PERMISSIONS`)과
+ *    같은 원칙이다. 공개 빌드에 들어가면 그 기기의 localhost:5180에 뜬 아무 페이지나 내 설정을 읽고 쓴다.
+ * 🔴 사이트를 배포하면 `PRODUCTION_SITE_URL`만 그 주소로 바꾼다 — manifest·허용 목록은 여기서 파생된다.
+ */
+export const PRODUCTION_SITE_URL = null;
+
+/** 사이트 개발 서버(`site/`의 vite) 주소. 🔴 `SAI_SITE_DEV=1` 빌드에서만 쓰인다. */
+export const DEV_SITE_URL = 'http://localhost:5180';
+
+/**
+ * 빌드 시점 스위치 `SAI_SITE_DEV=1`.
+ * 🔴 두 곳에서 읽힌다 — ① manifest를 만들 때(Node, 진짜 `process.env`) ② 확장 번들 안(브라우저 —
+ *    `process`가 없다). ②는 `vite.config.js`의 `define`이 `process.env.SAI_SITE_DEV`를 빌드 시점
+ *    문자열로 바꿔 넣는다. 둘 다 아니면(치환 없는 브라우저) ReferenceError → 꺼짐으로 떨어진다.
+ * 🔴 `globalThis.process?.env…`로 바꾸지 않는다 — `define`이 찾는 문자열과 달라져 번들 안에서는
+ *    언제나 꺼짐이 된다(manifest에는 개발 오리진이 있는데 화면 버튼은 안 뜨는 어긋남).
+ */
+function readSiteDevFlag() {
+  try {
+    return process.env.SAI_SITE_DEV === '1';
+  } catch {
+    return false;
+  }
+}
+
+export const SITE_DEV = readSiteDevFlag();
+
+/** 확장 화면의 「자세한 설정 — 웹에서 열기」가 여는 주소. `null`이면 그 버튼을 그리지 않는다. */
+export const SITE_URL = SITE_DEV ? DEV_SITE_URL : PRODUCTION_SITE_URL;
+
+/**
+ * 브리지에 말을 걸 수 있는 오리진 목록 — manifest `externally_connectable.matches`와
+ * `onMessageExternal`의 `sender.origin` 검사(이중 방어)가 **같은 목록**에서 나온다.
+ */
+export function siteAllowedOrigins(siteDev, productionUrl = PRODUCTION_SITE_URL) {
+  const origins = [];
+  if (productionUrl) origins.push(new URL(productionUrl).origin);
+  if (siteDev) origins.push(new URL(DEV_SITE_URL).origin);
+  return origins;
+}
+
+export const SITE_ALLOWED_ORIGINS = siteAllowedOrigins(SITE_DEV);
+
+/** manifest `externally_connectable.matches` 값. 빈 배열이면 manifest가 블록을 넣지 않는다. */
+export const SITE_EXTERNALLY_CONNECTABLE_MATCHES = SITE_ALLOWED_ORIGINS.map((origin) => `${origin}/*`);

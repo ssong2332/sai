@@ -28,6 +28,7 @@
 | 설치 | `npm install` | 2026-08-12 |
 | 빌드 | `npm run build` | 2026-08-12 |
 | 빌드 결과 확인 | `npx vite preview --port 4173 --strictPort` | 2026-08-12 |
+| 사이트 개발 빌드(`externally_connectable`에 `http://localhost:5180/*` 추가) | `npm run build:sitedev` (🔴 같은 `dist/`에 쓴다 — 배포본은 반드시 `npm run build`로 다시 만든다) | 2026-10-24 |
 | 단위 테스트 | `npm test` | 2026-08-12 |
 | 로컬 refine 프록시 | `npm run proxy` | 2026-08-13 |
 | 프록시 상태 확인 | `curl http://127.0.0.1:8787/health` | 2026-08-13 |
