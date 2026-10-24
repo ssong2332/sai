@@ -11,6 +11,7 @@
 
 import { createRoot } from 'react-dom/client';
 import tokensCss from '../styles/tokens.css?inline';
+import motionCss from '../styles/motion.css?inline';
 import contentCss from './content.css?inline';
 import SaiOverlay from './SaiOverlay.jsx';
 import { getLocal, STORAGE_KEYS } from '../lib/storage.js';
@@ -30,7 +31,7 @@ function mount() {
   const shadow = host.attachShadow({ mode: 'open' });
 
   const style = document.createElement('style');
-  style.textContent = `${tokensCss}\n${contentCss}`;
+  style.textContent = `${tokensCss}\n${motionCss}\n${contentCss}`;
   shadow.appendChild(style);
 
   const mountPoint = document.createElement('div');

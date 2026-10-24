@@ -1,0 +1,265 @@
+/* 사이 모션 v2 — keyframes · 공용 유틸. 규칙: `docs/design/DesignSystem-v2.md` §5.
+ *
+ * 🔴 금지
+ *   - transform·opacity(·clip-path) 밖의 속성을 반복 애니메이션하지 않는다(레이아웃 재계산).
+ *   - 등장 지연은 합쳐서 300ms를 넘기지 않는다 — 읽기를 막지 않는다.
+ *   - 반복(무한) 애니메이션은 「기다리는 중」에만 쓴다(로딩·hover 로고). 결과 화면에는 없다.
+ *   - `prefers-reduced-motion: reduce`이면 움직임을 끄고 상태는 남긴다(로딩 선은 정지 선으로).
+ *
+ * 시그니처 — 「SHIFT 이음선」: 로고의 어긋난 두 바가 정렬되는 동작을 화면 전체 폭으로 키운 것.
+ *   로딩 = 두 바가 서로를 향해 미끄러졌다 벌어진다(협상 중) · 결과 = 맞물린 뒤 그 아래에서 글이 나온다.
+ */
+
+/* ── v1 이름 유지 (사이드패널이 쓴다) ── */
+@keyframes sai-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sai-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sai-toast-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sai-flash {
+  0% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--seam) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+@keyframes sai-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes sai-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── v2 ── */
+
+/* 블록 등장 — 아래에서 6px. 팝업 자식 순차 등장에 쓴다. */
+@keyframes sai-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 결과가 「이음선에서 나온다」 — 위 가장자리부터 드러난다. */
+@keyframes sai-emerge {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 -4px 0);
+    transform: none;
+  }
+}
+
+/* 이음선 두 바 — 어긋남에서 정렬로(한 번). */
+@keyframes sai-seam-a-align {
+  from {
+    transform: translateX(-18%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sai-seam-b-align {
+  from {
+    transform: translateX(18%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* 로딩 — 두 바가 서로를 향해 미끄러졌다 벌어진다(반복). */
+@keyframes sai-seam-a-loop {
+  0%,
+  100% {
+    transform: translateX(-34%);
+  }
+  50% {
+    transform: translateX(34%);
+  }
+}
+@keyframes sai-seam-b-loop {
+  0%,
+  100% {
+    transform: translateX(34%);
+  }
+  50% {
+    transform: translateX(-34%);
+  }
+}
+
+/* 선이 자란다 — 경고 띠·토스트 띠. */
+@keyframes sai-draw-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes sai-draw-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* 「막혔다」 — 흔들지 않는다. 옆에서 짧게 멈춰 선다. */
+@keyframes sai-halt {
+  0% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* 긴급도 막대 — 표면 길이에서 실제 길이로 자란다(`--from` → 1). */
+@keyframes sai-gap-shift {
+  from {
+    transform: scaleX(var(--from, 0));
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* 로고 마크 "SHIFT" — 3초 루프. 출처: claude.ai/design MEDIATE 로고 03 SHIFT 전개(형태만). */
+@keyframes sai-logo-shift-a {
+  0%,
+  12% {
+    transform: translateX(-26px);
+  }
+  46%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes sai-logo-shift-b {
+  0%,
+  12% {
+    transform: translateX(26px);
+  }
+  46%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes sai-logo-shift-c {
+  0%,
+  40% {
+    transform: scaleX(0);
+  }
+  76%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/* 로고 등장 — 한 번만 맞물린다(플로팅 버튼이 뜰 때). */
+@keyframes sai-logo-settle-a {
+  from {
+    transform: translateX(-26px);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sai-logo-settle-b {
+  from {
+    transform: translateX(26px);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sai-logo-settle-c {
+  0%,
+  45% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.sai-logo-mark-animated .sai-logo-bar-a {
+  animation: sai-logo-shift-a 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.sai-logo-mark-animated .sai-logo-bar-b {
+  animation: sai-logo-shift-b 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.sai-logo-mark-animated .sai-logo-bar-c {
+  animation: sai-logo-shift-c 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  transform-origin: 14px 76px;
+}
+
+/* 🔴 모션 최소화 — 움직임을 끄고 최종 상태를 남긴다. 로딩 「정지 선」은 각 컴포넌트가 정의한다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
