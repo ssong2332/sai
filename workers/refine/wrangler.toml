@@ -17,8 +17,8 @@ compatibility_date = "2026-10-15"
 # 🔴 nodejs_compat는 **꼭 필요해서** 켠다(2026-10-23 확인):
 #    ① 공유 코어 `src/core/refine/cache.js`가 `import { createHash } from 'node:crypto'`를 정적으로 부른다
 #       — 이 플래그 없이는 번들이 로드조차 안 된다. 코어를 고치지 않으려고 플래그 쪽을 택했다.
-#    ② `providers/anthropic.js`의 사고 스위치가 `process.env.SAI_ANTHROPIC_THINKING`을 읽는다
-#       (Worker에서는 `src/handler.js` `applyThinkingSwitch`가 env 값을 — 없으면 `disabled`를 — 거기에 옮겨 준다).
+#    ② (2026-10-24 #42부터 해당 없음) 사고 스위치는 `src/handler.js` `thinkingSwitch`가 env 값을 코어에 직접
+#       넘긴다 — Worker는 요청 중 `process`를 읽지 않는다(`test/handler.test.js`가 잠근다).
 compatibility_flags = ["nodejs_compat"]
 
 # 🔴 Anthropic SDK를 번들에서 뺀다(2026-10-23 L33 — 콜드 cpuTime 34ms·30ms > 무료 한도 10ms 대응, 선택지 A).
