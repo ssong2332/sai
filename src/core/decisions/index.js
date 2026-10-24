@@ -78,6 +78,7 @@ export async function summarizeDecisions(request, deps = {}) {
     cache = defaultCache,
     fetchImpl,
     timeoutMs,
+    thinking,
     logger = () => {},
     now = () => Date.now(),
   } = deps;
@@ -114,6 +115,8 @@ export async function summarizeDecisions(request, deps = {}) {
       model,
       timeoutMs,
       fetchImpl,
+      // 🔴 `undefined`는 그대로 넘긴다 — provider가 「안 넘김」으로 보고 process.env를 읽는다(Node 경로 불변).
+      thinking,
       errors: { RefineCallError, classifyHttpFailure, parseJsonContent },
     });
   } catch (error) {

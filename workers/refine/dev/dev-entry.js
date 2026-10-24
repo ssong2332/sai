@@ -11,23 +11,59 @@
 
 import { createHandler } from '../src/handler.js';
 import { createMemoryUsageStore } from '../src/usageStore.js';
-import { fakeAnthropicFetch, makeKeys, signIdToken } from '../test/helpers.js';
+import { fakeAnthropicFetch, goodRaw, makeKeys, signIdToken } from '../test/helpers.js';
+
+/**
+ * mode별 가짜 Claude 응답(2026-10-24 — decode·decisions·reply 이식 확인용). 합성 데이터 — 각 코어 schema를 통과하는 최소 모양.
+ * 들어온 요청의 `mode`로 고른다(모르는 값은 refine — handler와 같다). 동시 요청은 가정하지 않는다(로컬 확인 전용).
+ */
+const DEV_RAW = {
+  refine: goodRaw(),
+  decode: {
+    literalTranslation: '업데이트 고마워요! 사소한 코멘트가 몇 개 있어요.',
+    actualIntent: '접근 방식 재검토를 요구하고 있을 가능성이 높습니다.',
+    intentEvidence: '"a few minor comments"',
+    surfaceUrgency: 'LOW',
+    actualUrgency: 'CRITICAL',
+    urgencyReason: '표면상 가볍지만 실질 요구가 있습니다.',
+    urgencyEvidence: 'revisit the overall approach',
+    requiredActions: ['재검토안 준비'],
+  },
+  decisions: {
+    decisions: [
+      { decision: '금요일에 배포한다', owner: 'Jin', dueDate: 'Friday', authorityStatus: '확정', authorityEvidence: '"Friday works."' },
+    ],
+  },
+  reply: { draft: '네, 검토하겠습니다.', placeholderNote: '' },
+};
 
 let ready = null;
 function init() {
   // 🔴 전역 스코프에서는 비동기 작업을 못 하므로 첫 요청에서 만든다.
   ready ??= (async () => {
     const keys = await makeKeys('dev-kid');
-    const fetchImpl = fakeAnthropicFetch();
-    return { keys, fetchImpl, handle: createHandler({ jwks: keys.jwks, fetchImpl, usageStore: createMemoryUsageStore() }) };
+    const fakes = Object.fromEntries(Object.entries(DEV_RAW).map(([mode, raw]) => [mode, fakeAnthropicFetch(raw)]));
+    const state = { mode: 'refine' };
+    const fetchImpl = (url, init) => fakes[state.mode](url, init);
+    Object.defineProperty(fetchImpl, 'seen', { get: () => fakes[state.mode].seen });
+    const handle = createHandler({ jwks: keys.jwks, fetchImpl, usageStore: createMemoryUsageStore() });
+    return { keys, fetchImpl, state, handle };
   })();
   return ready;
 }
 
 export default {
   async fetch(request, env) {
-    const { keys, fetchImpl, handle } = await init();
+    const { keys, fetchImpl, state, handle } = await init();
     const url = new URL(request.url);
+    if (request.method === 'POST' && url.pathname === '/v1/refine') {
+      const mode = await request
+        .clone()
+        .json()
+        .then((b) => b?.mode)
+        .catch(() => undefined);
+      state.mode = Object.hasOwn(DEV_RAW, mode) ? mode : 'refine';
+    }
     if (url.pathname === '/__dev/token') {
       return globalThis.Response.json({ devOnly: true, token: await signIdToken(keys) });
     }
