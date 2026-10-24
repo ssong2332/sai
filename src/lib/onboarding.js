@@ -108,6 +108,56 @@ export async function setMyLanguage(language) {
   return next;
 }
 
+/**
+ * 온보딩의 **일부 필드만** 바꾼다 (2026-10-24 — 웹 설정 브리지 `site:set` `language` 섹션).
+ *
+ * 🔴 `setMyLanguage`와 같은 이유로 **`saveOnboarding`을 쓰지 않는다** — `completedAt`을 지금으로 찍지
+ *    않고, 넘기지 않은 필드를 지우지 않는다. 목록 밖 값은 `null`로 떨어뜨린다.
+ * 🔴 **톤 → 프로필 연결은 `saveOnboarding`과 같다** — 톤을 값으로 넘기면 `collabStyleId`도 같은 값이
+ *    된다(톤을 `null`로 비울 때는 `saveOnboarding`처럼 프로필을 건드리지 않는다).
+ *
+ * @param {{language?: string|null, partnerRegion?: string|null, tone?: string|null}} patch
+ */
+export async function setOnboardingFields(patch) {
+  const current = await getOnboarding();
+  const next = { ...EMPTY, ...current };
+  const pick = (list, value) => (list.some((item) => item.id === value) ? value : null);
+  if (patch?.language !== undefined) next.language = pick(MY_LANGUAGES, patch.language);
+  if (patch?.partnerRegion !== undefined) next.partnerRegion = pick(PARTNER_REGIONS, patch.partnerRegion);
+  if (patch?.tone !== undefined) next.tone = pick(DEFAULT_TONES, patch.tone);
+  await setLocal(STORAGE_KEYS.ONBOARDING, next);
+
+  if (patch?.tone !== undefined && next.tone) {
+    const { setProfile } = await import('./profile.js');
+    await setProfile({ collabStyleId: next.tone });
+  }
+  return next;
+}
+
+/**
+ * 프로필을 바꾸고, 「선호하는 말투」가 바뀌었으면 온보딩의 「기본 톤」도 맞춘다 (2026-10-24 추출).
+ *
+ * 🔴 **사이드패널 `changeProfile`(App.jsx)에 있던 규칙을 그대로 옮겼다** — 웹 설정 브리지도 같은 규칙을
+ *    써야 해서 한 곳으로 모았다. 규칙(2026-08-20 ⓨ — 「선호하는 말투」 `sai.profile.collabStyleId`와
+ *    온보딩 「기본 톤」 `sai.onboarding.tone`은 id가 같은 한 축이다. 온보딩 → 프로필은 `saveOnboarding`이
+ *    맞추지만 반대 방향이 없어서, 프로필에서 말투를 바꾸면 홈 요약이 옛 값을 보여줬다):
+ *    - `collabStyleId`를 넘겼고 **온보딩을 끝낸 상태**면 `saveOnboarding({...온보딩, tone})`으로 맞춘다.
+ *    - 아직 온보딩을 안 끝냈으면 건드리지 않는다 — `saveOnboarding`이 `completedAt`을 찍어 첫 설정
+ *      화면이 사라지기 때문이다.
+ *
+ * @returns {Promise<{profile: object, onboarding: object, onboardingChanged: boolean}>}
+ */
+export async function setProfileSyncingTone(patch) {
+  const { setProfile } = await import('./profile.js');
+  const profile = await setProfile(patch);
+  const current = await getOnboarding();
+  if (patch?.collabStyleId !== undefined && current?.completedAt) {
+    const onboarding = await saveOnboarding({ ...current, tone: patch.collabStyleId });
+    return { profile, onboarding, onboardingChanged: true };
+  }
+  return { profile, onboarding: current, onboardingChanged: false };
+}
+
 /** 다시 하기 — 저장값을 지워 질문이 다시 뜨게 한다. */
 export async function resetOnboarding() {
   await setLocal(STORAGE_KEYS.ONBOARDING, EMPTY);

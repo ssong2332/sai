@@ -1,5 +1,5 @@
 import { defineManifest } from '@crxjs/vite-plugin';
-import { FEATURES, LOCAL_PROXY_HOST_PERMISSIONS } from './config.js';
+import { FEATURES, LOCAL_PROXY_HOST_PERMISSIONS, SITE_EXTERNALLY_CONNECTABLE_MATCHES } from './config.js';
 
 export default defineManifest({
   manifest_version: 3,
@@ -36,7 +36,7 @@ export default defineManifest({
    *    L28 안전망·경고 상자가 들어갔는데 숫자가 그대로라 「다시 로드」가 됐는지 화면으로 알 수 없었다.
    *    `package.json`과 같은 값이어야 한다(`test/version.unit.test.js`).
    */
-  version: '0.1.11',
+  version: '0.1.12',
   /**
    * 🔴 **동작을 먼저, 은유는 빼고.** 예전 문구("사람과 사람, 언어와 언어 사이를 매끄럽게 잇는")는
    *    첫 줄이 은유라 무엇을 하는 도구인지 읽는 데 시간이 걸렸다.
@@ -175,4 +175,16 @@ export default defineManifest({
      */
     ...LOCAL_PROXY_HOST_PERMISSIONS,
   ],
+  /**
+   * 관리용 웹사이트 → 확장 직접 메시지 (2026-10-24 — `docs/WebSplit.md` 「C — 로컬 브리지」).
+   *
+   * 🔴 **오리진은 `src/config.js`에서 파생한다 — 여기 손으로 적지 않는다.** 개발 오리진
+   *    (`DEV_SITE_URL`)은 `SAI_SITE_DEV=1` 빌드(`npm run build:sitedev`)에서만 붙는다.
+   * 🔴 **목록이 비면 블록 자체를 넣지 않는다**(지금 공개 빌드 — 사이트 미배포). 기본 빌드의 manifest가
+   *    이 기능 이전과 같게 유지된다. 블록이 없어도 다른 확장은 메시지를 보낼 수 있지만,
+   *    `siteBridge.js`가 `sender.origin`을 다시 확인해 `forbidden_origin`으로 거절한다.
+   */
+  ...(SITE_EXTERNALLY_CONNECTABLE_MATCHES.length > 0
+    ? { externally_connectable: { matches: SITE_EXTERNALLY_CONNECTABLE_MATCHES } }
+    : {}),
 });

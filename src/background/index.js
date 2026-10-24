@@ -4,6 +4,8 @@ import { REFINE_ENDPOINT, REFINE_TIMEOUT_MS } from '../config.js';
 import { getIdToken } from '../lib/authClient.js';
 import { METRIC_MESSAGE, sendClientMetric } from '../lib/metricsClient.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from '../core/refine/fallback.js';
+// 🔴 2026-10-24 — 관리용 웹사이트 브리지(`docs/WebSplit.md` 「C — 로컬 브리지」). 처리 규칙은 그 파일에 있다.
+import { handleSiteMessage } from './siteBridge.js';
 
 // 툴바 아이콘 클릭 → 사이드 패널 열기 (Spec §1 UI 삼원화 — Side Panel 진입점)
 chrome.sidePanel
@@ -338,4 +340,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     // 🔴 본문(메시지)은 싣지 않는다. 누구에게 보낼 때인지까지만.
     message: `${item.recipientName}에게 보낼 시간입니다. 사이드패널에서 문장을 확인하세요.`,
   });
+});
+
+/* ── 웹 설정 브리지 (2026-10-24 — `docs/WebSplit.md` 「C — 로컬 브리지」) ─────────────── */
+
+/**
+ * 관리용 웹사이트가 `chrome.runtime.sendMessage(<확장 ID>, {type, ...})`로 보내는 메시지.
+ * 🔴 여기서는 연결만 한다 — 오리진 확인·검증·저장은 전부 `siteBridge.js`(순수 모듈, 단위 테스트 대상).
+ * 🔴 로그를 남기지 않는다 — type도, 값도. `handleSiteMessage`는 reject하지 않으므로 catch가 필요 없다.
+ * 🔴 `true`를 돌려줘야 비동기 `sendResponse`가 살아 있다.
+ */
+chrome.runtime.onMessageExternal?.addListener((message, sender, sendResponse) => {
+  handleSiteMessage(message, sender).then(sendResponse);
+  return true;
 });

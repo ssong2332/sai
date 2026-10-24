@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
-import { DASHBOARD_URL, FEATURES } from '../config.js';
+import { DASHBOARD_URL, FEATURES, SITE_URL } from '../config.js';
 import { getLocal, setLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
 import {
   listPersonalGlossary,
@@ -14,7 +14,6 @@ import {
 } from '../lib/glossary.js';
 import {
   getProfile,
-  setProfile,
   getLearnedCounts,
   removeLearnedPattern,
   clearLearnedPatterns,
@@ -78,6 +77,7 @@ import {
 import {
   getOnboarding,
   saveOnboarding,
+  setProfileSyncingTone,
   setMyLanguage,
   resetOnboarding,
   onboardingLabels,
@@ -482,19 +482,13 @@ export default function App() {
   };
 
   const changeProfile = async (patch) => {
-    setProfileState(await setProfile(patch));
     /**
-     * 🔴 **같은 축이 두 곳에 저장돼 어긋나 있었다** (2026-08-20 ⓨ 작업 중 확인).
-     *    「선호하는 말투」는 `sai.profile.collabStyleId`, 온보딩의 「기본 톤」은
-     *    `sai.onboarding.tone`인데 **id가 같다**(direct·warm·brief). 온보딩 → 프로필 방향은
-     *    `saveOnboarding()`이 맞춰 주지만 **반대 방향이 없었다** — 프로필에서 말투를 바꾸면
-     *    홈의 접힌 요약 「설정 완료 ✓ 한국어 · 직접적으로」가 **옛 값을 계속 보여줬다.**
-     * 🔴 **아직 온보딩을 안 끝냈으면 건드리지 않는다** — 여기서 `saveOnboarding`을 부르면
-     *    `completedAt`이 찍혀 첫 설정 화면이 사라진다.
+     * 🔴 2026-10-24 — 아래 규칙을 `setProfileSyncingTone`(`lib/onboarding.js`)으로 옮겼다. 웹 설정
+     *    브리지(`background/siteBridge.js`)도 같은 규칙을 써야 해서다. 규칙 자체는 바꾸지 않았다.
      */
-    if (patch?.collabStyleId !== undefined && onboarding?.completedAt) {
-      setOnboarding(await saveOnboarding({ ...onboarding, tone: patch.collabStyleId }));
-    }
+    const synced = await setProfileSyncingTone(patch);
+    setProfileState(synced.profile);
+    if (synced.onboardingChanged) setOnboarding(synced.onboarding);
     setToast('프로필을 저장했어요');
   };
 
@@ -1179,6 +1173,28 @@ function SettingsTab({
             ))}
         </div>
       ))}
+
+      {/**
+        * 🔴 **웹 설정으로 가는 입구 — 추가만 했다** (2026-10-24, `docs/WebSplit.md` 「C — 로컬 브리지」).
+        *    웹은 이 확장의 `chrome.storage.local`을 직접 메시지로 읽고 쓴다(서버 없음). 여기 있는 설정을
+        *    옮기거나 지우는 것은 **별도 승인 단계**다 — 지금은 같은 설정이 양쪽에 있다.
+        * 🔴 `SITE_URL`이 `null`이면(공개 빌드 — 사이트 미배포) 이 줄을 그리지 않는다. 열 곳이 없는
+        *    버튼을 두지 않는다.
+        */}
+      {SITE_URL && (
+        <div className="card">
+          <div className="card-head card-head-bare">
+            <h3 className="card-label">자세한 설정</h3>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => chrome.tabs?.create({ url: `${SITE_URL}/settings` })}
+            >
+              자세한 설정 — 웹에서 열기 →
+            </button>
+          </div>
+        </div>
+      )}
 
       <ShortcutCard />
     </div>

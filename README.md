@@ -87,6 +87,7 @@ npm run dev
 | `GROQ_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **폴오버 예비**(2026-10-23, `openai/gpt-oss-120b`). 폴오버 2단계 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
 | `SAI_CACHE_TTL_MS` | 로컬 `.env` | 프록시 캐시 수명(기본 10분 · 상한 6시간). 시연 촬영 때 호출을 줄이는 용도 |
+| `SAI_SITE_DEV` | 빌드 시점 — `npm run build:sitedev`가 켠다 (🔴 `.env`에서 읽지 않는다) | `1`이면 manifest `externally_connectable`에 `http://localhost:5180/*`가 붙고 설정에 「자세한 설정 — 웹에서 열기」가 뜬다(`docs/WebSplit.md` C). 🔴 이 빌드는 배포하지 않는다 |
 
 > 🔴 **키를 시크릿에 등록할 때는 파일로 넘긴다.** `firebase functions:secrets:set`의 숨김
 > 프롬프트에 붙여넣으면 조용히 빈 값이 들어가고, 끝 개행이 섞이면 401을 받고 **코드 문제로

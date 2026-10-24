@@ -10,6 +10,10 @@ export default defineConfig({
   // 모든 페이지에서 즉시 크래시한다(jsdom 테스트로는 잡히지 않는 유형).
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
+    // 🔴 2026-10-24 — 사이트 개발 빌드 스위치(`npm run build:sitedev`). `src/config.js`의 `SITE_URL`이
+    //    번들 안에서도 manifest와 같은 값을 보게 한다 — 이게 없으면 manifest에는 개발 오리진이 있는데
+    //    사이드패널의 「웹에서 열기」 버튼은 뜨지 않는다(브라우저에는 `process`가 없다).
+    'process.env.SAI_SITE_DEV': JSON.stringify(process.env.SAI_SITE_DEV ?? ''),
   },
   build: {
     rollupOptions: {

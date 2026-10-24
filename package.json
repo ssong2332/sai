@@ -1,11 +1,12 @@
 {
   "name": "sai",
   "private": true,
-  "version": "0.1.11",
+  "version": "0.1.12",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:sitedev": "node scripts/build-sitedev.mjs",
     "preview": "vite preview",
     "proxy": "node --env-file-if-exists=.env server/refine-proxy.js",
     "lint": "eslint .",
