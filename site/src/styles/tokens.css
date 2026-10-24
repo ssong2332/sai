@@ -1,0 +1,96 @@
+/* 사이 웹사이트 토큰 — 색은 「뜻」이다(확장과 같은 규칙).
+   | 토큰 | 뜻 | 쓰는 곳 |
+   |---|---|---|
+   | --ground / --surface / --sunken | 바닥 · 카드 · 눌린 영역 | 배경 |
+   | --ink / --sub / --mut | 본문 · 보조 · 라벨 | 글자 |
+   | --bar | 로고 바(그라파이트) · 트랙 | 로고·바 |
+   | --action | 누르는 것 | 주요 버튼·선택된 컨트롤 |
+   | --fact | 바뀌지 않는 것(원문의 숫자·날짜·이름, 내 기기에 남는 데이터) | 레드 바·표시 |
+   | --term | 용어집이 지킨 말 | 초록 표시 |
+   🔴 이 뜻 밖에서 색을 장식으로 쓰지 않는다. 글자에는 `-ink` 변형을 쓴다(AA). */
+:root {
+  color-scheme: light;
+  --ground: #eef0f3;
+  --surface: #ffffff;
+  --sunken: #f2f4f6;
+  --ink: #191f28;
+  --sub: #4e5968;
+  --mut: #565f6d;
+  --line: rgba(25, 31, 40, 0.12);
+  --line-strong: rgba(25, 31, 40, 0.24);
+
+  --bar: #201e1d;
+  --action: #ff6100;
+  --action-ink: #bf4900; /* 흰 바탕 5.04:1 */
+  --on-action: #191f28; /* 주황 위 글자 — 5.5:1 (흰 글자는 3.0:1이라 쓰지 않는다) */
+  --fact: #ec3013; /* 로고 액센트 — 두 테마 고정 */
+  --fact-ink: #c22a10; /* 흰 바탕 5.8:1 */
+  --term: #009b64;
+  --term-ink: #007c50;
+  --fact-tint: color-mix(in oklab, var(--fact) 9%, var(--surface));
+  --term-tint: color-mix(in oklab, var(--term) 11%, var(--surface));
+  --action-tint: color-mix(in oklab, var(--action) 10%, var(--surface));
+
+  --focus: #191f28;
+  --shadow: 0 1px 2px rgba(25, 31, 40, 0.06), 0 12px 32px rgba(25, 31, 40, 0.08);
+
+  --font-display: 'Hahmlet', 'Pretendard Variable', serif;
+  --font-body: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Pretendard Variable', Pretendard, monospace;
+
+  /* 글자 크기 단계 — 13 · 15 · 17 · 20 · 26 · 36 · 56 */
+  --t-xs: 0.8125rem;
+  --t-sm: 0.9375rem;
+  --t-md: 1.0625rem;
+  --t-lg: 1.25rem;
+  --t-xl: clamp(1.375rem, 1.1rem + 1vw, 1.625rem);
+  --t-2xl: clamp(1.75rem, 1.3rem + 1.8vw, 2.25rem);
+  --t-3xl: clamp(2.25rem, 1.4rem + 3.6vw, 3.5rem);
+
+  --radius: 10px;
+  --radius-lg: 16px;
+  --gutter: clamp(16px, 4vw, 40px);
+  --maxw: 1160px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --ground: #0e1116;
+    --surface: #1a1f27;
+    --sunken: #242b35;
+    --ink: #f2f4f6;
+    --sub: #c4cad3;
+    --mut: #9aa3ae;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-strong: rgba(255, 255, 255, 0.22);
+    --bar: #f8f4f4;
+    --action-ink: #ff7a2e;
+    --fact-ink: #ff7a63;
+    --term-ink: #2bbf86;
+    --focus: #f2f4f6;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ground: #0e1116;
+  --surface: #1a1f27;
+  --sunken: #242b35;
+  --ink: #f2f4f6;
+  --sub: #c4cad3;
+  --mut: #9aa3ae;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  --bar: #f8f4f4;
+  --action-ink: #ff7a2e;
+  --fact-ink: #ff7a63;
+  --term-ink: #2bbf86;
+  --focus: #f2f4f6;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
+}

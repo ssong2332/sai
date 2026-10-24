@@ -50,6 +50,10 @@
 | Worker 번들에 SDK 없음 확인(build:dry 포함) | `npm --prefix workers/refine run check:bundle` (🔴 `wrangler.toml` `[alias]`가 SDK를 `src/anthropicFetch.js`로 바꾼다 — 기준 112.8 KiB) | 2026-10-23 |
 | Worker 콜드 CPU 추정(배포 번들 그대로·새 프로세스) | `npm --prefix workers/refine run bench:cold -- --runs 31` (먼저 build:dry. 🔴 run 수가 적으면 흔들린다 — 5회 11~17ms. Node 추정 — 실제는 배포 후 `wrangler tail` cpuTime) | 2026-10-23 |
 | Worker 로컬 workerd(가짜 키·가짜 Claude, 🔴 배포 금지 설정) | `npm --prefix workers/refine run dev:mock` → `http://127.0.0.1:8790` (`/__dev/token`으로 시험 토큰) | 2026-10-23 |
+| 소개·설정 웹사이트(`site/`) 설치 | `site/` 안에서 `npm install` — 🔴 `npm --prefix site install`은 쓰지 않는다: `site/package.json`에 `"sai": "file:.."`를 몰래 넣는다(2026-10-24 실측) | 2026-10-24 |
+| 웹사이트 빌드 | `npm --prefix site run build` | 2026-10-24 |
+| 웹사이트 브리지 단위 테스트 | `npm --prefix site test` | 2026-10-24 |
+| 웹사이트 dev 서버 | `npm --prefix site run dev` → `http://localhost:5180` (strictPort — 확장 externally_connectable 개발 매치가 이 포트) · 미리보기 `/settings?demo=1` | 2026-10-24 |
 | Worker 배포 (🔴 사용자가 실행 — 에이전트 배포는 막혀 있다) | `workers/refine/` 안에서 `npx wrangler deploy` | 2026-10-24 |
 | Worker 배포 확인 | `curl https://sai-refine.aiisgod.workers.dev/health` → `"thinking":"disabled"` | 2026-10-24 |
 | Worker 실제 cpuTime 수집 (🔴 원본에 로그인 토큰이 있다 — 반드시 숫자만 거르는 필터를 거친다) | `workers/refine/` 안에서 `npx wrangler tail --format json 2>/dev/null \| node <필터.mjs>` — 필터는 path·method·status·outcome·cpuTime·wallTime만 출력, 원문은 버린다 | 2026-10-24 |

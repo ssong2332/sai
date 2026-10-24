@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>사이 — 해외 동료와 주고받는 업무 메시지</title>
+    <meta
+      name="description"
+      content="사이는 해외 동료에게 보낼 업무 메시지를 다듬고, 받은 메시지의 실제 의도를 풀어 주는 크롬 확장 프로그램입니다. 메시지 본문은 사이 서버에 저장하지 않습니다."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@300..700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <script>
+      // 첫 페인트 전에 테마를 정한다 — 깜빡임 방지. 저장소가 막혀 있으면 시스템 설정을 따른다.
+      try {
+        var t = localStorage.getItem('sai-site-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
