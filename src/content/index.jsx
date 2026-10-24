@@ -15,6 +15,8 @@ import motionCss from '../styles/motion.css?inline';
 import contentCss from './content.css?inline';
 import SaiOverlay from './SaiOverlay.jsx';
 import { getLocal, STORAGE_KEYS } from '../lib/storage.js';
+// 시안 A2 — 번들 서체를 호스트 문서에 고유 이름(`SaiPretendard`)으로 등록한다(Shadow root 안 @font-face 대신).
+import { registerSaiFont } from '../lib/saiFont.js';
 
 const HOST_ID = 'sai-root';
 
@@ -36,6 +38,12 @@ function mount() {
 
   const mountPoint = document.createElement('div');
   shadow.appendChild(mountPoint);
+
+  /**
+   * 🔴 서체 등록은 실패해도 조용하다 — OS 서체로 그려질 뿐 팝업은 그대로 뜬다(`saiFont.js`).
+   *    URL 출처 `FontFace`라 팝업 글자가 처음 그려질 때에야 파일을 읽는다(팝업을 안 여는 페이지는 0바이트).
+   */
+  registerSaiFont();
 
   // 사이드패널에서 고른 테마를 팝업에도 적용한다 (2026-08-12 결정으로 다크모드 v1 포함).
   /**

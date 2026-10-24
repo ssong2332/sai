@@ -1930,6 +1930,39 @@ function TeamDashboardCard({ team, onToast }) {
   );
 }
 
+/**
+ * 시안 A2 — 「오늘의 사이」 숫자 굴리기(2026-10-24).
+ * 🔴 **표시만 움직인다** — 값·저장·카운트 규칙은 그대로다(`src/lib/usage.js`). 이전 값에서 새 값까지
+ *    900ms 동안 굴려 「방금 늘었다」가 보이게 한다. 🔴 모션 최소화면 즉시 최종값을 보인다.
+ */
+function RollingNumber({ value, className }) {
+  const [shown, setShown] = useState(value);
+  const fromRef = useRef(value);
+  useEffect(() => {
+    const from = fromRef.current;
+    fromRef.current = value;
+    const reduce =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || from === value || typeof requestAnimationFrame !== 'function') {
+      setShown(value);
+      return undefined;
+    }
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now) => {
+      const k = Math.min(1, (now - start) / 900);
+      const eased = 1 - (1 - k) ** 3;
+      setShown(Math.round(from + (value - from) * eased));
+      if (k < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <span className={className}>{shown}</span>;
+}
+
 function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
   /**
    * S23 — 실제 적립 잔액. 🔴 목업(`POINTS.balance`)이 아니라 `chrome.storage.local`의 실제 값이다.
@@ -2003,7 +2036,7 @@ function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
             { id: 'scheduled', label: '예약 발송', value: usage.scheduled, accent: 'ink' },
           ].map((stat) => (
             <div key={stat.id} className="stat">
-              <span className={`stat-value stat-${stat.accent}`}>{stat.value}</span>
+              <RollingNumber className={`stat-value stat-${stat.accent}`} value={stat.value} />
               <span className="stat-label">{stat.label}</span>
             </div>
           ))}

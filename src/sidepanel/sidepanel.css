@@ -12,8 +12,10 @@
  *    14→15 · 15→16. **제목급(19·22)은 그대로 뒀다** — 이미 충분히 크고, 좁은 패널에서
  *    올리면 줄바꿈만 늘어난다.
  */
-/* 사이드 패널 스타일 — [DS] 프로토타입 `Sai Prototype.dc.html`의 사이드 패널 인라인 스타일을
-   클래스로 정리한 것. 수치(폰트 크기·radius·padding)는 프로토타입 값을 그대로 옮겼다. */
+/* 사이드 패널 스타일 — 시안 A2(2026-10-24, `docs/design/DesignSystem-A2.md`).
+   🔴 v1 별칭(`--o`·`--g`·`--r`…)을 쓰지 않는다 — 뜻 색 이름(`--seam`·`--kept`·`--dusk`·`--check`·`--fault`)만.
+   🔴 주 동작은 잉크 채움 하나(`.button-primary`·`.chip-on`·켜진 스위치). 색 = 뜻.
+   🔴 굵기는 번들 서체가 가진 400·600·700·800만. 움직임은 transform·opacity만(노브·탭·세그먼트 = `--spring`). */
 
 * {
   box-sizing: border-box;
@@ -30,13 +32,47 @@ body {
 body {
   margin: 0;
   font-family: var(--font-sans);
+  font-size: 15px;
+  letter-spacing: -0.01em;
   color: var(--ink);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button {
   font-family: inherit;
+}
+
+/* 키보드 포커스 — A2: Dusk 고리. */
+:focus-visible {
+  outline: 3px solid var(--dusk);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* 누르면 살짝 들어갔다가 스프링으로 돌아온다(A2 `.press`). */
+.button,
+.chip,
+.tab,
+.segment-item,
+.icon-button,
+.slot,
+.fold-head,
+.sai-switch,
+.link-button {
+  transition: transform var(--dur-press) var(--spring), background-color var(--dur-quick) var(--ease-out),
+    color var(--dur-quick) var(--ease-out), box-shadow var(--dur-quick) var(--ease-out);
+}
+
+.button:active:not(:disabled),
+.chip:active,
+.tab:active,
+.segment-item:active,
+.icon-button:active,
+.slot:active,
+.sai-switch:active {
+  transform: scale(0.96);
 }
 
 /**
@@ -65,9 +101,9 @@ button {
 .panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
+  gap: 10px;
+  padding: 16px 18px 12px;
+  background: var(--surface);
   flex: none;
 }
 
@@ -93,7 +129,7 @@ button {
 }
 
 .brand-name {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 800;
   /* 가운뎃점이 글자에 묻히지 않게 아주 살짝 벌린다 — 「사이」로 읽히는 것이 이름의 요점이다. */
   letter-spacing: 0.02em;
@@ -104,10 +140,10 @@ button {
  *    한 번 읽으면 되는 문장이다. 좁은 패널에서 줄바꿈되지 않도록 크기를 낮게 잡았다.
  */
 .brand-tagline {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--mut);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -128,8 +164,10 @@ button {
   color: var(--mut);
   font-size: 15px;
   cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm);
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 12px;
   flex: none;
 }
 
@@ -144,8 +182,8 @@ button {
  *    누르려고 다가갔을 때 되돌릴 수 없는 동작임을 알리면 충분하다.
  */
 .icon-button-danger:hover {
-  background: var(--r-tint);
-  color: var(--r-deep);
+  background: var(--fault-tint);
+  color: var(--fault-deep);
 }
 
 /* 🔴 이모지(⚙️)는 폰트에 따라 작고 흐리게 그려져 알아보기 어려웠다(2026-08-13 사용자 지적).
@@ -154,24 +192,57 @@ button {
   display: block;
 }
 
-/* ── 탭 ── */
+/* ── 탭 (A2 .ptabs) — 같은 폭 4칸 + 가라앉은 노브가 스프링으로 미끄러진다 ──
+   🔴 노브는 `::before` 하나 — JS 없이 `:has()`로 위치를 정한다(탭 id·순서는 `TABS` 그대로). */
 
 .panel-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 10px 14px 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  padding: 0 12px 12px;
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--line);
   flex: none;
+  isolation: isolate;
+  z-index: 1;
+}
+
+.panel-tabs::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 12px;
+  bottom: 12px;
+  width: calc((100% - 24px) / 4);
+  height: 38px;
+  border-radius: 12px;
+  background: var(--sunken);
+  transform: translateX(calc(var(--tab, 0) * 100%));
+  transition: transform var(--dur-enter) var(--spring);
+}
+
+.panel-tabs:has(> .tab:nth-child(2).tab-active)::before {
+  --tab: 1;
+}
+.panel-tabs:has(> .tab:nth-child(3).tab-active)::before {
+  --tab: 2;
+}
+.panel-tabs:has(> .tab:nth-child(4).tab-active)::before {
+  --tab: 3;
 }
 
 .tab {
   border: 0;
   background: transparent;
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 7px 11px;
-  border-radius: 9px;
+  font-size: 14.5px;
+  font-weight: 700;
+  height: 38px;
+  padding: 0 6px;
+  border-radius: 12px;
   color: var(--mut);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .tab:hover {
@@ -179,9 +250,9 @@ button {
 }
 
 .tab-active {
-  background: var(--surface);
+  background: transparent;
   color: var(--ink);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  box-shadow: none;
 }
 
 /* ── 본문 ── */
@@ -220,37 +291,53 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 18px 18px;
+  padding: 14px 14px 28px;
   display: grid;
   grid-auto-rows: max-content;
   gap: 12px;
   align-content: start;
 }
 
+/* 탭을 바꾸면(본문이 `key`로 새로 그려진다) 카드가 아래에서 순서대로 선다 — 합계 160ms 상한. */
+.panel-body > * {
+  animation: sai-rise var(--dur-enter) var(--out) both;
+}
+.panel-body > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.panel-body > :nth-child(3) {
+  animation-delay: 80ms;
+}
+.panel-body > :nth-child(4) {
+  animation-delay: 120ms;
+}
+.panel-body > :nth-child(n + 5) {
+  animation-delay: 160ms;
+}
+
 /* ── 카드 ── */
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--radius-xl);
+  padding: 18px;
 }
 
 .card-accent {
-  background: var(--o-tint);
-  border-color: transparent;
+  background: var(--seam-tint);
 }
 
 .card-dashed {
-  background: var(--g-tint);
-  border: 1.5px dashed color-mix(in oklab, var(--g) 40%, transparent);
+  background: var(--kept-tint);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--kept) 35%, transparent);
 }
 
 .card-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 14px;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
 }
 
@@ -261,26 +348,28 @@ button {
 
 .card-title {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .card-label {
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--mut);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .card-label-green {
-  color: var(--g-deep);
-  font-size: 12.5px;
+  color: var(--kept-deep);
+  font-size: 13.5px;
   font-weight: 800;
 }
 
 .card-text {
   margin: 8px 0 0;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--sub);
   line-height: 1.6;
 }
@@ -290,7 +379,7 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .card-head-bare {
@@ -304,22 +393,33 @@ button {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  text-align: center;
-  margin-top: 8px;
+  text-align: left;
+  margin-top: 12px;
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+  background: var(--sunken);
+  border-radius: 12px;
+  padding: 12px 12px 10px;
 }
 
 .stat-value {
   display: block;
-  font-size: 19px;
+  font-size: var(--t-display);
   font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-orange {
-  color: var(--o-deep);
+  color: var(--ink);
 }
 
 .stat-green {
-  color: var(--g-deep);
+  color: var(--ink);
 }
 
 .stat-ink {
@@ -328,23 +428,61 @@ button {
 
 .stat-label {
   font-size: 12.5px;
+  font-weight: 600;
   color: var(--mut);
 }
 
 .points {
   font-size: 16px;
   font-weight: 800;
-  color: var(--o-deep);
+  color: var(--seam-deep);
+  font-variant-numeric: tabular-nums;
 }
 
-/* ── 세그먼트 ── */
+/* ── 세그먼트 (A2 .seg) — 같은 폭 칸 + 흰 노브가 스프링으로 미끄러진다(칸 수 2~4를 `:has()`로 안다) ── */
 
 .segment {
+  position: relative;
   display: flex;
-  gap: 2px;
+  gap: 0;
   background: var(--sunken);
-  border-radius: var(--radius-md);
-  padding: 3px;
+  border-radius: 13px;
+  padding: 4px;
+  isolation: isolate;
+}
+
+.segment::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / var(--n, 3));
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--knob-shadow);
+  transform: translateX(calc(var(--k, 0) * 100%));
+  transition: transform var(--dur-enter) var(--spring);
+}
+
+.segment:has(> .segment-item:nth-child(2):last-child)::before {
+  --n: 2;
+}
+.segment:has(> .segment-item:nth-child(4):last-child)::before {
+  --n: 4;
+}
+.segment:has(> .segment-item:nth-child(2).segment-active)::before {
+  --k: 1;
+}
+.segment:has(> .segment-item:nth-child(3).segment-active)::before {
+  --k: 2;
+}
+.segment:has(> .segment-item:nth-child(4).segment-active)::before {
+  --k: 3;
+}
+.segment:not(:has(> .segment-active))::before {
+  opacity: 0;
 }
 
 .segment-item {
@@ -352,43 +490,44 @@ button {
   border: 0;
   background: transparent;
   text-align: center;
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 5px 0;
-  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 700;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
   color: var(--mut);
   cursor: pointer;
 }
 
 .segment-active {
-  background: var(--surface);
+  background: transparent;
   color: var(--ink);
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 
 /* ── 용어·스니펫·태그 ── */
 
 .term-from {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
 }
 
 .term-to {
-  font-size: 13.5px;
-  color: var(--g-deep);
+  font-size: 14px;
+  color: var(--kept-deep);
   font-weight: 600;
 }
 
 .snippet-text {
-  margin: 0 0 8px;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--sub);
+  margin: 0 0 10px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink);
 }
 
 .learned-text {
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--sub);
 }
@@ -396,25 +535,25 @@ button {
 .tag-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 8px 0;
+  gap: 8px;
+  margin: 10px 0;
 }
 
 .chip {
   font-size: 13px;
   font-weight: 600;
-  padding: 4px 9px;
-  border-radius: 7px;
+  padding: 6px 11px;
+  border-radius: var(--radius-pill);
   border: 0;
   white-space: nowrap;
 }
 
 .chip-green {
-  color: var(--g-deep);
-  background: var(--g-tint);
+  color: var(--kept-deep);
+  background: var(--kept-tint);
 }
 
-/* S13 — 1순위 프로필 선택 칩. 기본은 회색, 고르면 주황(선택 상태가 한눈에 보여야 한다). */
+/* S13 — 1순위 프로필 선택 칩. 기본은 회색, 고르면 잉크 채움(A2 — 선택 = 주 동작 색). */
 .tag-row .chip {
   cursor: pointer;
   color: var(--sub);
@@ -422,32 +561,38 @@ button {
 }
 
 .tag-row .chip.chip-on {
-  color: #fff;
-  background: var(--o);
+  color: var(--on-ink);
+  background: var(--ink);
 }
 
 /* 소통 태그(읽기 전용, 필수 9)는 위 규칙에 휩쓸리면 안 된다 — 초록 유지·커서 없음. */
 .tag-row .chip.chip-green {
   cursor: default;
-  color: var(--g-deep);
-  background: var(--g-tint);
+  color: var(--kept-deep);
+  background: var(--kept-tint);
 }
 
 .chip-orange {
-  color: var(--o-deep);
-  background: var(--o-tint);
+  color: var(--on-ink);
+  background: var(--ink);
   cursor: pointer;
   font-weight: 700;
-  padding: 5px 10px;
+  padding: 6px 12px;
+}
+
+/* 🔴 `.tag-row .chip`(회색)이 특이도로 이겨 동작 칩이 배경에 묻혔다(A2 다크 하네스 실측) — 동작 칩은 잉크 채움. */
+.tag-row .chip.chip-orange {
+  color: var(--on-ink);
+  background: var(--ink);
 }
 
 .chip-outline {
   color: var(--sub);
-  background: var(--sunken);
-  border: 1px dashed var(--faint);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
   font-size: 12px;
   font-weight: 700;
-  padding: 3px 7px;
+  padding: 3px 9px;
 }
 
 /* ── 버튼 ── */
@@ -455,36 +600,49 @@ button {
 .button {
   border: 0;
   border-radius: var(--radius-md);
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 700;
-  padding: 8px 12px;
+  min-height: 42px;
+  padding: 0 16px;
   cursor: pointer;
 }
 
 .button-green {
   margin-top: 8px;
-  background: var(--g);
-  color: #fff;
+  background: var(--ink);
+  color: var(--on-ink);
 }
 
 .button-dashed {
-  border: 1.5px dashed var(--faint);
+  border: 0;
+  box-shadow: inset 0 0 0 1.5px var(--faint);
   background: transparent;
-  color: var(--mut);
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 10px 0;
+  color: var(--sub);
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0;
   width: 100%;
 }
 
 .button-primary {
-  background: var(--o);
-  color: #fff;
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.button-primary:hover:not(:disabled),
+.button-green:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--ink) 86%, var(--surface));
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .button-quiet {
   background: var(--sunken);
-  color: var(--sub);
+  color: var(--ink);
 }
 
 /* ── 용어집 추가/수정 폼 (S12) ── */
@@ -496,30 +654,39 @@ button {
 
 .form-label {
   display: grid;
-  gap: 4px;
-  font-size: 12.5px;
-  font-weight: 700;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--mut);
 }
 
 .form-input {
   /**
-   * 🔴 **`width: 100%`가 없으면 가로 스크롤바가 생긴다** (2026-08-18 실측).
-   *    `<input>`은 CSS로 폭을 안 주면 **브라우저 기본 폭(약 20자)**을 쓰는데, 그 폭은
-   *    «글자 크기에 비례»한다. 글자를 한 단계 키우자 그 기본 폭이 패널보다 넓어졌고,
-   *    세로 스크롤바가 뜨면 폭이 15px 더 줄어 **가로 스크롤바까지** 생겼다.
-   * 🔴 `box-sizing: border-box`가 이미 전역이라 padding·border를 포함해 계산된다.
-   */
+  * 🔴 **`width: 100%`가 없으면 가로 스크롤바가 생긴다** (2026-08-18 실측).
+  *    `<input>`은 CSS로 폭을 안 주면 **브라우저 기본 폭(약 20자)**을 쓰는데, 그 폭은
+  *    «글자 크기에 비례»한다. 글자를 한 단계 키우자 그 기본 폭이 패널보다 넓어졌고,
+  *    세로 스크롤바가 뜨면 폭이 15px 더 줄어 **가로 스크롤바까지** 생겼다.
+  * 🔴 `box-sizing: border-box`가 이미 전역이라 padding·border를 포함해 계산된다.
+  */
   width: 100%;
   min-width: 0;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 400;
   color: var(--ink);
   background: var(--sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 7px 10px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
+  border-radius: 12px;
+  min-height: 42px;
+  padding: 8px 12px;
+  transition: box-shadow var(--dur-quick) var(--ease-out), background-color var(--dur-quick) var(--ease-out);
+}
+
+.form-input:focus {
+  outline: none;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
 }
 
 .form-check {
@@ -530,11 +697,12 @@ button {
   color: var(--sub);
 }
 
-/* 오류는 레드 — 강조(주황)와 색으로 구분한다(content.css `.sai-error` 주석 참조). */
+/* 오류는 Fault — 사이 강조(이음선)와 색으로 구분한다. */
 .form-error {
   margin: 0;
   font-size: 13px;
-  color: var(--r-deep);
+  font-weight: 600;
+  color: var(--fault-deep);
 }
 
 .form-actions {
@@ -545,7 +713,7 @@ button {
 }
 
 .form-actions .button {
-  padding: 7px 14px;
+  padding: 0 16px;
 }
 
 .link-button {
@@ -553,10 +721,18 @@ button {
   background: transparent;
   padding: 0;
   margin-top: 6px;
-  font-size: 12.5px;
-  color: var(--mut);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
   text-decoration: underline;
+  text-decoration-color: var(--faint);
+  text-underline-offset: 3px;
   cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--ink);
+  text-decoration-color: var(--ink);
 }
 
 .link-inline {
@@ -592,8 +768,8 @@ button {
  *    선을 긋는 것보다 조용하고, 좁은 패널에서 선이 늘면 답답해진다.
  */
 .field-label {
-  margin: 18px 0 7px;
-  font-size: 13.5px;
+  margin: 18px 0 8px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   line-height: 1.4;
@@ -614,7 +790,7 @@ button {
 
 .empty {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--sub);
   line-height: 1.6;
   padding: 12px 2px;
@@ -629,22 +805,45 @@ button {
   transform: translateX(-50%);
   z-index: 50;
   background: var(--ink);
-  color: var(--bg);
-  border-radius: 14px;
-  padding: 10px 18px;
-  font-size: 13.5px;
-  font-weight: 600;
-  box-shadow: var(--shadow);
-  animation: sai-toast-up 0.3s ease;
+  color: var(--on-ink);
+  border-radius: 16px;
+  padding: 13px 18px 13px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--e3);
+  overflow: hidden;
+  animation: sai-panel-toast var(--dur-enter) var(--spring) both;
   max-width: calc(100% - 36px);
+}
+
+.toast::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--seam);
+}
+
+/* 🔴 토스트는 `translateX(-50%)`로 가운데 맞춘다 — 등장 keyframes도 그 값을 품어야 위치가 안 튄다. */
+@keyframes sai-panel-toast {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* 예약 기록 한 건 — 카드 안의 작은 블록. */
 .card-inset {
-  margin-top: 8px;
-  padding: 8px 10px;
+  margin-top: 10px;
+  padding: 12px 14px;
   background: var(--sunken);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 /* ── 설정 시트 (2026-08-13) ── */
@@ -655,15 +854,16 @@ button {
   inset: 0;
   z-index: 20;
   overflow-y: auto;
-  padding: 14px 18px 18px;
+  padding: 14px 14px 28px;
   background: var(--bg);
   display: grid;
   gap: 12px;
   align-content: start;
+  animation: sai-slide-in var(--dur-enter) var(--out) both;
 }
 
-/* ── 스위치 — 팝업(`content.css`)과 같은 모양 ──
-   두 화면에서 같은 조작이 달라 보이면 사용자가 다시 배워야 한다.
+/* ── 스위치 (A2 .sw 52×32) — 팝업(`content.css` 40×24)과 같은 모양·비율 ──
+   두 화면에서 같은 조작이 달라 보이면 사용자가 다시 배워야 한다. 켜짐 = 잉크, 노브는 스프링.
    🔴 노브는 `transform`으로만 움직인다(레이아웃 재계산 없이 매끄럽게).
    🔴 꺼짐 트랙을 충분히 진하게 + 노브에 그림자 — 옅은 회색 트랙에 흰 노브면
       켜짐/꺼짐이 구분되지 않는다(2026-08-13 사용자 지적). */
@@ -671,53 +871,55 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  width: 32px;
-  height: 20px;
+  width: 52px;
+  height: 32px;
   border: 0;
-  border-radius: 10px;
-  padding: 2px;
-  background: var(--mut);
+  border-radius: 16px;
+  padding: 3px;
+  background: var(--faint);
   cursor: pointer;
   flex: none;
-  transition: background 160ms ease;
 }
 
 .sai-switch-on {
-  background: var(--o);
+  background: var(--ink);
 }
 
 .sai-switch-knob {
-  width: 16px;
-  height: 16px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   transform: translateX(0);
-  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform var(--dur-enter) var(--spring);
 }
 
 .sai-switch-on .sai-switch-knob {
-  transform: translateX(12px);
+  transform: translateX(20px);
+  background: var(--on-ink);
 }
 
 /* ── 회의 시간 추천 (S23 / Spec 권장 12) ── */
 
 .slot-select {
   width: 100%;
-  margin: 8px 0 6px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  margin: 10px 0 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
+  border-radius: 12px;
   background: var(--sunken);
   color: var(--ink);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 .slot-list {
   display: grid;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 /* 슬롯 하나가 곧 버튼이다 — 누르면 그 시간으로 정해진다. */
@@ -728,45 +930,48 @@ button {
   gap: 10px;
   width: 100%;
   text-align: left;
-  padding: 9px 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--sunken);
   color: var(--ink);
   font-family: inherit;
   cursor: pointer;
 }
 
 .slot:hover {
-  background: var(--sunken);
+  background: var(--dusk-tint);
 }
 
 .slot-times {
   display: grid;
-  gap: 1px;
-  font-size: 13.5px;
+  gap: 2px;
+  font-size: 15px;
+  font-weight: 700;
   min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 상대 시각은 보조 정보 — 내 시각보다 작고 흐리게. */
 .slot-sub {
-  font-size: 12.5px;
-  color: var(--mut);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dusk-deep);
 }
 
 .slot-note {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   white-space: nowrap;
   flex: none;
 }
 
 .slot-note-green {
-  color: var(--g-deep);
+  color: var(--kept-deep);
 }
 
 .slot-note-orange {
-  color: var(--o-deep);
+  color: var(--seam-deep);
 }
 
 .slot-note-mut {
@@ -796,13 +1001,14 @@ button {
 
 .shortcut-key {
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--ink);
   background: var(--sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px 7px;
+  border: 0;
+  box-shadow: inset 0 -1px 0 var(--border-strong);
+  border-radius: 8px;
+  padding: 3px 8px;
   white-space: nowrap;
   flex: none;
 }
@@ -821,11 +1027,11 @@ button {
 /* Device Flow 사용자 코드 — 8자를 옮겨 적어야 하므로 크고 또렷하게, 자간을 벌린다. */
 .github-code {
   margin: 6px 0;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 3px;
-  color: var(--o-deep);
+  color: var(--seam-deep);
 }
 
 .github-suggest {
@@ -878,17 +1084,16 @@ button {
   overflow-wrap: anywhere;
   text-align: left;
   line-height: 1.5;
-  padding: 8px 10px;
+  padding: 10px 12px;
   /**
-   * 🔴 **색을 명시한다** (2026-08-19 사용자 지적 — 다크에서 하얗게 떴다).
-   *    `.chip`은 색을 정하지 않고, 색은 `.tag-row .chip`이 준다. 이 버튼은 `.tag-row` 안에
-   *    있지 않아 **어떤 배경도 못 받고 브라우저 기본값(밝은 회색)으로 그려졌다** — 다크 화면에
-   *    흰 덩어리 셋이 뜬 이유다. 토큰으로 칠하면 두 테마를 함께 따라간다.
-   */
+  * 🔴 **색을 명시한다** (2026-08-19 사용자 지적 — 다크에서 하얗게 떴다).
+  *    `.chip`은 색을 정하지 않고, 색은 `.tag-row .chip`이 준다. 이 버튼은 `.tag-row` 안에
+  *    있지 않아 **어떤 배경도 못 받고 브라우저 기본값(밝은 회색)으로 그려졌다**.
+  */
   background: var(--sunken);
   color: var(--sub);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 0;
+  border-radius: 12px;
 }
 
 /**
@@ -905,9 +1110,10 @@ button {
    *    충분히 밝다").
    * 🔴 그래서 **주황은 「면적이 작은 것」에만 남긴다** — 1px 테두리와 ✓ 표식뿐이다.
    *    글자는 평소 색(`--ink`/`--mut`)을 쓴다. 상태는 여전히 한눈에 보이면서 읽기가 편하다.
+   * 🔴 A2: 사이가 제안한 것을 고른 상태 — 이음선 틴트 + 1.5px 고리(색 면적은 작게).
    */
-  background: var(--o-tint);
-  border-color: var(--o);
+  background: var(--seam-tint);
+  box-shadow: inset 0 0 0 1.5px var(--seam);
   color: var(--ink);
 }
 
@@ -918,7 +1124,7 @@ button {
 
 /* 표식만 주황 — 작아서 밝아도 눈이 편하고, 색맹이어도 ✓ 모양으로 구분된다. */
 .github-suggest-item.chip-on .github-suggest-check {
-  color: var(--o-deep);
+  color: var(--seam-deep);
 }
 
 .github-suggest-item + .github-suggest-item {
@@ -938,9 +1144,9 @@ button {
 /* ── 보관함 접이 섹션 (2026-08-14 탭 5→3 정리) ────────────────────────── */
 
 .fold {
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  margin-bottom: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
   background: var(--surface);
   overflow: hidden;
 }
@@ -951,12 +1157,14 @@ button {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 14px;
+  min-height: 56px;
+  padding: 0 18px;
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   text-align: left;
   cursor: pointer;
 }
@@ -968,17 +1176,18 @@ button {
 .fold-title {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* 접힌 상태에서도 안에 뭐가 있는지 알 수 있게 하는 개수 배지. */
 .fold-count {
-  padding: 1px 7px;
+  padding: 2px 9px;
   border-radius: var(--radius-pill);
   background: var(--sunken);
-  color: var(--mut);
+  color: var(--sub);
   font-size: 12.5px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .fold-caret {
@@ -988,8 +1197,17 @@ button {
 
 /* 🔴 위쪽 테두리로 머리와 몸을 나눈다 — 안에 또 카드가 들어와도 경계가 안 무너진다. */
 .fold-body {
-  padding: 4px 12px 12px;
-  border-top: 1px solid var(--border);
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--line);
+  animation: sai-rise var(--dur-enter) var(--out) both;
+}
+
+/* 접이 섹션 안의 항목 카드 — 흰 면 위 흰 카드는 경계가 사라진다(A2 하네스 비교 2회차). 가라앉은 면으로 묶는다. */
+.fold-body .card {
+  background: var(--sunken);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 8px;
 }
 
 /* ── 내 문체 리포트 (S30 대안) ────────────────────────────────────────── */
@@ -1031,8 +1249,9 @@ button {
 .region-list {
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  border-radius: 12px;
   background: var(--surface);
 }
 
@@ -1042,12 +1261,13 @@ button {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 9px 12px;
+  min-height: 42px;
+  padding: 0 14px;
   border: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
   background: transparent;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 14.5px;
   text-align: left;
   cursor: pointer;
 }
@@ -1058,13 +1278,13 @@ button {
 
 .region-option:hover,
 .region-option:focus-visible {
-  background: var(--o-tint);
-  color: var(--o-deep);
+  background: var(--sunken);
+  color: var(--ink);
 }
 
 .region-option-on {
   font-weight: 700;
-  color: var(--o-deep);
+  color: var(--ink);
 }
 
 .region-empty {
@@ -1079,7 +1299,7 @@ button {
  */
 .region-option-custom {
   border-top: 1px dashed var(--line);
-  background: var(--o-tint);
+  background: var(--sunken);
 }
 
 /**
@@ -1089,9 +1309,9 @@ button {
 .region-manual {
   display: grid;
   gap: 8px;
-  padding: 10px;
+  padding: 12px;
   border-top: 1px solid var(--line);
-  background: var(--o-tint);
+  background: var(--sunken);
 }
 
 /** 수신자 카드의 편집·삭제 — 한 줄에 나란히. 🔴 삭제만 있던 자리라 폭을 다시 잡는다. */
@@ -1131,7 +1351,7 @@ button {
   min-width: 0;
 }
 .service-name {
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 700;
 }
 .service-row .chip {
@@ -1155,7 +1375,7 @@ button {
   min-width: 0;
 }
 .member-name {
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 600;
   /* 🔴 이메일이 길어도 줄을 밀지 않는다 — 좁은 패널에서 권한 버튼이 화면 밖으로 나간다. */
   overflow: hidden;
@@ -1206,12 +1426,12 @@ button {
   gap: 12px;
   margin-top: 4px;
 }
-/* 🔴 되돌릴 수 없는 조작의 확인 상자 — 주황 배경으로 평소 줄과 구분한다. */
+/* 🔴 되돌릴 수 없는 조작의 확인 상자 — 확인(Check) 배경으로 평소 줄과 구분한다. */
 .member-confirm {
-  margin-top: 6px;
-  padding: 8px 10px;
-  background: var(--o-tint);
-  border-radius: var(--radius-sm);
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: var(--check-tint);
+  border-radius: 12px;
 }
 .member-confirm .meta {
   margin: 0 0 6px;
@@ -1220,19 +1440,19 @@ button {
 /* 용어집 다중 선택 (2026-08-16) — 여러 개를 한 번에 옮기기 위한 체크박스와 동작 바. */
 .glossary-check {
   flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  accent-color: var(--o);
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
   cursor: pointer;
 }
 .glossary-bulk {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  background: var(--o-tint);
-  border-radius: var(--radius-sm);
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--sunken);
+  border-radius: 12px;
 }
 .glossary-bulk .meta {
   margin: 0;
@@ -1254,11 +1474,11 @@ button {
 .slot-chosen {
   display: grid;
   gap: 8px;
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--o-tint);
+  margin-top: 12px;
+  padding: 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--dusk-tint);
 }
 
 /**
@@ -1267,12 +1487,12 @@ button {
  */
 .slot-draft {
   margin: 0;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 14.5px;
   line-height: 1.6;
   color: var(--ink);
   white-space: pre-wrap;
@@ -1289,11 +1509,11 @@ button {
  *    사용자가 매번 다시 훑어야 한다.
  */
 .group-title {
-  margin: 20px 0 2px;
+  margin: 20px 4px 2px;
   font-size: 13.5px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--mut);
   text-transform: none;
 }
 
@@ -1325,12 +1545,12 @@ button {
  */
 .profile-block + .profile-block,
 .profile-me > .profile-block:not(:first-child) {
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 .profile-me > .card-label:first-child {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--ink);
 }
 
@@ -1357,10 +1577,11 @@ button {
  *    그래서 채운 알약이 아니라 얇은 테두리 원이다.
  */
 .setting-why {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex: none;
-  border: 1px solid var(--border);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
   border-radius: 50%;
   background: transparent;
   color: var(--mut);
@@ -1373,7 +1594,7 @@ button {
 
 .setting-why:hover {
   color: var(--ink);
-  border-color: var(--mut);
+  box-shadow: inset 0 0 0 1px var(--mut);
 }
 
 .setting-why-open {
@@ -1436,12 +1657,12 @@ button {
  * 🔴 위 숫자 세 개와 **다른 성격**이다(한 것 vs 안 일어나게 한 것) — 초록 배경으로 갈라 놓는다.
  */
 .blocked-line {
-  margin-top: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--g-tint);
-  color: var(--g-deep);
-  font-weight: 600;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--kept-tint);
+  color: var(--kept-deep);
+  font-weight: 700;
 }
 
 /**
@@ -1497,9 +1718,9 @@ button {
 }
 
 .glossary-all input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--o);
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
   cursor: pointer;
 }
 
@@ -1508,13 +1729,13 @@ button {
  *    되돌릴 수 없는 동작을 실수로 누른다. 배경 틴트만 쓰고 테두리 줄무늬는 쓰지 않는다.
  */
 .chip-danger {
-  color: var(--r-deep);
-  background: var(--r-tint);
+  color: var(--fault-deep);
+  background: var(--fault-tint);
   border-color: transparent;
 }
 
 .chip-danger:hover {
-  background: color-mix(in oklab, var(--r) 18%, var(--surface));
+  background: color-mix(in oklab, var(--fault) 18%, var(--surface));
 }
 
 /* ── 수신자 카드 구분 (2026-08-18 사용자 지적 ②) ────────────────── */
@@ -1526,8 +1747,8 @@ button {
  *    좁은 패널에서 굵은 선이 늘면 답답해진다.
  */
 .person-card {
-  border-color: var(--seam, rgba(25, 31, 40, 0.16));
-  box-shadow: 0 1px 3px rgba(25, 31, 40, 0.06);
+  border: 0;
+  box-shadow: var(--e1);
   padding: 0;
   overflow: hidden;
 }
@@ -1539,18 +1760,18 @@ button {
 /* 이름 줄 — 카드의 «머리»임을 배경으로 표시한다. */
 .person-card > .card-head {
   background: var(--sunken);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0;
   margin: 0;
-  padding: 11px 14px;
+  padding: 12px 16px;
 }
 
 .person-card > *:not(.card-head) {
-  padding-left: 14px;
-  padding-right: 14px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .person-card > *:last-child {
-  padding-bottom: 12px;
+  padding-bottom: 14px;
 }
 
 /**
