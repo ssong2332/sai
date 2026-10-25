@@ -12,11 +12,12 @@
 2. `docs/Tasks.md` — 태스크 분해·상태. done은 실행 증거 필수.
 3. `docs/reference/Lessons.md` — 이전 프로젝트 이식 지식. Spec과 충돌하면 무시.
 4. `docs/reference/c*.ts`, `TestCases-legacy.md` — 프롬프트·테스트 시드 자산.
+5. `docs/reference/Spec-hackathon-2026-08.md` — 해커톤 시점 명세 기록본(2026-10-25 보관). 현재 기준 아님 — 옛 결정 근거를 찾을 때만.
 
 ## Project Overview
 - Name: 사이 (Sai) — 글로벌 업무 메시지 AI 교정 크롬 확장
 - 🔴 **상태: 해커톤(2026-08-12 ~ 08-21) 종료 후, 실제 서비스 출시를 목표로 계속 개발 중 (2026-09-30~, 1인 개발).** 결정·우선순위는 `docs/Spec.md` §0, 태스크는 `docs/Tasks.md` 「출시 v1.0」(L01~). 판단 기준은 「시연이 되는가」가 아니라 **「누구나·매일·안전하게 쓸 수 있는가」**.
-- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore·Functions, Node 22) / **Anthropic Claude API** (`claude-haiku-5-5`, 사고 끔 · 단일 통합 호출 `POST /v1/refine`) — 2026-10-23 사용자 결정으로 기본, 폴오버 예비는 Groq(Spec §0). Gemini(2026-09-30~10-22 기본)·OpenAI는 명시 요청으로만 남는다. 아래 명령 절의 옛 provider 기록(2026-08-17 OpenAI, 10-01 Gemini)보다 이 줄이 우선한다
+- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore · Functions는 2026-10-28 중단 예정) / Cloudflare Workers(교정 서버, 전환 중) / **Anthropic Claude API** (`claude-haiku-5-5`, 사고 끔 · 단일 통합 호출 `POST /v1/refine`) — 2026-10-23 사용자 결정으로 기본, 폴오버 예비는 Groq(Spec §0). Gemini(2026-09-30~10-22 기본)·OpenAI는 명시 요청으로만 남는다. 아래 명령 절의 옛 provider 기록(2026-08-17 OpenAI, 10-01 Gemini)보다 이 줄이 우선한다
 - 범위 밖(출시 v1.0): 캘린더 빈 시간(`calendar.readonly`) · 유료화. 팀 기능은 무료 공개
 - 해커톤 기간 기록: 2026-08-12 ~ 08-21 (컷 규칙은 `docs/Tasks.md`의 「컷 규칙 (해커톤)」)
 
