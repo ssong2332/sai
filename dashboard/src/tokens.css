@@ -1,0 +1,132 @@
+/* 사이 팀 대시보드 토큰 — 🔴 site/src/styles/tokens.css 사본(값을 바꿀 때 양쪽을 함께 고친다).
+   사이 웹사이트 토큰 — 시안 A2(docs/design/reference-a2.html) 값. 🔴 색은 「뜻」이다(확장과 같은 규칙).
+   | 토큰 | 뜻 | 쓰는 곳 |
+   |---|---|---|
+   | --bg / --surface / --sunken | 바닥 · 카드 · 눌린 영역 | 배경 |
+   | --ink / --sub / --mut | 본문 · 보조 · 라벨 | 글자 |
+   | --seam | 바뀌지 않는 것(숫자·날짜·이름) · 지우기 · 올라가지 않는 것 | 로고 이음선·사실 표시 |
+   | --kept | 용어집이 지킨 말 · 연결됨 · 계정에 올라가는 것 | 초록 표시 |
+   | --dusk | 받은 글(해석) · 상대 · 포커스 | 파랑 표시 |
+   | --check | 확인이 필요한 것 | 노랑 표시 |
+   | --night | 「보낼 때」 밤 장면 하나뿐 | 배경 |
+   | --act / --on-act | 누르는 것 | 주요 버튼·켜진 스위치 |
+   🔴 이 뜻 밖에서 색을 장식으로 쓰지 않는다. 작은 글자에는 `-ink` 변형을 쓴다(AA 4.5:1).
+   A2와 다른 값: --mut(#6B7684 → #5F6B78, 회색 바닥 위 작은 글자 AA) · `-ink` 네 개(추가). */
+:root {
+  color-scheme: light;
+  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic',
+    system-ui, sans-serif;
+
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --sunken: #f2f4f6;
+  --ink: #191f28;
+  --sub: #4e5968;
+  --mut: #5f6b78;
+  --faint: #d1d6db;
+
+  --seam: #f04419;
+  --seam-ink: #c2360f;
+  --seam-tint: #ffeee8;
+  --kept: #0e9f6e;
+  --kept-ink: #067a54;
+  --kept-tint: #e6f7f0;
+  --dusk: #3d5afe;
+  --dusk-ink: #2e47e0;
+  --dusk-tint: #eceffe;
+  --check: #e59500;
+  --check-ink: #8f5c00;
+  --check-tint: #fff6e0;
+  --night: #0b1026;
+  /* 로고 전용 — 확장 SaiMark와 같은 색(바 그라파이트/크림 · 액센트 레드 두 테마 고정) */
+  --bar: #201e1d;
+  --fact: #ec3013;
+
+  --act: #191f28;
+  --on-act: #ffffff;
+  --line: rgba(25, 31, 40, 0.08);
+  --line-strong: rgba(25, 31, 40, 0.16);
+  --e1: 0 1px 3px rgba(25, 31, 40, 0.06);
+  --e3: 0 2px 6px rgba(25, 31, 40, 0.04), 0 24px 48px -16px rgba(25, 31, 40, 0.22);
+  --knob-shadow: 0 2px 6px rgba(25, 31, 40, 0.12);
+
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --out: cubic-bezier(0.16, 1, 0.3, 1);
+  --r-lg: 28px;
+  --r: 20px;
+  --r-sm: 14px;
+
+  --wrap: 1180px;
+  --gutter: 24px;
+  --nav-h: 64px;
+}
+
+@media (max-width: 480px) {
+  :root {
+    --gutter: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #101318;
+    --surface: #1b1f27;
+    --sunken: #242a33;
+    --ink: #f2f4f6;
+    --sub: #b0b8c1;
+    --mut: #8b95a1;
+    --faint: #3a434f;
+    --seam: #ff6a45;
+    --seam-ink: #ff7c5c;
+    --seam-tint: #3a211b;
+    --kept: #33c38e;
+    --kept-ink: #3fd09a;
+    --kept-tint: #15302a;
+    --dusk: #8c9eff;
+    --dusk-ink: #9dadff;
+    --dusk-tint: #1e2440;
+    --check: #ffb938;
+    --check-ink: #ffc35a;
+    --check-tint: #3a2e14;
+    --bar: #f8f4f4;
+    --act: #f2f4f6;
+    --on-act: #101318;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.18);
+    --e1: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --e3: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+    --knob-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #101318;
+  --surface: #1b1f27;
+  --sunken: #242a33;
+  --ink: #f2f4f6;
+  --sub: #b0b8c1;
+  --mut: #8b95a1;
+  --faint: #3a434f;
+  --seam: #ff6a45;
+  --seam-ink: #ff7c5c;
+  --seam-tint: #3a211b;
+  --kept: #33c38e;
+  --kept-ink: #3fd09a;
+  --kept-tint: #15302a;
+  --dusk: #8c9eff;
+  --dusk-ink: #9dadff;
+  --dusk-tint: #1e2440;
+  --check: #ffb938;
+  --check-ink: #ffc35a;
+  --check-tint: #3a2e14;
+  --bar: #f8f4f4;
+  --act: #f2f4f6;
+  --on-act: #101318;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --e1: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --e3: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+  --knob-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}

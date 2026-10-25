@@ -3,13 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>사이 Team Health — 협업 건강도 대시보드 (데모)</title>
+    <title>사이 Team Health — 협업 건강도</title>
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" />
     <!-- 🔴 확장(MV3)에서는 CSP 때문에 CDN 폰트를 피했지만(Tasks.md S04), 이 대시보드는
-         별도 웹페이지라 그 제약이 적용되지 않는다 — 클로드 디자인 시안 원본과 동일하게 로드. -->
+         별도 웹페이지라 그 제약이 적용되지 않는다 — 소개 사이트(site/index.html)와 같은 CSS를 쓴다. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
+    <script>
+      // 첫 페인트 전에 테마를 정한다 — 깜빡임 방지. 저장값이 없거나 저장소가 막혀 있으면 시스템 설정을 따른다.
+      try {
+        var t = localStorage.getItem('sai-dashboard-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,706 +1,885 @@
 /**
- * S18 — B2B 웹 대시보드 스타일.
- * 🔴 2026-08-13 — 클로드 디자인 시안(`Sai Dashboard.dc.html`)의 토큰·수치를 그대로 옮겼다.
- *    메인 확장의 `tokens.css`와 값이 미묘하게 다르다(예: `--o-deep`) — 이 대시보드는 별도로
- *    커미션된 시안이 원본이라 그 값을 그대로 따른다(주황/초록 브랜드 색상 자체는 동일).
- *    다크 모드는 프로젝트의 나머지 부분과 같은 `data-theme` 속성 방식을 쓴다(시안 원본은
- *    `body.dark` 클래스를 썼지만, 이 프로젝트 전체 관례(사이드패널·팝업)와 맞춰 속성 방식으로
- *    이식했다 — 시각 결과는 동일하다).
+ * 팀 대시보드 — 디자인 A2 (2026-10-25). 토큰은 `tokens.css`(소개 사이트 사본), 부품 모양은
+ * `site/src/styles/base.css`(내비·세그먼트·버튼)와 같다.
+ * 🔴 색 = 뜻: 긍정 신호 `--kept` · 마찰 신호 `--check` · 이음선 `--seam`(로고와 가운데 선에만).
+ *    작은 글자에는 `-ink` 변형(AA 4.5:1). 장식 색을 쓰지 않는다.
+ * 🔴 움직임은 transform·opacity만, 한 번만. `prefers-reduced-motion`이면 끝 상태로 바로 간다(맨 아래).
  */
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-:root {
-  /* 🔴 확장의 `src/styles/tokens.css`와 **같은 팔레트**를 쓴다 (2026-08-14 사용자 지정).
-     둘이 갈리면 같은 브랜드가 두 색으로 보인다 — 값을 바꿀 때는 반드시 양쪽을 함께 고친다. */
-  --o: #ff6100;
-  --g: #009b64;
-  --r: #ee0031;
-
-  --bg: #eef0f3;
-  --surface: #ffffff;
-  --sunken: #f2f4f6;
-  --border: rgba(25, 31, 40, 0.09);
-  --ink: #191f28;
-  --sub: #4e5968;
-  --mut: #8b95a1;
-  --faint: #cdcdcd;
-
-  /* 글자용 — 흰 배경·tint 배경 둘 다에서 4.5:1을 넘도록 계산한 값이다. */
-  --o-deep: #bf4900;
-  --g-deep: #007c50;
-  --r-deep: #d6002c;
-  --o-tint: color-mix(in oklab, var(--o) 10%, var(--surface));
-  --g-tint: color-mix(in oklab, var(--g) 11%, var(--surface));
-  --r-tint: color-mix(in oklab, var(--r) 9%, var(--surface));
-  --o-bar: color-mix(in oklab, var(--o) 88%, black 2%);
-  --g-bar: color-mix(in oklab, var(--g) 82%, black 4%);
-
-  /* ── 로고 마크 전용 색 (`SaiMark.jsx`, `src/styles/tokens.css`와 값을 맞춘다) ──
-     🔴 브랜드 accent 토큰(--o/--g)과 별개다 — 로고는 어디서나 원본 색 그대로 쓴다. */
-  --sai-logo-bar: #201e1d;
-  --sai-logo-accent: #ec3013;
-}
-
-:root[data-theme='dark'] {
-  --bg: #0e1116;
-  --surface: #1a1f27;
-  --sunken: #242b35;
-  --border: rgba(255, 255, 255, 0.09);
-  --ink: #f2f4f6;
-  --sub: #c4cad3;
-  --mut: #9aa3ad;
-  --faint: #525a66;
-
-  /* 다크 — sunken(#242b35)까지 포함해 4.5:1을 넘는 값(확장 tokens.css와 동일). */
-  --o-deep: #ff6100;
-  --g-deep: #1aa574;
-  --r-deep: #f45c7b;
-  --o-bar: color-mix(in oklab, var(--o) 80%, white 6%);
-  --g-bar: color-mix(in oklab, var(--g) 75%, white 6%);
-
-  /* 🔴 로고 액센트(빨강)는 라이트/다크 두 락업 모두 고정 — 다크 블록에서 재정의하지 않는다
-     (`SaiMark.jsx` 헤더 주석과 동일한 규칙). 바 색만 크림으로 바뀐다. */
-  --sai-logo-bar: #f8f4f4;
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
-  margin: 0;
-  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-family: var(--font);
   background: var(--bg);
   color: var(--ink);
-  transition: background 0.25s;
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
 }
 
-a {
-  color: var(--o-deep);
-}
-a:hover {
-  color: var(--o);
+button,
+select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
 }
 button {
-  font-family: inherit;
+  cursor: pointer;
+  border: 0;
+  background: none;
+}
+svg {
+  display: block;
 }
 table {
   border-collapse: collapse;
   width: 100%;
 }
 
-.dash-shell {
+:focus-visible {
+  outline: 3px solid var(--dusk);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: 12px;
+  transform: translateY(-200%);
+  z-index: 100;
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--e3);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.3s var(--out);
+}
+.skip-link:not(:focus) {
+  box-shadow: none;
+}
+.skip-link:focus {
+  transform: none;
+}
+
+.shell {
   min-height: 100vh;
-  background: var(--bg);
   display: flex;
   flex-direction: column;
 }
 
-/* ── 헤더 ── */
-.dash-header {
+.wrap {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.press {
+  transition:
+    transform 0.25s var(--spring),
+    background-color 0.2s,
+    box-shadow 0.2s,
+    color 0.2s;
+}
+.press:active {
+  transform: scale(0.96);
+}
+
+/* ── 내비 (소개 사이트 `.nav.solid`와 같다) ── */
+.nav {
   position: sticky;
   top: 0;
-  z-index: 10;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  z-index: 50;
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: saturate(1.6) blur(18px);
+  backdrop-filter: saturate(1.6) blur(18px);
+  box-shadow: 0 1px 0 var(--line);
+}
+.nav-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 32px;
+  height: var(--nav-h);
 }
-
-/* 🔴 예전엔 텍스트 배지("사")였다 — 이제 실제 로고 마크(SaiMark)를 쓴다. 여백만 맞춘다. */
-.dash-brand-mark {
-  flex: none;
-  display: block;
-}
-
-.dash-brand-name {
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.dash-brand-team {
-  font-size: 12px;
-  color: var(--mut);
-  border-left: 1px solid var(--border);
-  padding-left: 12px;
-}
-
-.dash-spacer {
-  flex: 1;
-}
-
-.dash-theme-toggle {
-  border: 0;
-  cursor: pointer;
+.brand {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  background: var(--sunken);
-  border-radius: 10px;
-  padding: 7px 13px;
-  font-size: 12.5px;
-  font-weight: 600;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.brand-sub {
   color: var(--sub);
+  font-weight: 700;
 }
-
-/* ── 목업 배너 ── */
-.dash-mock-banner {
-  background: var(--o-tint);
-  border-bottom: 1px solid var(--border);
-  padding: 10px 32px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
+.sp {
+  flex: 1;
 }
-
-.dash-mock-banner-icon {
+.team-select {
+  min-width: 0;
+  max-width: 220px;
+  height: 40px;
+  padding: 0 36px 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background-color: color-mix(in oklab, var(--sunken) 70%, transparent);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--sub) 50%),
+    linear-gradient(135deg, var(--sub) 50%, transparent 50%);
+  background-position:
+    right 18px center,
+    right 13px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  appearance: none;
   font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.team-select:hover {
+  box-shadow: inset 0 0 0 1.5px var(--faint);
+}
+.team-select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+.theme-t {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--sunken) 70%, transparent);
+  color: var(--ink);
+  flex: none;
+}
+.theme-t svg {
+  transition: transform 0.6s var(--spring);
+}
+.theme-t:hover svg {
+  transform: rotate(-24deg);
 }
 
-.dash-mock-banner-strong {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--o-deep);
-}
-
-.dash-mock-banner-note {
-  font-size: 12.5px;
-  color: var(--sub);
+@media (max-width: 420px) {
+  .brand-sub {
+    display: none;
+  }
+  .team-select {
+    max-width: 170px;
+  }
 }
 
 /* ── 본문 ── */
-.dash-main {
+.main {
   flex: 1;
-  max-width: 1120px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 32px 32px 40px;
   display: grid;
   gap: 20px;
+  padding-top: 24px;
+  padding-bottom: 48px;
 }
 
-.dash-title-row {
+/* ── 상태 띠 (소개 사이트 /settings `.strip`과 같다) ── */
+.strip {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  align-items: baseline;
   gap: 12px;
-}
-
-.dash-title {
-  font-size: 20px;
-  font-weight: 800;
-}
-
-/* 세그먼트 토글(기간 선택 · 차트/표) 공통. */
-.dash-segment {
-  display: inline-flex;
-  background: var(--sunken);
-  border-radius: 11px;
-  padding: 3px;
-  gap: 2px;
-}
-
-.dash-segment-btn {
-  border: 0;
-  cursor: pointer;
-  font-size: 12.5px;
-  font-weight: 700;
-  padding: 7px 14px;
-  border-radius: 9px;
-  color: var(--mut);
-  background: transparent;
-}
-
-.dash-segment-btn-sm {
-  font-size: 12px;
-  padding: 6px 12px;
-  border-radius: 8px;
-}
-
-.dash-segment-btn-active {
+  padding: 14px 18px;
+  border-radius: var(--r);
   background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--e1);
+  font-size: 14.5px;
+}
+.strip > span:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  min-width: 0;
+}
+.strip b {
+  font-weight: 700;
+}
+.strip-meta {
+  color: var(--sub);
+}
+.strip-dot {
+  flex: none;
+  align-self: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--mut);
+}
+.strip-dot-live {
+  background: var(--kept);
+  box-shadow: 0 0 0 4px var(--kept-tint);
+}
+/* 데모·빈 팀 = 「확인이 필요한 것」 */
+.strip-demo {
+  background: var(--check-tint);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--check) 55%, transparent);
+}
+.strip-demo b {
+  color: var(--check-ink);
+}
+.strip-demo .strip-dot {
+  background: var(--check);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--check) 25%, transparent);
 }
 
+/* ── 제목 줄 ── */
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+  margin-top: 12px;
+}
+.eyebrow {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mut);
+}
+.title {
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+/* ── 세그먼트 — 미끄러지는 손잡이 (소개 사이트 `.seg`와 같다) ── */
+.seg {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  background: var(--sunken);
+  border-radius: 13px;
+  padding: 4px;
+}
+.card .seg {
+  background: var(--sunken);
+}
+.seg button {
+  position: relative;
+  z-index: 1;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--mut);
+  white-space: nowrap;
+  transition:
+    color 0.25s,
+    transform 0.25s var(--spring);
+}
+.seg button:hover {
+  color: var(--sub);
+}
+.seg button[aria-checked='true'] {
+  color: var(--ink);
+}
+.seg button:active {
+  transform: scale(0.94);
+}
+.seg .knob {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--knob-shadow);
+  transition:
+    transform 0.45s var(--spring),
+    width 0.45s var(--spring),
+    height 0.45s var(--spring);
+  pointer-events: none;
+}
+/* 바닥(--bg) 위 세그먼트 — 트랙이 바닥과 같은 색이면 안 보인다 */
+.title-row .seg {
+  background: color-mix(in oklab, var(--sunken) 55%, var(--faint));
+}
+.seg .knob[data-ready='false'] {
+  opacity: 0;
+  transition: none;
+}
+.seg:not(.has-knob) button[aria-checked='true'] {
+  background: var(--surface);
+}
+
+/* ── 카드 ── */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 28px 32px;
-}
-
-/* ── 히어로 게이지 ── */
-.dash-hero {
-  display: flex;
-  align-items: center;
-  gap: 36px;
-  flex-wrap: wrap;
-}
-
-.dash-gauge {
-  position: relative;
-  width: 168px;
-  height: 168px;
-  flex: none;
-  border-radius: 84px;
-}
-
-.dash-gauge-inner {
-  position: absolute;
-  inset: 13px;
-  border-radius: 71px;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.dash-gauge-value {
-  font-size: 44px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.dash-gauge-label {
-  font-size: 11px;
-  color: var(--mut);
-  font-weight: 600;
-  margin-top: 2px;
-}
-
-.dash-hero-side {
-  display: grid;
-  gap: 10px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--e1);
+  padding: clamp(22px, 4vw, 40px);
   min-width: 0;
 }
 
-.dash-hero-formula {
-  font-size: 13px;
-  color: var(--sub);
-  line-height: 1.6;
-}
-
-.dash-stat-row {
-  display: flex;
-  gap: 22px;
-  flex-wrap: wrap;
-}
-
-.dash-stat-label {
-  font-size: 11px;
-  color: var(--mut);
-  font-weight: 600;
-}
-
-.dash-stat-value {
-  font-size: 19px;
-  font-weight: 800;
-}
-
-.dash-stat-value-o {
-  color: var(--o-deep);
-}
-
-.dash-stat-value-g {
-  color: var(--g-deep);
-}
-
-.dash-hero-note {
-  font-size: 11.5px;
-  color: var(--mut);
-  line-height: 1.55;
-  max-width: 420px;
-}
-
-/* ── 차트 섹션 ── */
-.dash-chart-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.dash-chart-title {
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.dash-chart-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.dash-legend {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.dash-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--sub);
-}
-
-.dash-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  display: inline-block;
-}
-
-.dash-swatch-positive {
-  background: var(--g-bar);
-}
-
-.dash-swatch-friction {
-  background: var(--o-bar);
-}
-
-/* ── 나비형(mirror) 막대 — 라벨이 바깥쪽, 막대가 중앙선을 향해 자란다. ── */
-.dv-wrap {
-  position: relative;
-  margin-top: 18px;
-}
-
-.dv-centerline {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1.5px;
-  background: var(--border);
-  transform: translateX(-0.75px);
-}
-
-.dv-group {
+/* ── 히어로: 「사이」 구도 — 두 쪽 이름을 이음선 하나가 잇고, 그 위에 Health Index ── */
+.between {
   display: grid;
-  gap: 4px 0;
-}
-
-.dv-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 8px 0;
-}
-
-.dv-row {
-  display: grid;
-  grid-template-columns: 1fr 1.5px 1fr;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+  grid-template-areas:
+    'a seam b'
+    '. label .';
   align-items: center;
-  min-height: 52px;
+  gap: 10px 20px;
 }
-
-.dv-row-positive .dv-label-col {
-  text-align: right;
-  padding-right: 16px;
-}
-
-.dv-row-positive .dv-bar-col {
+.side {
+  grid-area: a;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 2px;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 13em;
 }
-
-.dv-row-friction .dv-bar-col {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-right: 2px;
-}
-
-.dv-row-friction .dv-label-col {
-  text-align: left;
-  padding-left: 16px;
-}
-
-.dv-item-label {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.dv-item-desc {
-  font-size: 11.5px;
-  color: var(--mut);
-  line-height: 1.4;
-}
-
-.dv-bar {
-  height: 22px;
-  min-width: 3px;
-  transition: width 0.4s ease;
-}
-
-.dv-bar-positive {
-  border-radius: 0 6px 6px 0;
-  background: var(--g-bar);
-}
-
-.dv-bar-friction {
-  border-radius: 6px 0 0 6px;
-  background: var(--o-bar);
-}
-
-.dv-value {
-  font-size: 12.5px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.dv-value-positive {
-  color: var(--g-deep);
-}
-
-.dv-value-friction {
-  color: var(--o-deep);
-}
-
-/* ── 표 보기 ── */
-.dv-table {
-  margin-top: 16px;
-}
-
-.dv-table th {
-  text-align: left;
-  font-size: 11.5px;
-  color: var(--mut);
-  font-weight: 700;
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.dv-table th:last-child {
+.side-b {
+  grid-area: b;
+  align-items: flex-end;
   text-align: right;
 }
-
-.dv-table td {
-  padding: 11px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.dv-table-badge {
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 7px;
-}
-
-.dv-table-badge-positive {
-  background: var(--g-tint);
-  color: var(--g-deep);
-}
-
-.dv-table-badge-friction {
-  background: var(--o-tint);
-  color: var(--o-deep);
-}
-
-.dv-table-label {
+.side-k {
   font-size: 13px;
   font-weight: 700;
-}
-
-.dv-table-desc {
-  font-size: 12.5px;
-  color: var(--sub);
-}
-
-.dv-table-count {
-  font-size: 13.5px;
-  font-weight: 800;
-  text-align: right;
-}
-
-/* ── 푸터 ── */
-.dash-footer {
-  text-align: center;
-  padding: 8px 0 4px;
-  display: grid;
-  gap: 6px;
-}
-
-.dash-footer-zero {
-  font-size: 12px;
   color: var(--mut);
 }
-
-.dash-footer-copy {
-  font-size: 11px;
-  color: var(--faint);
+.side-name {
+  font-size: clamp(18px, 2.2vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
 }
-
-/* ── 로고 마크 "SHIFT" 모션 (`SaiMark.jsx`) — `src/styles/tokens.css`와 동일한 규칙을 그대로
-   옮겼다. 확장 쪽과 같은 로고가 같은 방식으로 움직여야 "다른 앱"처럼 보이지 않는다. */
-@keyframes sai-logo-shift-a {
-  0%,
-  12% {
-    transform: translateX(-26px);
-  }
-  46%,
-  100% {
-    transform: translateX(0);
-  }
+.seam {
+  grid-area: seam;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 24px);
+  min-width: 0;
 }
-@keyframes sai-logo-shift-b {
-  0%,
-  12% {
-    transform: translateX(26px);
-  }
-  46%,
-  100% {
-    transform: translateX(0);
-  }
+.seam-line {
+  flex: 1 1 0;
+  min-width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--seam);
+  animation: seam-in 0.6s var(--out) both;
 }
-@keyframes sai-logo-shift-c {
-  0%,
-  40% {
+/* 양쪽 이름에서 가운데로 그어진다 — 「잇는다」 */
+.seam-line-a {
+  transform-origin: left center;
+}
+.seam-line-b {
+  transform-origin: right center;
+}
+@keyframes seam-in {
+  from {
     transform: scaleX(0);
   }
-  76%,
-  100% {
-    transform: scaleX(1);
-  }
 }
-.sai-logo-mark-animated .sai-logo-bar-a {
-  animation: sai-logo-shift-a 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+.index {
+  animation: rise 0.45s var(--out) 0.12s both;
 }
-.sai-logo-mark-animated .sai-logo-bar-b {
-  animation: sai-logo-shift-b 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+.index-num {
+  display: block;
+  flex: none;
+  font-size: clamp(64px, 10vw, 128px);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.05em;
 }
-.sai-logo-mark-animated .sai-logo-bar-c {
-  animation: sai-logo-shift-c 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-  transform-origin: 14px 76px;
+.index-num.is-empty {
+  color: var(--faint);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .sai-logo-mark-animated .sai-logo-bar-a,
-  .sai-logo-mark-animated .sai-logo-bar-b,
-  .sai-logo-mark-animated .sai-logo-bar-c {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-}
-
-/* 실데이터일 때 기간 선택 대신 쓰는 라벨 (2026-08-15). 세그먼트와 같은 자리·같은 높이. */
-.dash-range-note {
+.index-label {
+  grid-area: label;
+  justify-self: center;
+  text-align: center;
   font-size: 13px;
-  color: var(--sub);
-  padding: 6px 10px;
-}
-
-/* 팀 전환 드롭다운 (2026-08-16) — 헤더의 팀 이름 자리를 그대로 쓴다. */
-.dash-team-select {
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--sub);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 4px 8px;
-  max-width: 320px;
-}
-
-/* 신호 필터 (2026-08-16) — 끈 신호는 지수 계산에서도 빠진다. */
-.dash-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-.dash-filter-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--sub);
-  margin-right: 4px;
-}
-.dash-filter-chip {
-  font-family: inherit;
-  font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: transparent;
+  color: var(--mut);
+  line-height: 1.45;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.read {
+  margin-top: 28px;
+  text-align: center;
+  font-size: clamp(16px, 1.6vw, 18px);
   color: var(--sub);
-  cursor: pointer;
 }
-/**
- * 🔴 **꺼진 것이 꺼져 보여야 한다** (2026-08-16 사용자 지적: "선택 여부가 똑같아서 가독성이
- *    떨어져"). 테두리 굵기 1px 차이는 화면에서 사실상 구분되지 않았다. 세 가지를 함께 바꾼다:
- *    배경(채움 vs 빈칸) · 글자색 · 앞의 표시(● / ○). 색만으로 갈리지 않아 색각 이상에서도 읽힌다.
- */
-.dash-filter-chip::before {
-  content: '○ ';
-  font-size: 11px;
-}
-.dash-filter-chip {
-  opacity: 0.6;
-  text-decoration: line-through;
-}
-.dash-filter-chip-on::before {
-  content: '● ';
-}
-.dash-filter-chip-on {
-  opacity: 1;
-  text-decoration: none;
-  border-width: 2px;
-  border-color: var(--g-bar);
-  background: var(--g-tint);
+.read b {
   color: var(--ink);
   font-weight: 700;
 }
+.delta {
+  font-weight: 700;
+  color: var(--ink);
+}
+.delta-up {
+  color: var(--check-ink);
+}
+.delta-down {
+  color: var(--kept-ink);
+}
 
-/**
- * 신호 필터를 **긍정/마찰 두 줄로** 나눈다 (2026-08-16 사용자 요청 ⑥).
- * 🔴 켜진 칩의 색이 **그 줄의 극성 색**이다 — 위 차트의 초록/주황과 같은 색이라 필터와 차트가
- *    같은 언어를 쓴다. 예전에는 마찰 신호를 켜도 초록으로 칠해져 짝이 어긋났다.
- * 🔴 색은 **보조**다 — 줄 라벨(「긍정 신호」/「마찰 신호」)과 ●/○ 표시가 색 없이도 구분을 만든다.
- */
-.dash-filter-block {
-  margin-bottom: 4px;
+/* 조용한 줄 — 공식 · 수치 4개 · 집계 단위 */
+.quiet {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
 }
-.dash-filter-row:last-of-type {
-  margin-bottom: 8px;
+.formula {
+  font-size: 13px;
+  color: var(--mut);
 }
-.dash-filter-label {
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+}
+.stats dt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mut);
+}
+.stats dd {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+.note {
+  font-size: 13px;
+  color: var(--mut);
+}
+.tone-kept {
+  color: var(--kept-ink);
+}
+.tone-check {
+  color: var(--check-ink);
+}
+
+@media (max-width: 640px) {
+  /* 좁으면 이름 둘이 위 양끝, 이음선이 아래 전체 폭 */
+  .between {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'a b'
+      'seam seam'
+      'label label';
+    gap: 16px 12px;
+  }
+  .side {
+    max-width: none;
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .read {
+    text-align: left;
+  }
+}
+
+/* ── 신호 카드 ── */
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.h2 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+.chart-sub {
+  margin-top: 4px;
+  font-size: 14.5px;
+  color: var(--sub);
+}
+/* 색만으로 구분하지 않는다 — 늘 글자와 함께 쓰는 색 견본 */
+.key {
+  white-space: nowrap;
+}
+.key::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: 0;
+}
+.key-positive::before {
+  background: var(--kept);
+}
+.key-friction::before {
+  background: var(--check);
+}
+
+/* 신호 필터(실데이터) — 켜짐 = 잉크 채움, 꺼짐 = 빈 칩 */
+.filters {
+  margin-top: 22px;
+  padding: 16px;
+  border-radius: var(--r);
+  background: var(--sunken);
+  display: grid;
+  gap: 10px;
+}
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.filter-label {
+  min-width: 5.5em;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sub);
+}
+.chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-width: 66px;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mut);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--faint);
 }
-.dash-filter-chip-friction.dash-filter-chip-on {
-  border-color: var(--o-bar);
-  background: var(--o-tint);
-}
-.dash-filter-note {
-  font-size: 12px;
+.chip:hover {
   color: var(--sub);
-  margin: 0 0 14px;
+}
+.chip[aria-pressed='true'] {
+  background: var(--act);
+  color: var(--on-act);
+  box-shadow: none;
+}
+.chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.chip-positive[aria-pressed='true'] .chip-dot {
+  background: var(--kept);
+  box-shadow: none;
+}
+.chip-friction[aria-pressed='true'] .chip-dot {
+  background: var(--check);
+  box-shadow: none;
+}
+.chip[aria-pressed='false'] {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+@media (max-width: 640px) {
+  .filter-label {
+    flex-basis: 100%;
+  }
+}
+.filter-note {
+  font-size: 13px;
+  color: var(--sub);
 }
 
-/**
- * 추이 막대 툴팁 (2026-08-16 ③) — 어느 신호가 몇 건인지.
- * 🔴 JS 없이 hover/focus로만 연다 — 상태를 만들면 30개 칸마다 리렌더가 돈다.
- * 🔴 `pointer-events: none`이라 툴팁 자체가 마우스를 가로채 깜빡이지 않는다.
- */
+/* ── 거울 막대 — 가운데 세로선 = 히어로와 같은 이음선 ── */
+.dv-wrap {
+  position: relative;
+  margin-top: 26px;
+}
+.dv-centerline {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  bottom: -6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--seam);
+  transform: translateX(-1.5px);
+  z-index: 1;
+}
+.dv-group {
+  display: grid;
+  gap: 6px;
+}
+.dv-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 14px 0;
+}
+.dv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  min-height: 58px;
+}
+.dv-row-positive .dv-label-col {
+  text-align: right;
+  padding-right: 22px;
+}
+.dv-row-friction .dv-label-col {
+  padding-left: 22px;
+}
+.dv-bar-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.dv-row-positive .dv-bar-col {
+  padding-left: 1.5px;
+}
+.dv-row-friction .dv-bar-col {
+  justify-content: flex-end;
+  padding-right: 1.5px;
+}
+.dv-item-label {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.dv-item-desc {
+  font-size: 12.5px;
+  color: var(--mut);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.dv-bar {
+  flex: 0 1 auto;
+  height: 22px;
+  min-width: 4px;
+  animation: grow 0.6s var(--out) both;
+}
+/* 이음선에 붙은 쪽은 평평하게, 바깥 끝만 둥글게 */
+.dv-bar-positive {
+  background: var(--kept);
+  border-radius: 0 7px 7px 0;
+  transform-origin: left center;
+}
+.dv-bar-friction {
+  background: var(--check);
+  border-radius: 7px 0 0 7px;
+  transform-origin: right center;
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.dv-value {
+  flex: none;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  /* 좁으면 라벨이 자기 막대 위로 — 여전히 가운데 선을 기준으로 마찰 왼쪽, 긍정 오른쪽 */
+  .dv-row {
+    grid-template-rows: auto auto;
+    row-gap: 6px;
+    min-height: 0;
+    padding: 4px 0;
+  }
+  .dv-row-positive .dv-label-col {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: left;
+    padding: 0 0 0 12px;
+  }
+  .dv-row-positive .dv-bar-col {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .dv-row-friction .dv-label-col {
+    grid-column: 1;
+    grid-row: 1;
+    text-align: right;
+    padding: 0 12px 0 0;
+  }
+  .dv-row-friction .dv-bar-col {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .dv-item-label {
+    font-size: 13.5px;
+  }
+  .dv-item-desc {
+    font-size: 12px;
+  }
+  .dv-bar {
+    height: 18px;
+  }
+}
+
+/* ── 표 ── */
+.dv-table-wrap {
+  margin-top: 22px;
+  overflow-x: auto;
+}
+.dv-table th {
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mut);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.dv-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14.5px;
+  vertical-align: middle;
+}
+.dv-table-label {
+  font-weight: 700;
+}
+.dv-table td.dv-table-desc {
+  color: var(--sub);
+  font-size: 13.5px;
+}
+.dv-table-count {
+  text-align: right;
+  white-space: nowrap;
+}
+.dv-table td.dv-table-count {
+  font-weight: 800;
+}
+.dv-table th.dv-table-count {
+  text-align: right;
+}
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-positive {
+  background: var(--kept-tint);
+  color: var(--kept-ink);
+}
+.badge-friction {
+  background: var(--check-tint);
+  color: var(--check-ink);
+}
+@media (max-width: 640px) {
+  .dv-table .dv-table-desc {
+    display: none;
+  }
+  .dv-table th,
+  .dv-table td {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+/* ── 날짜별 추이(실데이터) — 라이브러리 없이 CSS 막대 ── */
+.dash-swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.dash-swatch-positive {
+  background: var(--kept);
+}
+.dash-swatch-friction {
+  background: var(--check);
+}
+.dash-trend {
+  margin-top: 26px;
+}
+.dash-trend-plot {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 200px;
+  padding-bottom: 4px;
+}
 .dash-trend-col {
   position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  border-radius: 6px;
+}
+.dash-trend-col:hover,
+.dash-trend-col:focus-visible {
+  background: var(--sunken);
+}
+.dash-trend-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  width: 100%;
+  justify-content: center;
+}
+/* 🔴 0건도 얇게 그린다 — 아무것도 없으면 "그날이 없는지 0인지" 구분되지 않는다. */
+.dash-trend-bar {
+  width: 42%;
+  max-width: 14px;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+}
+.dash-trend-bar-positive {
+  background: var(--kept);
+}
+.dash-trend-bar-friction {
+  background: var(--check);
+}
+.dash-trend-label {
+  font-size: 11.5px;
+  color: var(--mut);
+  white-space: nowrap;
+  margin-top: 6px;
+  height: 14px;
 }
 .dash-trend-tip {
   display: none;
@@ -710,17 +889,14 @@ table {
   transform: translateX(-50%);
   z-index: 5;
   min-width: 190px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
   background: var(--surface);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 14%);
-  font-size: 12px;
-  line-height: 1.5;
+  box-shadow:
+    var(--e3),
+    0 0 0 1px var(--line);
+  font-size: 13px;
   color: var(--ink);
-  text-align: left;
-  white-space: nowrap;
-  pointer-events: none;
 }
 .dash-trend-col:hover .dash-trend-tip,
 .dash-trend-col:focus-visible .dash-trend-tip {
@@ -740,55 +916,56 @@ table {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 3px;
+  margin-top: 4px;
 }
 .dash-trend-tip-none {
   color: var(--sub);
-  margin-top: 3px;
-}
-
-/* 날짜별 추이 (2026-08-16). 🔴 라이브러리 없이 CSS 막대로 그린다. */
-.dash-trend { margin-top: 8px; }
-.dash-trend-plot {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 180px;
-  padding-bottom: 4px;
-}
-.dash-trend-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-}
-.dash-trend-bars {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 1px;
-  width: 100%;
-  justify-content: center;
-}
-/* 🔴 0건도 얇게 그린다 — 아무것도 없으면 "그날이 없는지 0인지" 구분되지 않는다. */
-.dash-trend-bar {
-  width: 45%;
-  min-height: 2px;
-  border-radius: 2px 2px 0 0;
-}
-.dash-trend-bar-positive { background: var(--g-bar); }
-.dash-trend-bar-friction { background: var(--o); }
-.dash-trend-label {
-  font-size: 10px;
-  color: var(--sub);
-  white-space: nowrap;
   margin-top: 4px;
-  height: 12px;
 }
 .dash-trend-note {
-  margin: 6px 0 0;
-  font-size: 12px;
+  margin-top: 10px;
+  font-size: 13px;
   color: var(--sub);
+}
+
+/* ── 푸터 ── */
+.foot {
+  border-top: 1px solid var(--line);
+  padding: 28px 0 40px;
+  color: var(--mut);
+  font-size: 13.5px;
+}
+.foot-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+.foot-zero {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--sub);
+}
+.foot-dot {
+  flex: none;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kept);
+}
+
+/* ── 모션 줄이기 — 내용은 다 보이고, 움직임은 없다 ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+  }
 }
