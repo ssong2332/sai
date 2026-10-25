@@ -18,6 +18,28 @@
  * | `clear`          | 긍정 | 오해 소지가 있던 문장을 **교정문으로 적용**했을 때 |
  * | `schedule`       | 긍정 | 예약 제안을 받아들여 저장에 성공했을 때           |
  *
+ * 맥락 카운트 판정표 (2026-10-25 사용자 승인, L34 — 이 표대로만 센다)
+ * 🔴 극성 `context` — **마찰도 긍정도 아니다.** 건강도 지수(`healthIndex`)는 `friction`만 세므로
+ *    이 키들이 아무리 늘어도 지수는 변하지 않는다. 대시보드의 긍정·마찰 막대에도 들어가지 않는다.
+ * | 종류                  | 세는 순간 (모두 폴백이 아닐 때만, 메시지당 최대 1)                         |
+ * |---|---|
+ * | `decoded`             | 뜻 풀기(해독)가 성공했을 때 — `bumpUsage(DECODED)`와 같은 자리             |
+ * | `decodeUrgencyGap`    | 그 해독의 `urgencyGap === true`(표면 긴급도 ≠ 실제 긴급도, 원문 인용 관문 통과 후) |
+ * | `urgencyCritical`     | 다듬기 성공 시 **최종 적용 긴급도**가 CRITICAL — `refined`와 같은 자리     |
+ * | `urgencyNormal`       | 〃 NORMAL                                                                 |
+ * | `urgencyLow`          | 〃 LOW                                                                    |
+ * | `teamGlossaryApplied` | 다듬기 성공 + 이번 요청에 실린 **팀**(scope=team) 용어 중 1개 이상이 교정문에서 확인됐을 때 |
+ *
+ * 🔴 긴급도 3종은 **누가 골랐는지 가르지 않는다** — 사용자 선택(`user`)이든 AI 판정(`ai`)이든 화면에
+ *    적용된 최종값 하나를 센다. 단 `urgencySource === 'fallback'`(모델이 긴급도를 못 내서 NORMAL로
+ *    채운 것)은 **세지 않는다** — 판정된 적 없는 값을 분포에 넣으면 NORMAL이 부풀려진다.
+ *    그래서 세 키의 합은 `refined` 이하다. 긴급도를 바꿔 다시 다듬으면 `refined`처럼 다시 센다.
+ * 🔴 기존 `urgencyGap`(다듬기 쪽)과 `decodeUrgencyGap`(뜻 풀기 쪽)은 다른 사실이라 키를 나눴다.
+ * 🔴 「예약 알림 저장」은 새 키를 만들지 않는다 — 기존 `schedule`이 정확히 그 순간(`addReservation`
+ *    성공)에 세고 있다.
+ * 🔴 팀 용어는 **메시지 수**를 센다(용어 개수가 아니다). 모델의 자기 신고만 믿지 않고
+ *    `checkGlossaryApplied`로 교정문에 실제 있는 것만 본다.
+ *
  * 🔴 `misread`와 `clear`가 **같은 메시지에서 둘 다** 오를 수 있다. 의도된 것이다 — 전자는 "원문에
  *    위험이 있었다", 후자는 "그 위험이 교정으로 정리됐다"로 서로 다른 사실이고, 대시보드 목업의
  *    설명("교정 전 원문 기준, 교정 후 반영됨" / "오해 소지 표현이 교정 과정에서 정리됨")도 그렇다.
@@ -29,6 +51,7 @@
  */
 
 import { getLocal, setLocal, STORAGE_KEYS } from './storage.js';
+import { checkGlossaryApplied } from '../core/refine/glossaryCheck.js';
 
 /** 🔴 이 키 집합이 계약이다 — `functions/teams.js`의 `COUNT_KEYS`와 같아야 한다. */
 export const FRICTION_EVENTS = {
@@ -55,7 +78,93 @@ export const FRICTION_EVENTS = {
   URGENCY_GAP: 'urgencyGap',
   MISSING: 'missing',
   SENSITIVE_BLOCKED: 'sensitiveBlocked',
+  /** 🔴 맥락 카운트 6종 (2026-10-25, L34) — 극성 `context`. 판정표는 파일 헤더. */
+  DECODED: 'decoded',
+  DECODE_URGENCY_GAP: 'decodeUrgencyGap',
+  URGENCY_CRITICAL: 'urgencyCritical',
+  URGENCY_NORMAL: 'urgencyNormal',
+  URGENCY_LOW: 'urgencyLow',
+  TEAM_GLOSSARY_APPLIED: 'teamGlossaryApplied',
 };
+
+/** 최종 긴급도 → 분포 키. 목록 밖 값은 세지 않는다. */
+export const URGENCY_EVENT = {
+  CRITICAL: 'urgencyCritical',
+  NORMAL: 'urgencyNormal',
+  LOW: 'urgencyLow',
+};
+
+/**
+ * 성공한 다듬기 한 건이 낼 **맥락 카운트** 목록 (판정표 그대로 — 호출부가 조건을 다시 쓰지 않게 여기 둔다).
+ * @param {object} response `requestRefine` 응답.
+ * @param {{teamGlossaryApplied?: boolean}} [extra]
+ * @returns {string[]}
+ */
+export function refineContextEvents(response, extra = {}) {
+  if (!response || response.fallback) return [];
+  const events = [];
+  if (response.urgencySource !== 'fallback' && URGENCY_EVENT[response.urgency]) {
+    events.push(URGENCY_EVENT[response.urgency]);
+  }
+  if (extra.teamGlossaryApplied === true) events.push(FRICTION_EVENTS.TEAM_GLOSSARY_APPLIED);
+  return events;
+}
+
+/**
+ * 이번 다듬기에서 **팀 용어가 1개 이상 실제로 적용됐는가** (`teamGlossaryApplied` 판정).
+ *
+ * | 조건 | 결과 |
+ * |---|---|
+ * | 폴백 · 요청에 팀 용어 없음 | false |
+ * | `checkGlossaryApplied`가 교정문에서 확인한 항목 중 `id`가 요청의 scope=team 항목 id와 같은 것이 있다 | true |
+ * | 모델이 `id`를 비워 신고했다 | 그 항목은 세지 않는다 — 개인/팀을 가를 근거가 없다(과소 집계 쪽으로 틀린다) |
+ * 🔴 문자열은 이 함수 안에서만 비교하고 버린다 — 반환은 불리언 하나다.
+ * @param {object} response `requestRefine` 응답.
+ * @param {Array<{id: string, scope: string}>} glossary 이번 요청에 실은 용어집.
+ */
+export function hasAppliedTeamGlossary(response, glossary) {
+  if (!response || response.fallback || !Array.isArray(glossary)) return false;
+  const teamIds = new Set(
+    glossary.filter((entry) => entry?.scope === 'team' && entry.id).map((entry) => String(entry.id)),
+  );
+  if (teamIds.size === 0) return false;
+  return checkGlossaryApplied(response).applied.some((entry) => entry.id && teamIds.has(String(entry.id)));
+}
+
+/**
+ * 성공한 뜻 풀기 한 건이 낼 카운트 목록.
+ * @param {object} response `requestDecode` 응답.
+ * @returns {string[]}
+ */
+export function decodeEvents(response) {
+  if (!response || response.fallback) return [];
+  const events = [FRICTION_EVENTS.DECODED];
+  if (response.urgencyGap === true) events.push(FRICTION_EVENTS.DECODE_URGENCY_GAP);
+  return events;
+}
+
+/** 긴급도 높은 순 — 앞일수록 급하다(`core/refine/prompt.js` `URGENCY_LEVELS`와 같은 순서). */
+const URGENCY_RANK = ['CRITICAL', 'NORMAL', 'LOW'];
+
+/**
+ * 다듬기 쪽 `urgencyGap` 판정 — **「완곡한 표현이 실제 긴급도를 가렸다」**.
+ *
+ * | 조건 | 결과 |
+ * |---|---|
+ * | 폴백 · 사용자가 긴급도를 고르지 않음(AI·폴백 출처) | false |
+ * | 사용자가 고른 긴급도가 글에서 읽히는 긴급도(AI 판정)보다 **높다** | true — 급한데 글은 급해 보이지 않는다 |
+ * | 같거나 낮다 · AI 판정 없음 | false |
+ *
+ * 🔴 2026-10-25 — 옛 조건(`urgency !== aiUrgency && 출처 === 'ai'`)은 출처가 ai이면 schema가
+ *    `urgency = aiUrgency`로 넣어 **항상 거짓**이었다(이 지표는 그동안 0건). 사용자 결정으로 이 표로 바꿨다.
+ * @param {object} response `requestRefine` 응답.
+ */
+export function isUrgencyMasked(response) {
+  if (!response || response.fallback || response.urgencySource !== 'user') return false;
+  const picked = URGENCY_RANK.indexOf(response.urgency);
+  const read = URGENCY_RANK.indexOf(response.aiUrgency);
+  return picked !== -1 && read !== -1 && picked < read;
+}
 
 /** 극성 — 대시보드가 신호 막대와 분모를 가르는 데 쓴다. */
 export const EVENT_POLARITY = {
@@ -70,6 +179,13 @@ export const EVENT_POLARITY = {
   missing: 'friction',
   // 🔴 민감정보를 **막은 것**은 긍정이다 — 사고가 났다는 뜻이 아니라 사고를 막았다는 뜻이다.
   sensitiveBlocked: 'positive',
+  // 🔴 `context`는 마찰도 긍정도 아니다 — 건강도 지수·긍정/마찰 막대에 들어가지 않는다(L34).
+  decoded: 'context',
+  decodeUrgencyGap: 'context',
+  urgencyCritical: 'context',
+  urgencyNormal: 'context',
+  urgencyLow: 'context',
+  teamGlossaryApplied: 'context',
 };
 
 const EVENT_KEYS = Object.values(FRICTION_EVENTS);
@@ -85,6 +201,12 @@ export const EVENT_LABELS = {
   urgencyGap: '긴급도가 실제와 다름',
   missing: '기한·영향이 빠진 요청',
   sensitiveBlocked: '민감정보 전송을 막음',
+  decoded: '뜻 풀기한 메시지',
+  decodeUrgencyGap: '겉보기와 실제 긴급도가 다른 받은 메시지',
+  urgencyCritical: '긴급(CRITICAL)으로 다듬음',
+  urgencyNormal: '보통(NORMAL)으로 다듬음',
+  urgencyLow: '낮음(LOW)으로 다듬음',
+  teamGlossaryApplied: '팀 용어집이 적용된 메시지',
 };
 
 function emptyCounts() {

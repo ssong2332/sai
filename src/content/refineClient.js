@@ -21,6 +21,7 @@ import { buildCasualToneBlock } from '../core/meme/index.js';
 import { getLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
 import { getOnboarding, languagePairFrom } from '../lib/onboarding.js';
 import { detectLanguage } from '../lib/detectLanguage.js';
+import { hasAppliedTeamGlossary } from '../lib/friction.js';
 
 /** background에 보내는 메시지 타입. */
 export const REFINE_MESSAGE = 'sai:refine';
@@ -154,6 +155,11 @@ export async function requestRefine(request) {
     sourceLanguage: payload.sourceLanguage,
     targetLanguage: payload.targetLanguage,
     ...response,
+    /**
+     * 🔴 L34 — 팀 지표 `teamGlossaryApplied` 판정용 **불리언 하나**. 어느 항목이 팀 것인지는
+     *    용어집을 실은 이 함수만 안다(응답에는 scope가 없다). 용어 문자열은 싣지 않는다.
+     */
+    teamGlossaryApplied: hasAppliedTeamGlossary(response, payload.glossary),
   });
 
   // 확장 밖(개발 하네스)에는 chrome.runtime이 없다 — 프록시를 직접 부르고, 그마저 죽어 있으면

@@ -77,6 +77,7 @@
 
 ### 팀 기능 (무료)
 초대 코드로 팀 만들기·참가(여러 팀) · 명부(표시 이름·직급) · 팀원 내보내기·팀장 넘기기·초대 코드 다시 만들기·이름 바꾸기 · 대시보드 보기 권한 · 팀 용어집 · 팀 단위 마찰 카운트 업로드(본문 없음) · 팀 나가기 · 계정 삭제.
+올라가는 카운트(날짜별 정수뿐, 키 목록은 `src/lib/friction.js` 판정표가 계약): 마찰(`misread`·`venting`·`forceOffHours`·`urgencyGap`·`missing`) · 긍정(`clear`·`schedule`=예약 알림 저장·`sensitiveBlocked`) · 분모(`refined`) · **맥락**(L34 — `decoded`·`decodeUrgencyGap`·`urgencyCritical`/`urgencyNormal`/`urgencyLow`·`teamGlossaryApplied`, 건강도 지수에 넣지 않는다).
 **협업 건강도**(F-10/F-26): `건강도 = 100 − 정규화된 마찰 카운트`(하소연 감지·업무 외 시간 강행 등 합계). 개인 점수는 만들지 않는다(「금지 2」).
 🔴 서버는 지금 Functions `teamV1` — Worker 이전은 2단계(10-28 이후 멈춤 감수).
 
@@ -130,7 +131,7 @@
 | 계정 | Firebase Auth | 계정 삭제까지 |
 | 설정·학습 통계(유형·횟수·변경 정도 숫자)·용어집·팀 | Firestore(서울) | 사용자가 지울 때까지 |
 | 사용 횟수 | Firestore(서울) | 8일 뒤 자동 파기 |
-| 팀 마찰 카운트 · 날짜별 지표 합계 | Firestore — 식별자 없는 합계 | — |
+| 팀 마찰·맥락 카운트(뜻 풀기·긴급도별·팀 용어 적용 횟수 포함, §3) · 날짜별 지표 합계 | Firestore — 식별자 없는 합계 | — |
 | 저장 문구·예약 알림·대화 상대 태그·화면 설정 | 기기(`chrome.storage.local`)만 | 확장 삭제까지 |
 | 공휴일 | Nager.Date에 국가 코드·연도만 | — |
 

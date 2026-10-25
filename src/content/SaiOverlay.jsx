@@ -29,7 +29,14 @@ import { bumpUsage, USAGE_KINDS } from '../lib/usage.js';
 import { reportMetric, METRIC_KINDS } from '../lib/metricsClient.js';
 import { editedTextForLearning } from './urgentTag.js';
 // Spec §3 F-10/F-26 — 팀 건강도의 입력. 🔴 카운트만 쌓는다(본문·개인 식별자 없음).
-import { recordFrictionEvent, FRICTION_EVENTS, NO_TEAM_BUCKET } from '../lib/friction.js';
+import {
+  recordFrictionEvent,
+  FRICTION_EVENTS,
+  NO_TEAM_BUCKET,
+  refineContextEvents,
+  decodeEvents,
+  isUrgencyMasked,
+} from '../lib/friction.js';
 // 🔴 대화 상대 **후보만** 뽑는다 — 등록은 사용자가 누를 때만(`detectPeople.js` 헤더).
 import { detectSpeakerNames, matchRecipient } from './detectPeople.js';
 import {
@@ -645,11 +652,21 @@ export default function SaiOverlay({ autoButton = true }) {
            * 🔴 `urgencyGap`은 「완곡한 표현이 실제 긴급도를 가렸다」는 뜻이다 — 이 제품이
            *    잡으려는 대표 실패(F-11)와 같은 축이라 팀 지표로서 의미가 크다.
            */
-          if (response.urgency !== response.aiUrgency && response.urgencySource === 'ai') {
+          // 🔴 판정은 `friction.js` `isUrgencyMasked` 한 곳(2026-10-25 — 옛 조건은 항상 거짓이라 0건이었다).
+          if (isUrgencyMasked(response)) {
             recordFrictionEvent(FRICTION_EVENTS.URGENCY_GAP, { teamId: frictionTeamId() });
           }
           if ((response.missingElements ?? []).length > 0) {
             recordFrictionEvent(FRICTION_EVENTS.MISSING, { teamId: frictionTeamId() });
+          }
+          /**
+           * 🔴 L34 — 맥락 카운트(최종 긴급도 분포 · 팀 용어 적용). `refined`와 **같은 순간**에 센다.
+           *    조건은 `friction.js` `refineContextEvents` 판정표 한 곳에만 있다.
+           */
+          for (const kind of refineContextEvents(response, {
+            teamGlossaryApplied: response.teamGlossaryApplied === true,
+          })) {
+            recordFrictionEvent(kind, { teamId: frictionTeamId() });
           }
         }
         // 🔴 「내 문체」 수집을 제거했다(2026-08-17) — 기능 자체를 지웠다. `App.jsx` 주석 참고.
@@ -685,6 +702,10 @@ export default function SaiOverlay({ autoButton = true }) {
       const response = await requestDecode({ text, threadContext: threadContextRef.current });
       setDecodeResult(response);
       if (!response.fallback) bumpUsage(USAGE_KINDS.DECODED); // 교정과 같은 규칙 — 성공만 센다.
+      // 🔴 L34 — 팀 지표 `decoded`(+ 표면≠실제 긴급도면 `decodeUrgencyGap`). 폴백이면 빈 목록이다.
+      for (const kind of decodeEvents(response)) {
+        recordFrictionEvent(kind, { teamId: frictionTeamId() });
+      }
     } catch {
       // 🔴 예외 메시지에 원문이 섞이지 않게 우리 문구로 덮는다.
       setDecodeError(failureMessage('해독'));
