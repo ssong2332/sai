@@ -42,8 +42,9 @@ const PANELS = [
   { id: 'activation', label: '켜는 방법·단축키', sub: '사이 버튼 · 단축키' },
   { id: 'integrations', label: '통합', sub: '사이트별 켜고 끄기' },
   { id: 'blocked', label: '표시 안 할 사이트', sub: '사이 버튼 숨기기' },
-  { id: 'language', label: '언어와 톤', sub: '' },
-  { id: 'me', label: '나', sub: '내 정보 · 상황 · 협업 성향' },
+  // 🔴 id `language`는 그대로 둔다(2026-10-25 이름만 「보내는 글 기본값」으로) — 예전 `#language` 링크가 계속 맞는다.
+  { id: 'language', label: '보내는 글 기본값', sub: '상대 지역 · 기본 톤' },
+  { id: 'me', label: '나', sub: '내 언어 · 내 정보 · 상황 · 협업 성향' },
   { id: 'glossary', label: '용어집', sub: '' },
   { id: 'learned', label: '학습 내역', sub: '' },
   { id: 'data', label: '데이터', sub: '이 컴퓨터에 저장된 것' },
@@ -322,7 +323,7 @@ function ActivationPanel({ toast }) {
         </ol>
         <p className="group-note">
           특정 사이트에서 버튼이 뜨지 않게 하려면 <a href="#blocked">표시 안 할 사이트</a>나 <a href="#integrations">통합</a>
-          에서 꺼요.
+          에서 꺼요. 꺼 둔 사이트에서도 단축키로는 쓸 수 있어요.
         </p>
       </Group>
 
@@ -378,7 +379,7 @@ function IntegrationsPanel({ data, act }) {
   return (
     <Group
       title="자주 쓰는 업무 사이트"
-      note="끄면 그 사이트에서 사이 버튼과 팝업이 뜨지 않아요. 여기 없는 사이트도 기본으로 켜져 있어요 — 끄려면 「표시 안 할 사이트」에 넣어요."
+      note="끄면 그 사이트에서 문장을 선택해도 사이 버튼이 뜨지 않아요. 단축키(Alt+D 등)로는 그대로 쓸 수 있어요. 여기 없는 사이트도 기본으로 켜져 있어요 — 끄려면 「표시 안 할 사이트」에 넣어요."
     >
       <ul className="integrations">
         {INTEGRATIONS.map((item) => {
@@ -395,7 +396,7 @@ function IntegrationsPanel({ data, act }) {
                 </span>
                 {state.blockedBy && (
                   <span className="row-warn">
-                    「표시 안 할 사이트」의 <b>{state.blockedBy}</b> 때문에 꺼져 있어요. 그 목록에서 빼야 다시 떠요.
+                    「표시 안 할 사이트」의 <b>{state.blockedBy}</b> 때문에 버튼이 숨겨져 있어요. 그 목록에서 빼야 다시 떠요.
                   </span>
                 )}
                 <a className="ext-link" href={item.openUrl} target="_blank" rel="noopener noreferrer">
@@ -441,7 +442,7 @@ function BlockedPanel({ data, act }) {
     <>
       <Group
         title="사이트 추가"
-        note="여기 넣은 사이트와 그 하위 도메인에서는 사이 버튼·팝업·단축키가 반응하지 않아요. 주소를 붙여 넣으면 사이트 이름만 남겨요."
+        note="여기 넣은 사이트와 그 하위 도메인에서는 문장을 선택해도 사이 버튼이 뜨지 않아요. 단축키(Alt+D 등)로는 그대로 쓸 수 있어요. 주소를 붙여 넣으면 사이트 이름만 남겨요."
       >
         <form className="add-host" onSubmit={submit} noValidate>
           <label className="sr-only" htmlFor={inputId}>
@@ -506,7 +507,9 @@ function BlockedPanel({ data, act }) {
   );
 }
 
-/* ── 언어와 톤 ─────────────────────────────────────────── */
+/* ── 보내는 글 기본값 (예전 「언어와 톤」) ─────────────────
+ * 🔴 2026-10-25 사용자 결정 — 「나에 대한 사실」(내 언어 → 「나」 패널)과 「사이가 보내는 글을 어떻게 쓰나」(여기)를 나눈다.
+ *    한 화면에 같은 값을 두 번 두지 않는다. 저장 키는 그대로(`sai.onboarding`). */
 
 const pick = (list) => list.map(({ id, label }) => ({ id, label }));
 
@@ -514,14 +517,10 @@ function LanguagePanel({ data, act }) {
   const o = data.onboarding;
   const set = (patch) => act(() => setOnboardingFields(patch));
   return (
-    <Group title="언어와 톤" note="처음 설정에서 고른 값이에요. 바꾸면 다음 교정부터 적용돼요. 사이드 패널 설정에서도 바꿀 수 있어요.">
-      <ChoiceRow
-        label="내 언어"
-        hint="내가 쓰고 읽는 언어예요. 역번역과 뜻 풀기가 이 언어로 나와요."
-        options={pick(MY_LANGUAGES)}
-        value={o.language ?? null}
-        onChange={(next) => set({ language: next })}
-      />
+    <Group
+      title="상대와 말투"
+      note="사이가 상대에게 나가는 문장을 쓸 때의 기본값이에요. 바꾸면 다음 교정부터 적용돼요. 내 언어는 「나」에 있어요."
+    >
       <ChoiceRow
         label="상대 지역"
         hint="상대에게 보낼 언어의 기본값을 정하는 데만 써요. 상대의 성향이나 말투를 짐작하는 데 쓰지 않아요. 사람마다 다르면 사이드 패널 프로필의 「내가 대화하는 사람들」에서 정해요."
@@ -546,7 +545,14 @@ function LanguagePanel({ data, act }) {
 function MePanel({ data, act }) {
   return (
     <>
-      <Group title="내 정보" note="팀에서 나를 알아보게 하는 이름과 직급이에요. 팀을 만들거나 참가할 때만 함께 보내요. 교정 문장에는 쓰이지 않아요.">
+      <Group title="내 정보" note="이름과 직급은 팀에서 나를 알아보게 하는 값이에요. 팀을 만들거나 참가할 때만 함께 보내고, 교정 문장에는 쓰이지 않아요.">
+        <ChoiceRow
+          label="내 언어"
+          hint="내가 쓰고 읽는 언어예요. 역번역과 뜻 풀기가 이 언어로 나와요."
+          options={pick(MY_LANGUAGES)}
+          value={data.onboarding.language ?? null}
+          onChange={(next) => act(() => setOnboardingFields({ language: next }))}
+        />
         <TextRow
           label="표시 이름"
           value={data.identity.displayName}

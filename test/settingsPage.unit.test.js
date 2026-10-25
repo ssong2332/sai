@@ -36,10 +36,39 @@ test('🔴 사이드패널 시트 — 옮긴 토글의 저장 키를 더는 쓰�
     assert.equal(new RegExp(`STORAGE_KEYS\\.${key}\\b`).test(panel), false, `사이드패널이 아직 ${key}를 쓴다`);
   }
   assert.equal(panel.includes('chrome://extensions/shortcuts'), false, '단축키 카드는 설정 페이지로 옮겼다');
-  // 남긴 필수: 다크 모드 · 내 언어 · 상대 지역 · 기본 톤
-  for (const text of ['다크 모드', "label=\"내 언어\"", "label=\"상대 지역\"", "label=\"기본 톤\"", '자세한 설정']) {
+  // 남긴 필수: 다크 모드 · 「보내는 글 기본값」(상대 지역 · 기본 톤) · 자세한 설정
+  for (const text of ['다크 모드', '보내는 글 기본값', 'label="상대 지역"', 'label="기본 톤"', '자세한 설정']) {
     assert.ok(panel.includes(text), `시트에 ${text}가 없다`);
   }
+});
+
+test('🔴 「나」와 「보내는 글 기본값」 — 같은 값이 한 화면에 두 번 없다(2026-10-25)', () => {
+  // 사이드패널 시트에는 내 언어가 없다(프로필 › 내 정보에만).
+  const sheet = panel.slice(panel.indexOf('function SettingsTab('), panel.indexOf('/* ── 홈 — 온보딩 결과'));
+  assert.ok(sheet.length > 0);
+  assert.equal(sheet.includes('label="내 언어"'), false, '시트에 내 언어가 남아 있다');
+  assert.ok(sheet.includes('보내는 글 기본값'));
+  assert.ok(sheet.includes('label="상대 지역"') && sheet.includes('label="기본 톤"'));
+  assert.equal(sheet.includes('언어와 톤'), false);
+
+  // 설정 페이지: 내 언어는 「나」 패널에만, 상대 지역·기본 톤은 「보내는 글 기본값」에만.
+  const me = page.slice(page.indexOf('function MePanel('), page.indexOf('/* ── 용어집'));
+  const send = page.slice(page.indexOf('function LanguagePanel('), page.indexOf('/* ── 나 '));
+  assert.ok(me.length > 0 && send.length > 0);
+  assert.equal((page.match(/label="내 언어"/g) ?? []).length, 1);
+  assert.ok(me.includes('label="내 언어"'));
+  assert.ok(me.indexOf('label="내 언어"') < me.indexOf('label="표시 이름"'), '내 언어가 「나」 맨 위가 아니다');
+  assert.equal(send.includes('label="내 언어"'), false);
+  assert.ok(send.includes('label="상대 지역"') && send.includes('label="기본 톤"'));
+  assert.equal(me.includes('label="상대 지역"') || me.includes('label="기본 톤"'), false);
+  // 해시 id는 그대로 — 예전 #language 링크가 계속 맞는다.
+  assert.ok(page.includes("{ id: 'language', label: '보내는 글 기본값'"));
+});
+
+test('🔴 설정 페이지 — 사이트 끄기 안내가 「단축키는 산다」를 말한다', () => {
+  assert.equal(page.includes('사이 버튼·팝업·단축키가 반응하지 않아요'), false);
+  assert.equal(page.includes('사이 버튼과 팝업이 뜨지 않아요'), false);
+  assert.ok((page.match(/단축키\(Alt\+D 등\)로는 그대로 쓸 수 있어요/g) ?? []).length >= 2);
 });
 
 test('🔴 설정 페이지 — 단축키 변경은 chrome.tabs.create로 연다(<a href>는 크롬이 막는다)', () => {

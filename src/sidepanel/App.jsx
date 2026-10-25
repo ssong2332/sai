@@ -1039,9 +1039,11 @@ function SheetChoice({ label, options, value, onPick, allowNone = false }) {
  * | 남긴 것 | 이유 |
  * |---|---|
  * | 계정(AccountCard) | 로그인은 팀·동기화의 전제 — 2026-08-15 「연결이 맨 위」 결정 그대로 |
- * | 내 언어 · 상대 지역 · 기본 톤 | 교정 결과를 가장 크게 바꾸는 세 값 |
+ * | 상대 지역 · 기본 톤(「보내는 글 기본값」) | 나가는 문장을 가장 크게 바꾸는 두 값 |
  * | 다크 모드 | 지금 보고 있는 화면의 겉모습 |
  * | 「자세한 설정」 | 나머지 전부 — 확장 설정 페이지(`src/settings/`) |
+ * 🔴 **내 언어는 시트에 두지 않는다** (2026-10-25 사용자 결정 — 「나에 대한 사실」과 「사이가 보내는 글을 어떻게 쓰나」를
+ *    나눈다. 한 화면에 같은 값을 두 번 두지 않는다). 내 언어는 프로필 › 내 정보(`IdentityCard`)에만 있다.
  * 🔴 옮긴 것: 역번역 보기 · 변경 이유 보기 · 색 표시 설명 · 직전 대화 참고 · 저장 문구 이어 붙이기 · 단축키 카드.
  *    저장 키·기본값은 바꾸지 않았다(`src/lib/displaySettings.js` 표).
  * 🔴 「상대 지역」은 2026-08-16에 온보딩 질문에서 뺐던 값이다(값 하나로는 여러 나라와 일할 때 틀린다). 2026-10-25 사용자
@@ -1064,15 +1066,9 @@ function SettingsTab({ onClose, theme, onToggleTheme, onboarding, onChangeOnboar
       <AccountCard onNotice={onNotice} />
 
       <div className="settings-group">
-        <h3 className="group-title">언어와 톤</h3>
-        <p className="meta">바꾸면 다음 교정부터 적용돼요.</p>
+        <h3 className="group-title">보내는 글 기본값</h3>
+        <p className="meta">바꾸면 다음 교정부터 적용돼요. 내 언어는 프로필 › 내 정보에 있어요.</p>
         <div className="card">
-          <SheetChoice
-            label="내 언어"
-            options={pickList(MY_LANGUAGES)}
-            value={onboarding?.language}
-            onPick={(language) => onChangeOnboarding({ language })}
-          />
           <SheetChoice
             label="상대 지역"
             options={pickList(PARTNER_REGIONS)}

@@ -1,6 +1,9 @@
 /**
  * 사이트별 켜고 끄기 — 「통합」 토글 + 「사이 버튼을 표시하지 않을 사이트」 목록 (2026-10-25).
  *
+ * 🔴 「꺼짐」의 뜻: 그 사이트에서 **선택하면 저절로 뜨는 사이 버튼만** 숨긴다. 단축키(Alt+D·Alt+X)는 사용자가 직접
+ *    부른 것이라 그대로 팝업을 연다(2026-10-25 사용자 결정 — DeepL과 같다). 적용은 `src/content/SiteGate.jsx`.
+ *
  * 🔴 금지
  *   - 여기에 **방문 기록을 남기지 않는다.** 저장되는 것은 사용자가 직접 넣은 호스트 이름과 꺼 둔 통합 id뿐이다.
  *     콘텐츠 스크립트는 지금 페이지의 호스트를 **읽어서 비교만** 한다 — 어디에도 쓰지 않는다(Zero Retention).
@@ -206,7 +209,7 @@ export function findIntegration(pageHost) {
 }
 
 /**
- * 판정 — 헤더의 표 그대로.
+ * 판정 — 헤더의 표 그대로. `enabled: false` = 자동 사이 버튼 숨김(단축키는 별개로 산다).
  * @param {string} pageHost `location.hostname`
  * @param {{blocked?: unknown, integrationsOff?: unknown}} settings 저장값(정리 전이어도 된다)
  * @returns {{enabled: boolean, reason: null | 'blocked' | 'integration-off', rule: string | null, integrationId: string | null}}

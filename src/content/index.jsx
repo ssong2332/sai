@@ -92,11 +92,10 @@ function mount() {
     });
   }
 
-  // 🔴 2026-10-25 — 설정 페이지의 「통합」·「사이 버튼을 표시하지 않을 사이트」를 따른다(`SiteGate.jsx`).
+  // 🔴 2026-10-25 — 설정 페이지의 「통합」·「표시 안 할 사이트」를 따른다(`SiteGate.jsx`). 꺼진 사이트는
+  //    **자동 사이 버튼만** 숨기고 단축키는 살린다 — 그래서 오버레이는 언제나 마운트한다.
   createRoot(mountPoint).render(
-    <SiteGate>
-      <SaiOverlay />
-    </SiteGate>,
+    <SiteGate>{({ autoButton }) => <SaiOverlay autoButton={autoButton} />}</SiteGate>,
   );
 }
 

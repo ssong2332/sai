@@ -5,6 +5,7 @@
  *    ① 호스트 정규화 — 스킴·경로·쿼리·포트·`www.`·`*.`를 떼고 소문자로. 형식 밖은 거절(저장 안 함).
  *    ② 맞춤 규칙 — 같은 호스트와 그 하위 도메인만(점 경계). `badslack.com`은 `slack.com`에 맞지 않는다.
  *    ③ 우선순위 — 「끔」이 언제나 이긴다: 차단 목록 > 꺼 둔 통합 > 켜짐. 통합 「켬」은 차단을 뒤집지 않는다.
+ *    ⑤ 「끔」 = 자동 사이 버튼만 숨김. 단축키(Alt+D·Alt+X)는 산다(2026-10-25 사용자 결정).
  *    ④ 저장값을 믿지 않는다 — 형식 밖 항목·모르는 통합 id는 버린다.
  */
 
@@ -169,10 +170,24 @@ test('저장소 — 추가·빼기·통합 토글이 정해진 키에 정해진 
   assert.deepEqual(await getSiteGateSettings(), { blocked: ['foo.io'], integrationsOff: ['github'] });
 });
 
-test('🔴 콘텐츠 스크립트가 관문을 거쳐 오버레이를 그린다', () => {
+test('🔴 꺼진 사이트 — 오버레이는 늘 마운트하고 자동 버튼만 숨긴다(단축키는 산다)', () => {
   const boot = readFileSync(new URL('../src/content/index.jsx', import.meta.url), 'utf8');
-  assert.match(boot, /<SiteGate>\s*<SaiOverlay \/>\s*<\/SiteGate>/);
+  assert.match(boot, /<SiteGate>\{\(\{ autoButton \}\) => <SaiOverlay autoButton=\{autoButton\} \/>\}<\/SiteGate>/);
   const gate = readFileSync(new URL('../src/content/SiteGate.jsx', import.meta.url), 'utf8');
   assert.ok(gate.includes('evaluateSiteGate'), '판정을 lib 한 곳에서 한다');
   assert.ok(gate.includes('chrome.storage.onChanged'), '설정을 바꾸면 새로고침 없이 따라간다');
+  assert.ok(gate.includes('return children({ autoButton: enabled === true })'), '관문이 오버레이를 통째로 빼지 않는다');
+  assert.equal(/return enabled \? children : null/.test(gate), false, '예전 동작(오버레이 전체 제거)이 남아 있다');
+
+  const overlay = readFileSync(new URL('../src/content/SaiOverlay.jsx', import.meta.url), 'utf8');
+  assert.ok(overlay.includes('export default function SaiOverlay({ autoButton = true })'));
+  // 자동 버튼 묶음은 autoButton 또는 사용자가 부른 것(Alt+X 저장 문구 · Alt+D 안내)일 때만 그린다.
+  assert.ok(overlay.includes('const showFab = autoButton || snippetOpen || Boolean(fabHint);'));
+  assert.ok(overlay.includes('{!open && showFab && ('));
+  // 단축키 수신부는 autoButton을 보지 않는다 — 꺼진 사이트에서도 팝업을 연다.
+  const onMessage = overlay.slice(overlay.indexOf("message?.type === 'refine-selection'"), overlay.indexOf('chrome.runtime.onMessage.addListener(onMessage)'));
+  assert.ok(onMessage.length > 0, '단축키 수신부를 찾지 못했다');
+  assert.equal(onMessage.includes('autoButton'), false, '단축키가 버튼 숨김 설정에 묶였다');
+  // 열린 팝업(`open`)도 autoButton과 무관하다.
+  assert.ok(overlay.includes('{open && ('));
 });
