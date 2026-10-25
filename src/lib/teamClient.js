@@ -573,27 +573,12 @@ export async function removeTeamGlossaryEntry(id, { fetchImpl = globalThis.fetch
 /** 운영에서 검증된 batchGet 한 번의 문서 수. */
 export const FRICTION_BATCH_SIZE = 30;
 
-const pad2 = (n) => String(n).padStart(2, '0');
-
 /** 날짜 키 목록 → 마찰 문서 이름을 `size`개씩 묶은 배열. 순수 함수. */
 export function frictionDocNameBatches({ base, teamId, dateKeys, size = FRICTION_BATCH_SIZE }) {
   const wanted = (dateKeys ?? []).map((key) => `${base}/${teamId}_${key}`);
   const batches = [];
   for (let i = 0; i < wanted.length; i += size) batches.push(wanted.slice(i, i + size));
   return batches;
-}
-
-/**
- * 최근 `days`일의 마찰 문서 이름을 `size`개씩 묶어 돌려준다(오늘부터 거꾸로, 로컬 날짜 기준).
- * 순수 함수 — `test/frictionBatches.unit.test.js`가 잠근다.
- */
-export function frictionDocBatches({ base, teamId, days, today = new Date(), size = FRICTION_BATCH_SIZE }) {
-  const dateKeys = [];
-  for (let back = 0; back < days; back += 1) {
-    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back);
-    dateKeys.push(`${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`);
-  }
-  return frictionDocNameBatches({ base, teamId, dateKeys, size });
 }
 
 const FRICTION_BASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/frictionCounts`;
