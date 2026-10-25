@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 
 import { handleSiteMessage, SITE_PROTOCOL_VERSION } from '../src/background/siteBridge.js';
 import { clearAllLocal, getLocal, setLocal, STORAGE_KEYS } from '../src/lib/storage.js';
+import { SYNC_ERRORS } from '../src/lib/syncClient.js';
 import { SITE_ALLOWED_ORIGINS, SITE_EXTERNALLY_CONNECTABLE_MATCHES, SITE_URL, siteAllowedOrigins } from '../src/config.js';
 
 const SITE = 'http://localhost:5180';
@@ -286,10 +287,12 @@ test('🔴 용어집 — 형식 위반·길이 초과·없는 id는 bad_request,
 
 /* ── 학습 ─────────────────────────────────────────────── */
 
+const signedOut = { flushLearnedDeletions: async () => { throw Object.assign(new Error('x'), { reason: SYNC_ERRORS.NOT_SIGNED_IN }); } };
+
 test('🔴 site:learned:remove — 서버 삭제 대기(sai.profile.learned.deleted)에 올린다', async () => {
   await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'no-emoji': 4, shorter: 2 });
-  const response = await send({ type: 'site:learned:remove', categoryId: 'no-emoji' });
-  assert.deepEqual(response, { ok: true, learned: { counts: { shorter: 2 } } });
+  const response = await send({ type: 'site:learned:remove', categoryId: 'no-emoji' }, signedOut);
+  assert.deepEqual(response, { ok: true, learned: { counts: { shorter: 2 } }, server: 'local' });
   assert.deepEqual(await getLocal(STORAGE_KEYS.LEARNED_DELETIONS), { all: false, kinds: ['no-emoji'] });
 
   assert.deepEqual(await send({ type: 'site:learned:remove', categoryId: 'no-emoji' }), { ok: false, error: 'bad_request' });
@@ -298,9 +301,35 @@ test('🔴 site:learned:remove — 서버 삭제 대기(sai.profile.learned.dele
 
 test('🔴 site:learned:clear — 전부 지우고 all을 세운다', async () => {
   await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'no-emoji': 4 });
-  const response = await send({ type: 'site:learned:clear' });
-  assert.deepEqual(response, { ok: true, learned: { counts: {} } });
+  const response = await send({ type: 'site:learned:clear' }, signedOut);
+  assert.deepEqual(response, { ok: true, learned: { counts: {} }, server: 'local' });
   assert.deepEqual(await getLocal(STORAGE_KEYS.LEARNED_DELETIONS), { all: true, kinds: [] });
+});
+
+test('🔴 site:learned:* — 사이드패널처럼 지운 즉시 서버 삭제를 부른다', async () => {
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'no-emoji': 4, shorter: 2 });
+  let calls = 0;
+  const flushed = { flushLearnedDeletions: async () => { calls += 1; return { deleted: 1 }; } };
+  const removed = await send({ type: 'site:learned:remove', categoryId: 'no-emoji' }, flushed);
+  assert.equal(removed.server, 'deleted');
+  const cleared = await send({ type: 'site:learned:clear' }, flushed);
+  assert.equal(cleared.server, 'deleted');
+  assert.equal(calls, 2);
+});
+
+test('🔴 site:learned:* — 서버 삭제가 실패해도 로컬 삭제는 성공이고 later를 알린다', async () => {
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'no-emoji': 4 });
+  const failing = { flushLearnedDeletions: async () => { throw Object.assign(new Error('x'), { reason: SYNC_ERRORS.NETWORK }); } };
+  const response = await send({ type: 'site:learned:remove', categoryId: 'no-emoji' }, failing);
+  assert.deepEqual(response, { ok: true, learned: { counts: {} }, server: 'later' });
+  assert.deepEqual(await getLocal(STORAGE_KEYS.LEARNED_DELETIONS), { all: false, kinds: ['no-emoji'] });
+});
+
+test('🔴 site:learned:* — 실패한 요청(bad_request)은 서버 삭제를 부르지 않는다', async () => {
+  let calls = 0;
+  const flushed = { flushLearnedDeletions: async () => { calls += 1; } };
+  assert.deepEqual(await send({ type: 'site:learned:remove', categoryId: 'none' }, flushed), { ok: false, error: 'bad_request' });
+  assert.equal(calls, 0);
 });
 
 /* ── ③ 금지 키 ────────────────────────────────────────── */

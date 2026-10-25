@@ -112,9 +112,14 @@ export function useExtension({ demo }) {
         run(`learned.${categoryId}`, () => client.removeLearned(categoryId), (prev, r) => ({
           ...prev,
           learned: r.learned ?? prev.learned,
+          learnedServer: r.server ?? null,
         })),
       clearLearned: () =>
-        run('learned.all', () => client.clearLearned(), (prev, r) => ({ ...prev, learned: r.learned ?? prev.learned })),
+        run('learned.all', () => client.clearLearned(), (prev, r) => ({
+          ...prev,
+          learned: r.learned ?? prev.learned,
+          learnedServer: r.server ?? null,
+        })),
     }),
     [client, run],
   );

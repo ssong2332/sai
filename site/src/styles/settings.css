@@ -258,6 +258,15 @@
   font-size: 15px;
   max-width: 44em;
 }
+.learned-server {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--kept-tint);
+  color: var(--kept-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
 .group-rows {
   display: grid;
   margin-top: 8px;

@@ -138,11 +138,11 @@ export function createFakeSend({ delayMs = 160 } = {}) {
         const counts = { ...state.learned.counts };
         delete counts[message.categoryId];
         state.learned = { counts };
-        return { ok: true, learned: clone(state.learned) };
+        return { ok: true, learned: clone(state.learned), server: 'deleted' };
       }
       case 'site:learned:clear':
         state.learned = { counts: {} };
-        return { ok: true, learned: clone(state.learned) };
+        return { ok: true, learned: clone(state.learned), server: 'deleted' };
       default:
         return { ok: false, error: 'unknown_type' };
     }

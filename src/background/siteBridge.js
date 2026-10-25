@@ -53,6 +53,7 @@ import {
 import { LANGUAGE_LABELS } from '../lib/recipients.js';
 import { DIFF_CATEGORIES } from '../core/profile/diff.js';
 import { getSession } from '../lib/authClient.js';
+import { flushLearnedDeletions, SYNC_ERRORS } from '../lib/syncClient.js';
 
 export const SITE_PROTOCOL_VERSION = 1;
 
@@ -371,15 +372,31 @@ const HANDLERS = {
     // 🔴 사이드패널과 같은 함수 — 서버 삭제 대기(`sai.profile.learned.deleted`)에 올라간다.
     const removed = await deps.removeLearnedPattern(categoryId);
     if (!removed) fail();
-    return { learned: toSiteLearned(await deps.getLearnedCounts()) };
+    const server = await flushServerDeletions(deps);
+    return { learned: toSiteLearned(await deps.getLearnedCounts()), server };
   },
 
   async 'site:learned:clear'(_message, deps) {
     // 🔴 사이드패널과 같은 함수 — 서버에 있는 것까지 지우도록 `all`이 선다.
     await deps.clearLearnedPatterns();
-    return { learned: toSiteLearned(await deps.getLearnedCounts()) };
+    const server = await flushServerDeletions(deps);
+    return { learned: toSiteLearned(await deps.getLearnedCounts()), server };
   },
 };
+
+/**
+ * 사이드패널(`deleteOnServer`)처럼 지운 즉시 서버 기록도 지운다 (2026-10-25 사용자 요청).
+ * 실패해도 로컬 삭제는 이미 끝났고 대기 목록이 남아 다음 동기화가 다시 지운다 — 그래서 요청은 성공이다.
+ * @returns {Promise<'deleted' | 'local' | 'later'>} `local` = 로그인 안 함(서버에 지울 것이 없다)
+ */
+async function flushServerDeletions(deps) {
+  try {
+    await deps.flushLearnedDeletions();
+    return 'deleted';
+  } catch (error) {
+    return error?.reason === SYNC_ERRORS.NOT_SIGNED_IN ? 'local' : 'later';
+  }
+}
 
 function defaultVersion() {
   try {
@@ -405,6 +422,7 @@ export const DEFAULT_SITE_BRIDGE_DEPS = {
   getLearnedCounts,
   removeLearnedPattern,
   clearLearnedPatterns,
+  flushLearnedDeletions,
   listPersonalGlossary,
   addPersonalGlossaryEntry,
   updatePersonalGlossaryEntry,
