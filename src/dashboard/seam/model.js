@@ -1,17 +1,17 @@
 /**
  * Seam 대시보드 — **순수 계산만** 모은 모듈 (2026-10-25, 시안 「Seam」 이식).
  *
- * 🔴 DOM을 만지지 않는다. 화면(`render.js`)은 여기서 나온 숫자·문장을 그리기만 한다 —
+ * 🔴 DOM을 만지지 않는다. 화면(`app.js`)은 여기서 나온 숫자·문장을 그리기만 한다 —
  *    `test/seamModel.unit.test.js`가 이 파일만으로 집계·비교·할 일 규칙·문장을 잠근다.
  * 🔴 팀 단위 합계만 다룬다. 사람을 가리키는 값은 입력에도 출력에도 없다(Spec 필수 9 G1/G2).
  * 🔴 건강도 지수는 `healthIndex.js`의 `computeHealthMetrics` 하나로만 계산한다(100 − 마찰/다듬은 글).
  * 🔴 하루 단위로는 비율(%)을 보이지 않는다 — 신호 수가 메시지 수를 넘을 수 있다. 날마다는 건수로 말한다.
  */
 
-import { computeHealthMetrics } from '../healthIndex.js';
-import { FRICTION_IDS, POSITIVE_IDS, CONTEXT_IDS } from '../liveData.js';
+import { computeHealthMetrics } from './healthIndex.js';
+import { FRICTION_IDS, POSITIVE_IDS, CONTEXT_IDS } from './signals.js';
 
-/** 시안 문구(사용자 승인). id·극성은 `liveData.js`가 단일 출처다 — 여기에는 화면 문구만 있다. */
+/** 시안 문구(사용자 승인). id·극성은 `signals.js`가 단일 출처다 — 여기에는 화면 문구만 있다. */
 const SEAM_COPY = {
   misread: ['오해 소지 표현', '교정 전 원문에서 감지'],
   urgencyGap: ['긴급도가 실제와 다름', '완곡한 표현이 급함을 가림'],
@@ -44,7 +44,7 @@ const ALLOWED_KEYS = ['refined', ...FRICTION_IDS, ...POSITIVE_IDS, ...CONTEXT_ID
 /* ── 작은 도구 ────────────────────────────────────────────────────────── */
 
 /**
- * HTML 이스케이프. 🔴 팀 이름은 주소창(`#sai=`)에서 온다 — 화면 조각을 문자열로 만들므로
+ * HTML 이스케이프. 🔴 팀 이름은 사용자가 지은 문자열이다 — 화면 조각을 문자열로 만들므로
  *    사용자 문자열은 반드시 이걸 거친다(React가 해 주던 일을 여기서 한다).
  */
 export function esc(value) {
@@ -92,9 +92,9 @@ export const pct = (x) => `${(x * 100).toFixed(1)}%`;
 /* ── 데이터 → 날짜 줄 ─────────────────────────────────────────────────── */
 
 /**
- * 확장이 보낸 `byDate`를 **오늘까지 이어진 날짜 줄**로 펼친다.
+ * 팀의 `byDate`(날짜 키 → 팀 합계)를 **오늘까지 이어진 날짜 줄**로 펼친다.
  * 🔴 없는 날짜는 0으로 둔다(`recorded: false`) — 문서가 없다는 것은 그날 기록된 신호가 없다는 뜻이다.
- * 🔴 허용 키·정수만 받는다(`liveData.js`와 같은 방어) — 주소창은 누구나 고칠 수 있다.
+ * 🔴 허용 키·정수만 받는다 — Firestore 문서도 예시 데이터도 같은 방어를 지난다.
  */
 export function buildRows(byDate, coverageDays, today = new Date()) {
   const rows = [];
@@ -344,7 +344,7 @@ export function threadRows(cur, prev) {
 /* ── 실마다 따로 보기 — 「날짜별」 (2026-10-25 사용자 피드백) ───────────── */
 /*
  * 🔴 입력은 나머지 Seam과 같은 `rows`(buildRows 결과의 이번 기간 조각)뿐이다 — 자료가 어디서
- *    왔는지(주소창·확장 페이지·예시) 가정하지 않는다. 칸 번호 `i`는 그 `rows` 안의 위치다.
+ *    왔는지(확장 페이지의 Firestore 읽기·예시) 가정하지 않는다. 칸 번호 `i`는 그 `rows` 안의 위치다.
  */
 
 /** 「날짜별」 표에서 날마다 칸을 따로 세우는 최대 날 수. 넘으면 합계 + 작은 막대로 접는다. */

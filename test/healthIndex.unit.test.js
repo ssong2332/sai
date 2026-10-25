@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { computeHealthMetrics } from '../dashboard/src/healthIndex.js';
+import { computeHealthMetrics } from '../src/dashboard/seam/healthIndex.js';
 
 test('마찰 비율만큼 100에서 뺀다 — 주간 목업 값(긍정 31·마찰 9)', () => {
   const { frictionRatio, healthIndex } = computeHealthMetrics({ totalCount: 40, frictionCount: 9 });

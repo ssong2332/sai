@@ -25,6 +25,12 @@ export default defineConfig({
          *    직접 입력으로 넣어야 빌드된다(안 넣으면 dist에 아예 안 생긴다).
          */
         decisions: 'src/decisions/index.html',
+        /**
+         * 🔴 팀 대시보드(2026-10-25, 0.1.21)도 결정 로그와 같은 「일반 확장 페이지」다 — 사이드패널 「대시보드 열기」가
+         *    `chrome.tabs.create`로 연다. manifest에 자리가 없으므로 여기 넣어야 `dist/src/dashboard/`가 생긴다.
+         *    확장 자신의 페이지라 `web_accessible_resources`도 필요 없다.
+         */
+        dashboard: 'src/dashboard/index.html',
       },
     },
   },

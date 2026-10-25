@@ -562,25 +562,79 @@ export async function removeTeamGlossaryEntry(id, { fetchImpl = globalThis.fetch
   await firestore(`/teams/${team.teamId}/glossary/${id}`, { method: 'DELETE', fetchImpl });
 }
 
-/** 대시보드가 기간을 비교하려고 읽는 날짜 수(최근 60일 + 바로 앞 60일). */
-export const DASHBOARD_DAYS = 120;
 /** 운영에서 검증된 batchGet 한 번의 문서 수. */
 export const FRICTION_BATCH_SIZE = 30;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** 날짜 키 목록 → 마찰 문서 이름을 `size`개씩 묶은 배열. 순수 함수. */
+export function frictionDocNameBatches({ base, teamId, dateKeys, size = FRICTION_BATCH_SIZE }) {
+  const wanted = (dateKeys ?? []).map((key) => `${base}/${teamId}_${key}`);
+  const batches = [];
+  for (let i = 0; i < wanted.length; i += size) batches.push(wanted.slice(i, i + size));
+  return batches;
+}
 
 /**
  * 최근 `days`일의 마찰 문서 이름을 `size`개씩 묶어 돌려준다(오늘부터 거꾸로, 로컬 날짜 기준).
  * 순수 함수 — `test/frictionBatches.unit.test.js`가 잠근다.
  */
 export function frictionDocBatches({ base, teamId, days, today = new Date(), size = FRICTION_BATCH_SIZE }) {
-  const wanted = [];
+  const dateKeys = [];
   for (let back = 0; back < days; back += 1) {
     const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back);
-    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    wanted.push(`${base}/${teamId}_${key}`);
+    dateKeys.push(`${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`);
   }
-  const batches = [];
-  for (let i = 0; i < wanted.length; i += size) batches.push(wanted.slice(i, i + size));
-  return batches;
+  return frictionDocNameBatches({ base, teamId, dateKeys, size });
+}
+
+const FRICTION_BASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/frictionCounts`;
+
+/** batchGet 결과 → `{dateKey: {숫자 필드}}`. 문서가 없던 날은 빠진다(0으로 채우지 않는다). */
+function decodeFrictionRows(result) {
+  const byDate = {};
+  for (const row of Array.isArray(result) ? result : []) {
+    if (!row?.found?.fields) continue;
+    const decoded = decodeFields(row.found.fields);
+    const dateKey = typeof decoded.dateKey === 'string' ? decoded.dateKey : null;
+    if (!dateKey) continue;
+    const day = {};
+    for (const [key, value] of Object.entries(decoded)) {
+      if (typeof value === 'number') day[key] = value; // teamId·dateKey 같은 문자열 필드는 건너뛴다.
+    }
+    byDate[dateKey] = day;
+  }
+  return byDate;
+}
+
+/**
+ * 대시보드를 볼 수 있는 팀 — 팀장이거나 열람 권한을 받은 팀 (사이드패널 「대시보드 열기」와 같은 판정).
+ * 🔴 로컬 목록만 본다(서버 호출 없음). 최종 판정은 `firestore.rules`가 한다 — 여기서 빠뜨려도 데이터가 새지 않는다.
+ * 🔴 지표가 0건인 팀도 넣는다 — 빼면 그 팀을 고른 사용자에게 다른 팀이 열린다(2026-08-16 실측).
+ */
+export async function listViewableTeams() {
+  const teams = await listTeams();
+  return teams.filter((team) => team.role === 'owner' || team.canViewDashboard === true);
+}
+
+/**
+ * 확장 대시보드(`src/dashboard/`) — 팀 하나의 **고른 날짜만** 읽는다 (2026-10-25, 0.1.21).
+ *
+ * 🔴 활성 팀을 바꾸지 않는다 — `fetchTeamFriction`과 달리 팀을 인자로 받는다. 대시보드 탭에서 팀을 바꿔도
+ *    사이드패널이 보고 있던 팀은 그대로다.
+ * 🔴 이미 읽은 날을 걸러 내는 것은 부르는 쪽(`src/dashboard/frictionCache.js`)의 일이다. 여기는 받은 키만 읽는다.
+ * 🔴 30건씩 batchGet(운영 검증 크기). 문서가 없는 날은 결과에서 빠진다.
+ * @returns {Promise<Record<string, object>>} `{dateKey: counts}` — 문서가 있던 날만.
+ */
+export async function fetchFrictionDays({ teamId, dateKeys, fetchImpl = globalThis.fetch } = {}) {
+  const viewable = await listViewableTeams();
+  if (!viewable.some((team) => team.teamId === teamId)) throw new TeamClientError(TEAM_ERRORS.NOT_A_MEMBER, 'not-viewable');
+  const result = [];
+  for (const documents of frictionDocNameBatches({ base: FRICTION_BASE, teamId, dateKeys })) {
+    const page = await firestore(':batchGet', { method: 'POST', body: { documents }, fetchImpl });
+    if (Array.isArray(page)) result.push(...page);
+  }
+  return decodeFrictionRows(result);
 }
 
 /**
@@ -637,6 +691,9 @@ export async function fetchTeamFriction({ days = 30, fetchImpl = globalThis.fetc
 
 /**
  * 소속된 **모든 팀**의 지표를 모은다 (2026-08-16 — 대시보드 팀 전환).
+ *
+ * 🔴 **0.1.21(2026-10-25)부터 사이드패널은 이 함수를 부르지 않는다.** 대시보드가 확장 페이지(`src/dashboard/`)가
+ *    되어 `fetchFrictionDays`로 필요한 팀·날만 읽는다. 아래 설명은 웹 대시보드 시절의 이유다.
  *
  * 🔴 대시보드는 로그인이 없는 별도 페이지라 스스로 팀을 바꿔 읽을 수 없다. 그래서 확장이
  *    한 번에 다 읽어 넘긴다 — 웹페이지에서 드롭다운으로 전환하는 것이 목적이다.

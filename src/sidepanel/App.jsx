@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
-import { DASHBOARD_URL, FEATURES } from '../config.js';
+import { FEATURES } from '../config.js';
+import { dashboardPageUrl } from '../lib/dashboardPage.js';
 import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
 import {
   listPersonalGlossary,
@@ -110,8 +111,6 @@ import {
   saveTeamGlossaryEntry,
   removeTeamGlossaryEntry,
   uploadFriction,
-  fetchAllTeamsFriction,
-  DASHBOARD_DAYS,
   refreshAllMemberships,
   listTeamMembers,
   setMemberDashboardAccess,
@@ -1707,19 +1706,13 @@ function MeetingCard({ onAwarded, onToast }) {
 /**
  * B2B 대시보드 진입 (Spec §3).
  *
- * 🔴 **대시보드는 별도 웹페이지라 로그인이 없다.** Firestore를 직접 읽으려면 그 페이지에도
- *    구글 인증을 붙여야 하는데, 규칙상 팀원만 읽을 수 있으므로 인증 없는 페이지에 데이터를
- *    열어 주는 순간 **팀 id만 알면 남의 조직 지표가 공개된다.** 그래서 **읽기는 확장이 하고**
- *    (이미 팀원 자격이 있다) 집계 결과만 페이지로 넘긴다.
- * 🔴 값은 **URL 프래그먼트(`#`)**로 넘긴다 — 쿼리스트링과 달리 서버로 전송되지 않아 호스팅
- *    로그에 남지 않는다. 넘기는 것은 정수 합계뿐이고 개인 식별자는 애초에 존재하지 않는다
- *    (`friction.js` 설계 — 마찰 문서에 uid를 남기지 않는다).
- * 🔴 팀이 없으면 **데모로 연다** — 그리고 그렇다고 화면에 쓴다. 목업을 실데이터처럼 보이게
- *    하지 않는 것이 이 프로젝트에서 반복된 교훈이다(S33·S45).
+ * 🔴 **2026-10-25 (0.1.21, 사용자 결정 안 A) — 대시보드는 확장 페이지다**(`src/dashboard/`). 예전에는 로그인이 없는
+ *    웹페이지라 여기서 볼 수 있는 팀 전부를 120일씩 읽어 `#sai=`(URL)에 실어 보냈다 — 열 때마다 팀당 120회 읽기,
+ *    팀 합계가 주소·방문 기록에 남았다. 이제 여기서는 **아무것도 읽지 않고** 페이지만 연다. 페이지가 확장의
+ *    로그인으로 고른 팀의 최근 30일부터, 필요할 때 필요한 날만 읽는다.
+ * 🔴 주소에는 처음 고를 팀 id만 싣는다(`dashboardPageUrl`) — 지표는 싣지 않는다.
  */
 function TeamDashboardCard({ team, onToast }) {
-  const [busy, setBusy] = useState(false);
-
   /**
    * 🔴 **팀은 부모(`TeamPanel`)가 준다** (2026-08-16). 예전에는 이 카드가 스스로 `getTeam()`을
    *    읽어서, 「팀」 탭에서 팀을 바꿔도 **옛 팀**을 들고 있었다 — 「132 대시보드」를 눌렀는데
@@ -1729,37 +1722,13 @@ function TeamDashboardCard({ team, onToast }) {
   if (!canView) return null;
 
   const open = async () => {
-    setBusy(true);
+    const url = dashboardPageUrl(team.teamId);
     try {
-      /**
-       * 🔴 **볼 수 있는 팀을 전부 실어 보낸다** — 대시보드는 로그인이 없어 스스로 팀을 바꿔
-       *    읽을 수 없다. 웹페이지의 드롭다운이 이 배열로 전환한다.
-       * 🔴 **지표가 0건인 팀도 넣는다.** 빼면 그 팀을 고른 사용자에게 다른 팀 지표가 열린다
-       *    (실측으로 겪었다) — 빈 팀은 빈 팀으로 보여준다.
-       */
-      // 🔴 120일 — 대시보드가 60일을 바로 앞 60일과 비교한다. 받은 날짜 수(`days`)를 함께 실어,
-      //    대시보드가 자료가 닿지 않는 기간·비교를 지어내지 않게 한다(옛 확장은 30일만 보냈다).
-      const reports = await fetchAllTeamsFriction({ days: DASHBOARD_DAYS });
-      if (reports.length === 0) {
-        onToast('아직 지표를 볼 수 있는 팀이 없어요 — 데모 데이터로 열게요');
-        window.open(DASHBOARD_URL, '_blank', 'noopener');
-        return;
-      }
-      // 🔴 지금 보고 있는 팀을 **맨 앞**에 둔다 — 열었을 때 고른 팀이 나와야 한다.
-      const ordered = [
-        ...reports.filter((item) => item.teamId === team.teamId),
-        ...reports.filter((item) => item.teamId !== team.teamId),
-      ];
-      const payload = btoa(
-        // 🔴 `encodeURIComponent`를 거쳐야 한글 팀 이름이 `btoa`에서 깨지지 않는다.
-        unescape(encodeURIComponent(JSON.stringify({ teams: ordered, days: DASHBOARD_DAYS }))),
-      );
-      window.open(`${DASHBOARD_URL}#sai=${payload}`, '_blank', 'noopener');
+      await chrome.tabs.create({ url });
     } catch {
-      onToast('팀 지표를 불러오지 못했어요 — 데모 데이터로 열게요');
-      window.open(DASHBOARD_URL, '_blank', 'noopener');
-    } finally {
-      setBusy(false);
+      // 🔴 `tabs.create`가 없거나 실패하면 같은 주소를 새 창으로 — 그것도 막히면 알린다.
+      const opened = window.open(url, '_blank', 'noopener');
+      if (!opened) onToast('대시보드를 열지 못했어요 — 다시 눌러 주세요');
     }
   };
 
@@ -1767,10 +1736,9 @@ function TeamDashboardCard({ team, onToast }) {
     <section className="card card-dashed">
       <h2 className="card-label card-label-green">{team.name} — 협업 대시보드</h2>
       <p className="card-text">팀에 쌓인 협업 건강도와 마찰 리포트를 봅니다.</p>
-      {/* 🔴 사이드패널(chrome-extension:// 오리진)에서 별도 웹페이지를 열려면 새 탭으로 나가야
-          한다 — 리더에게 공유할 독립 URL이어야 한다(Spec §1). */}
-      <button type="button" className="button button-green" disabled={busy} onClick={open}>
-        {busy ? '불러오는 중…' : '대시보드 열기 →'}
+      {/* 🔴 확장 페이지를 새 탭으로 연다 — 사이드패널은 좁아 대시보드를 그릴 자리가 없다. */}
+      <button type="button" className="button button-green" onClick={open}>
+        대시보드 열기 →
       </button>
     </section>
   );

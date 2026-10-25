@@ -27,8 +27,8 @@ import {
   CONTEXT_IDS,
   POSITIVE_IDS,
   FRICTION_IDS,
-  readLiveScenarios,
-} from '../dashboard/src/liveData.js';
+} from '../src/dashboard/seam/signals.js';
+import { buildRows, sum, F, P } from '../src/dashboard/seam/model.js';
 
 const NEW_KEYS = [
   'decoded',
@@ -79,22 +79,19 @@ test('🔴 대시보드 긍정·마찰 목록에 context 키가 섞이지 않는
   }
 });
 
-test('#sai= 페이로드의 새 키가 시나리오 `context`로 살아 넘어온다 · 막대 합계는 그대로', () => {
+test('Firestore 날짜 문서의 새 키가 날짜 줄에 살아 넘어온다 · 마찰·긍정 합계는 그대로 · 허용 밖 키는 버린다', () => {
+  // 🔴 0.1.21 — 예전에는 `#sai=` 페이로드로 검사했다. 이제 확장 대시보드가 Firestore에서 읽은 `byDate`를 같은 `buildRows`로 편다.
+  const today = new Date(2026, 9, 25);
   const counts = { refined: 10, misread: 2, clear: 1, decoded: 4, urgencyCritical: 3, teamGlossaryApplied: 2, bogus: 7 };
-  const json = JSON.stringify({ teams: [{ teamId: 't1', teamName: '팀', counts, byDate: {} }] });
-  const hash = `#sai=${btoa(unescape(encodeURIComponent(json)))}`;
-  const [scenario] = readLiveScenarios(hash);
-  const byId = Object.fromEntries(scenario.context.map((row) => [row.id, row.count]));
-  assert.equal(byId.decoded, 4);
-  assert.equal(byId.urgencyCritical, 3);
-  assert.equal(byId.teamGlossaryApplied, 2);
-  assert.equal(byId.urgencyLow, 0);
-  assert.equal(scenario.total, 10);
-  assert.equal(scenario.positive.reduce((s, r) => s + r.count, 0), 1);
-  assert.equal(scenario.friction.reduce((s, r) => s + r.count, 0), 2);
-  // 화이트리스트 밖 키는 어디에도 없다.
-  const allIds = [...scenario.positive, ...scenario.friction, ...scenario.context].map((r) => r.id);
-  assert.ok(!allIds.includes('bogus'));
+  const [row] = buildRows({ '2026-10-25': counts }, 1, today);
+  assert.equal(row.c.decoded, 4);
+  assert.equal(row.c.urgencyCritical, 3);
+  assert.equal(row.c.teamGlossaryApplied, 2);
+  assert.equal(row.c.urgencyLow, undefined);
+  assert.equal(row.c.refined, 10);
+  assert.equal(sum([row], P), 1);
+  assert.equal(sum([row], F), 2);
+  assert.equal(row.c.bogus, undefined, '화이트리스트 밖 키는 어디에도 없다');
 });
 
 /* ── ③ 세는 순간 — 다듬기 ───────────────────────────────────────────── */
