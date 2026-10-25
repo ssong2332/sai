@@ -64,7 +64,7 @@ export function mount(teams, { demo }) {
   function drawWeave(rows) {
     const svg = $('weave');
     const W = Math.max(320, Math.round(svg.parentNode.clientWidth || 1240)), narrow = W < 640;
-    const LED = narrow ? 64 : 84, H = (narrow ? 250 : 300) + LED, L = narrow ? 8 : 96, R = narrow ? 8 : 24;
+    const H = narrow ? 250 : 300, L = narrow ? 8 : 96, R = narrow ? 8 : 24;
     const mid = narrow ? 120 : 150, minGap = 6, maxGap = narrow ? 150 : 200;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const n = rows.length, step = (W - L - R) / Math.max(1, n - 1);
@@ -80,21 +80,9 @@ export function mount(teams, { demo }) {
     const worst = worstDay(rows);
     if (state.sel == null || state.sel >= n) state.sel = worst ?? n - 1;
 
-    // 장부: 이름표가 붙은 두 줄, 줄마다 기준선 — 마찰 위 줄, 긍정 아래 줄(섞이지 않게). 막대는 둘 다 위로 자란다.
-    const laneH = LED / 2 - 4, fBase = H - 30 - LED / 2 - 4, pBase = H - 30 - 2;
+    // 2026-10-25 사용자 결정 — 아래 신호 막대(장부)는 뺐다. 실의 벌어짐이 이미 마찰을 말하므로 같은 말을 두 번
+    //    하지 않는다. 그날의 건수는 커서 옆 말풍선(`tip`)이 알려 준다.
     const fC = rows.map((d) => sum([d], F)), pC = rows.map((d) => sum([d], P));
-    const cMax = safeMax([...fC, ...pC]), bw = Math.max(3, Math.min(12, step * 0.5));
-    const hOf = (c) => laneHeight(c, cMax, laneH - 4);
-    let marks = `<line class="ledger-base" x1="${L}" y1="${fBase}" x2="${W - R}" y2="${fBase}"/><line class="ledger-base" x1="${L}" y1="${pBase}" x2="${W - R}" y2="${pBase}"/>`;
-    rows.forEach((d, i) => {
-      if (fC[i]) marks += `<rect class="snagmark" x="${(x(i) - bw / 2).toFixed(1)}" y="${(fBase - hOf(fC[i])).toFixed(1)}" width="${bw.toFixed(1)}" height="${hOf(fC[i]).toFixed(1)}" rx="2"/>`;
-      if (pC[i]) marks += `<rect class="stitchmark" x="${(x(i) - bw / 2).toFixed(1)}" y="${(pBase - hOf(pC[i])).toFixed(1)}" width="${bw.toFixed(1)}" height="${hOf(pC[i]).toFixed(1)}" rx="2"/>`;
-    });
-    const fSum = fC.reduce((t, v) => t + v, 0), pSum = pC.reduce((t, v) => t + v, 0);
-    marks += narrow
-      ? `<text class="ledger-k f" x="${L}" y="${fBase - laneH + 8}">마찰 신호 ${fSum}건</text><text class="ledger-k p" x="${L}" y="${pBase - laneH + 8}">긍정 신호 ${pSum}건</text>`
-      : `<text class="ledger-k f" x="${L - 12}" y="${fBase - 4}" text-anchor="end">마찰 신호</text><text class="ledger-n" x="${L - 12}" y="${fBase - 18}" text-anchor="end">${fSum}건</text>
-         <text class="ledger-k p" x="${L - 12}" y="${pBase - 4}" text-anchor="end">긍정 신호</text><text class="ledger-n" x="${L - 12}" y="${pBase - 18}" text-anchor="end">${pSum}건</text>`;
 
     let weekends = '', axis = '';
     rows.forEach((d, i) => {
@@ -108,7 +96,7 @@ export function mount(teams, { demo }) {
       const wx = x(worst), wy = mid - gap[worst] / 2, flip = wx > W * 0.6;
       const wd = rows[worst], wdF = sum([wd], F), cause = topCause(wd);
       const steadyNote = wd.c.refined < STEADY_MIN ? ' · 글이 적은 날이에요' : '';
-      callout = `<g class="callout"><line x1="${wx}" y1="${wy - 6}" x2="${wx}" y2="22"/><text x="${wx + (flip ? -8 : 8)}" y="26" text-anchor="${flip ? 'end' : 'start'}">가장 벌어진 날 · ${fmtD(wd.date)} (${WD[wd.wd]})</text><text class="sub" x="${wx + (flip ? -8 : 8)}" y="42" text-anchor="${flip ? 'end' : 'start'}">다듬은 글 ${wd.c.refined}건에서 마찰 신호 ${wdF}건${narrow || !cause ? '' : ` · ${cause.label} ${cause.count}건이 가장 많았어요`}${steadyNote}</text></g>`;
+      callout = `<g class="callout"><line x1="${wx}" y1="${wy - 6}" x2="${wx}" y2="22"/><text x="${wx + (flip ? -8 : 8)}" y="26" text-anchor="${flip ? 'end' : 'start'}">가장 벌어진 날 · ${fmtD(wd.date)} (${WD[wd.wd]})</text><text class="sub" x="${wx + (flip ? -8 : 8)}" y="42" text-anchor="${flip ? 'end' : 'start'}">${narrow || !cause ? '' : `${cause.label} ${cause.count}건이 가장 많았어요`}${steadyNote}</text></g>`;
       desc = `${n}일 동안 ${subject}의 마찰 비율. 가장 벌어진 날은 ${fmtD(wd.date)}, 다듬은 글 ${wd.c.refined}건에서 마찰 신호 ${wdF}건.`;
     }
 
@@ -120,7 +108,6 @@ export function mount(teams, { demo }) {
       <line class="seamline" x1="${L}" y1="${mid}" x2="${W - R}" y2="${mid}"/>
       <g class="axis">${axis}</g>
       <path class="gap" d="${area}"/>
-      <g class="marks">${marks}</g>
       <path class="strand a" d="${pTop}"/>
       <path class="strand b" d="${pBot}"/>
       ${narrow ? '' : `<text class="team-label a" x="${L - 12}" y="${mid - gap[0] / 2 - 2}" text-anchor="end">${esc(t.a)}</text>
@@ -130,16 +117,25 @@ export function mount(teams, { demo }) {
       <g id="hits">${rows.map((_, i) => `<rect class="hit" data-i="${i}" x="${(x(i) - step / 2).toFixed(1)}" y="0" width="${step.toFixed(1)}" height="${H - 30}"/>`).join('')}</g>`;
     svg.querySelectorAll('.strand').forEach((p) => p.style.setProperty('--len', Math.ceil(p.getTotalLength())));
     svg.classList.remove('drawn'); void svg.getBBox(); svg.classList.add('drawn');
-    svg._geo = { x, mid, gap, H, fBase, pBase, fC, pC, hOf };
+    svg._geo = { x, mid, gap, H, W, fC, pC, narrow };
     svg.tabIndex = 0;
     svg.setAttribute('aria-label', '날짜 선택 — 왼쪽·오른쪽 화살표로 날짜를 옮겨요');
     placeCursor(rows);
   }
 
+  /** 커서 말풍선 — 아래 실 밑에 그날의 마찰 신호 수(와 다듬은 글·긍정 신호)를 띄운다. 가장자리에서는 안쪽으로 접는다. */
+  function tip(g, i, d) {
+    const ref = d.c.refined || 0, w = g.narrow ? 156 : 176, h = 46, cx = g.x(i);
+    const left = Math.min(Math.max(cx - w / 2, 4), g.W - w - 4);
+    const top = Math.min(g.mid + g.gap[i] / 2 + 12, g.H - 30 - h - 2);
+    return `<g class="tip" aria-hidden="true"><rect x="${left}" y="${top}" width="${w}" height="${h}" rx="10"/>`
+      + `<text class="tip-1" x="${left + 12}" y="${top + 20}">${fmtD(d.date)} · 마찰 신호 ${g.fC[i]}건</text>`
+      + `<text class="tip-2" x="${left + 12}" y="${top + 36}">다듬은 글 ${ref}건 · 긍정 신호 ${g.pC[i]}건</text></g>`;
+  }
+
   function placeCursor(rows) {
     const svg = $('weave'), g = svg._geo, i = state.sel;
-    svg.querySelector('#cursor').innerHTML = `<line class="cursor" x1="${g.x(i)}" y1="12" x2="${g.x(i)}" y2="${g.H - 30}"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid - g.gap[i] / 2}" r="4.5"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid + g.gap[i] / 2}" r="4.5"/>
-      <text class="cursor-n f" x="${g.x(i) + 8}" y="${g.fBase - g.hOf(g.fC[i]) + 4}">${g.fC[i]}</text><text class="cursor-n p" x="${g.x(i) + 8}" y="${g.pBase - g.hOf(g.pC[i]) + 4}">${g.pC[i]}</text>`;
+    svg.querySelector('#cursor').innerHTML = `<line class="cursor" x1="${g.x(i)}" y1="12" x2="${g.x(i)}" y2="${g.H - 30}"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid - g.gap[i] / 2}" r="4.5"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid + g.gap[i] / 2}" r="4.5"/>${tip(g, i, rows[i])}`;
     $('th-day').textContent = fmtD(rows[i].date);
     const d = rows[i], fN = sum([d], F), pN = sum([d], P), ref = d.c.refined || 0;
     const chipRow = (kind) => EVENTS.filter((e) => e.kind === kind).map((e) => `<span class="chip ${kind === 'f' ? 'snag' : 'stitch'}${d.c[e.id] ? '' : ' zero'}"><b class="num">${d.c[e.id] || 0}</b>${e.label}</span>`).join('');
