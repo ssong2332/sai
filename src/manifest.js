@@ -36,7 +36,7 @@ export default defineManifest({
    *    L28 안전망·경고 상자가 들어갔는데 숫자가 그대로라 「다시 로드」가 됐는지 화면으로 알 수 없었다.
    *    `package.json`과 같은 값이어야 한다(`test/version.unit.test.js`).
    */
-  version: '0.1.27',
+  version: '0.1.28',
   /**
    * 🔴 **동작을 먼저, 은유는 빼고.** 예전 문구("사람과 사람, 언어와 언어 사이를 매끄럽게 잇는")는
    *    첫 줄이 은유라 무엇을 하는 도구인지 읽는 데 시간이 걸렸다.
@@ -169,7 +169,8 @@ export default defineManifest({
   //    `src/config.js`의 DEPLOYED_ENDPOINT와 반드시 함께 바꾼다. 로컬 프록시 권한은 아래
   //    `LOCAL_PROXY_HOST_PERMISSIONS`가 알아서 붙인다(손으로 추가하지 않는다).
   host_permissions: [
-    'https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/*',
+    // 2026-10-26 L33 U5 — Functions → Worker (`src/config.js` WORKER_ORIGIN). 옛 Functions 오리진은 뺐다.
+    'https://sai-refine.aiisgod.workers.dev/*',
     /**
      * S22 — GitHub 공개 활동 조회 + Device Flow. **`FEATURES.githubLookup`이 켜졌을 때만** 붙는다
      * (2026-09-30 L17 — 공개 빌드는 이 기능을 끄므로, 쓰지 않는 권한을 싣지 않는다. 스토어 심사는
