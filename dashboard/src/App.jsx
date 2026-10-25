@@ -93,7 +93,8 @@ export default function App() {
   const { positiveTotal, frictionTotal, positiveRows, frictionRows, allRows } = useMemo(() => {
     const posTotal = scenario.positive.reduce((sum, item) => sum + item.count, 0);
     const fricTotal = scenario.friction.reduce((sum, item) => sum + item.count, 0);
-    const max = Math.max(...scenario.positive.map((i) => i.count), ...scenario.friction.map((i) => i.count));
+    // 🔴 하한 1 — 신호가 모두 0건인 기간이면 0 ÷ 0이 되어 막대 폭이 `NaN%`였다(추이 차트와 같은 규칙).
+    const max = Math.max(1, ...scenario.positive.map((i) => i.count), ...scenario.friction.map((i) => i.count));
     // 🔴 최솟값 2%를 둔다(시안 원본 `Math.max(pct, 2)`) — 값이 아주 작아도 막대 자체가
     //    안 보이면 "0건인지 그냥 안 그려진 건지" 구분이 안 된다.
     const pct = (value) => Math.max((value / max) * 100, 2).toFixed(1);
