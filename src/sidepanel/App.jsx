@@ -18,7 +18,6 @@ import {
   removeLearnedPattern,
   clearLearnedPatterns,
   SITUATION_TEMPLATES,
-  COLLAB_STYLES,
 } from '../lib/profile.js';
 import { categoryLabel, LEARNING_THRESHOLD } from '../core/profile/diff.js';
 // S23 / Spec 권장 12 · §1 Token Economy
@@ -3640,7 +3639,13 @@ function ProfileTab({
   onUpdateRecipient,
   onNotice,
 }) {
-  const collabLabel = COLLAB_STYLES.find((item) => item.id === profile.collabStyleId)?.label ?? null;
+  /**
+   * 🔴 **말투는 「기본 톤」 하나다** (2026-10-25 사용자 결정 — 「협업 성향」을 「기본 톤」으로 합쳤다).
+   *    요약 줄의 말투는 `sai.onboarding.tone`에서 읽는다. 교정 요청이 읽는 `sai.profile.collabStyleId`는
+   *    톤을 바꿀 때 `setOnboardingFields`/`saveOnboarding`이 같은 값으로 맞춘다(키·동기화 규칙은 그대로).
+   *    톤을 바꾸는 자리: 설정 시트 「보내는 글 기본값」 · 홈 온보딩 · 설정 페이지 「보내는 글 기본값」.
+   */
+  const toneLabel = onboardingLabels(onboarding).tone;
 
   /**
    * 🔴 **접기를 「내 정보」 카드 하나로 올렸다** (2026-08-20 사용자 요청 ①③).
@@ -3665,7 +3670,7 @@ function ProfileTab({
   useEffect(() => {
     getIdentity().then(setIdentityState);
   }, []);
-  const meChosen = !!identity.displayName && !!collabLabel;
+  const meChosen = !!identity.displayName && !!toneLabel;
   const [meOpen, setMeOpen] = useState(false);
 
   return (
@@ -3701,7 +3706,7 @@ function ProfileTab({
         {meChosen && !meOpen && (
           <p className="card-text">
             <b>{identity.displayName}</b>
-            {identity.jobTitle ? ` · ${identity.jobTitle}` : ''} · <b>{collabLabel}</b>
+            {identity.jobTitle ? ` · ${identity.jobTitle}` : ''} · <b>{toneLabel}</b>
           </p>
         )}
         {(!meChosen || meOpen) && (
@@ -3728,7 +3733,7 @@ function ProfileTab({
         *    남기고 연결(ⓐ)하는 대신 **지운다.** 화면이 줄고 오해가 사라진다.
         */}
 
-      {/* Spec 필수 2 1순위 — 사용자가 직접 고른 상황 템플릿·협업 성향. 항상 100% 반영된다. */}
+      {/* Spec 필수 2 1순위 — 사용자가 직접 고른 상황 템플릿(+ 기본 톤). 항상 100% 반영된다. */}
       <div className="profile-block">
         {/**
           * 🔴 **정하고 나면 요약으로 접는다** (2026-08-16 사용자 요청 ③). 이 값은 **한 번 정하고
@@ -3736,7 +3741,7 @@ function ProfileTab({
           * 🔴 **정하지 않았으면 펼친 채로 둔다** — 접어 두면 설정해야 한다는 사실 자체가 숨는다.
           *    (교정에 항상 100% 반영되는 값이라 비워 두면 손해다 — Spec 필수 2 1순위)
           */}
-        <h3 className="card-label">1순위 — 내 상황 · 협업 성향</h3>
+        <h3 className="card-label">1순위 — 내 상황</h3>
         {/**
           * 🔴 **「주로 쓰는 상황」은 지우지 않는다** (2026-08-20 사용자 확인 ② — "필요 없으면 숨겨").
           *    확인해 보니 **교정에 실제로 실린다**: `buildProfileForRefine()`가 `situation.hint`를
@@ -3760,24 +3765,13 @@ function ProfileTab({
             </button>
           ))}
         </div>
-        <p className="field-label">선호하는 말투</p>
-        <div className="tag-row">
-          {COLLAB_STYLES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={profile.collabStyleId === item.id ? 'chip chip-on' : 'chip'}
-              aria-pressed={profile.collabStyleId === item.id}
-              onClick={() =>
-                onProfileChange({
-                  collabStyleId: profile.collabStyleId === item.id ? null : item.id,
-                })
-              }
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {/**
+          * 🔴 **「선호하는 말투」 칩을 뺐다** (2026-10-25 사용자 결정). 같은 축(`collabStyleId` = 온보딩 `tone`)이
+          *    설정 시트 「기본 톤」에도 있어 두 자리에서 바꿀 수 있었다. 이제 말투는 「기본 톤」 하나로 정한다.
+          */}
+        <p className="meta">
+          말투는 설정(톱니) › 보내는 글 기본값의 「기본 톤」에서 정해요{toneLabel ? ` — 지금: ${toneLabel}` : ''}.
+        </p>
       </div>
 
       {/**
@@ -3833,7 +3827,7 @@ function ProfileTab({
       {/* Spec 필수 2 과도기 규칙 — 3회 미만이면 1순위만 100% 반영. */}
       <p className="meta">
         {LEARNING_THRESHOLD}회 이상 축적된 패턴만 교정에 반영돼요 (2순위). 1순위는 항상 내 상황
-        템플릿 · 협업 성향이에요. 국가·문화권 특성은 교정에 쓰지 않아요.
+        템플릿 · 기본 톤이에요. 국가·문화권 특성은 교정에 쓰지 않아요.
       </p>
       </div>
       )}

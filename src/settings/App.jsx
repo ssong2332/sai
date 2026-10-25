@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 import { writeDisplaySetting } from '../lib/displaySettings.js';
 import { setOnboardingFields, setProfileSyncingTone, MY_LANGUAGES, PARTNER_REGIONS, DEFAULT_TONES } from '../lib/onboarding.js';
-import { removeLearnedPattern, clearLearnedPatterns, SITUATION_TEMPLATES, COLLAB_STYLES } from '../lib/profile.js';
+import { removeLearnedPattern, clearLearnedPatterns, SITUATION_TEMPLATES } from '../lib/profile.js';
 import { setIdentity, MAX_IDENTITY_FIELD } from '../lib/identity.js';
 import {
   addPersonalGlossaryEntry,
@@ -44,7 +44,7 @@ const PANELS = [
   { id: 'blocked', label: '표시 안 할 사이트', sub: '사이 버튼 숨기기' },
   // 🔴 id `language`는 그대로 둔다(2026-10-25 이름만 「보내는 글 기본값」으로) — 예전 `#language` 링크가 계속 맞는다.
   { id: 'language', label: '보내는 글 기본값', sub: '상대 지역 · 기본 톤' },
-  { id: 'me', label: '나', sub: '내 언어 · 내 정보 · 상황 · 협업 성향' },
+  { id: 'me', label: '나', sub: '내 언어 · 내 정보 · 상황' },
   { id: 'glossary', label: '용어집', sub: '' },
   { id: 'learned', label: '학습 내역', sub: '' },
   { id: 'data', label: '데이터', sub: '이 컴퓨터에 저장된 것' },
@@ -531,7 +531,7 @@ function LanguagePanel({ data, act }) {
       />
       <ChoiceRow
         label="기본 톤"
-        hint="따로 정하지 않았을 때 다듬는 말투예요. 「나」의 협업 성향과 같은 값이에요."
+        hint="따로 정하지 않았을 때 다듬는 말투예요. 교정에서 가장 먼저 따르는 기준(1순위)이에요."
         options={pick(DEFAULT_TONES)}
         value={o.tone ?? null}
         onChange={(next) => set({ tone: next })}
@@ -569,22 +569,16 @@ function MePanel({ data, act }) {
         />
       </Group>
       <Group
-        title="상황과 협업 성향"
-        note="교정에서 가장 먼저 따르는 기준이에요. 상대가 어느 나라 사람인지보다 지금 어떤 일을 하는지, 내가 어떻게 일하는지를 먼저 봅니다."
+        title="상황"
+        note="교정에서 가장 먼저 따르는 기준이에요. 상대가 어느 나라 사람인지보다 지금 어떤 일을 하는지를 먼저 봅니다. 말투는 「보내는 글 기본값」의 기본 톤에서 정해요."
       >
+        {/* 🔴 「협업 성향」 칩을 뺐다(2026-10-25 사용자 결정) — 말투는 「기본 톤」 하나다(같은 축, 저장 키는 그대로 동기화). */}
         <ChoiceRow
           label="자주 쓰는 상황"
           options={pick(SITUATION_TEMPLATES)}
           value={data.profile.situationId ?? null}
           allowNone
           onChange={(next) => act(() => setProfileSyncingTone({ situationId: next }))}
-        />
-        <ChoiceRow
-          label="협업 성향"
-          options={pick(COLLAB_STYLES)}
-          value={data.profile.collabStyleId ?? null}
-          allowNone
-          onChange={(next) => act(() => setProfileSyncingTone({ collabStyleId: next }))}
         />
       </Group>
     </>
