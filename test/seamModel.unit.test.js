@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import {
   EVENTS, F, P, buildRows, splitWindow, periodOptions, defaultPeriod, ratio, healthOf, sum,
   worstDay, dailyGap, topCause, headline, deltaOf, storyFacts, actions, briefLines, briefText,
-  weekdayFold, threadRows, safeMax, frac, isEmpty, esc, dateKey,
+  weekdayFold, threadRows, safeMax, frac, isEmpty, esc, dateKey, laneHeight,
 } from '../dashboard/src/seam/model.js';
 import { computeHealthMetrics } from '../dashboard/src/healthIndex.js';
 import { FRICTION_IDS, POSITIVE_IDS, readLiveScenarios, coverageDaysOf } from '../dashboard/src/liveData.js';
@@ -242,5 +242,23 @@ test('예시 데이터는 실데이터와 같은 모양(byDate 120일)으로 같
     assert.equal(sum(rows, ['refined']) > 0, true);
     assert.ok(rows.every((d) => (d.c.clear || 0) <= (d.c.misread || 0)), 'clear는 misread를 넘지 않는다');
     assert.ok(rows.every((d) => (d.c.decodeUrgencyGap || 0) <= (d.c.decoded || 0)));
+  }
+});
+
+/* ── 장부 두 줄 (2026-10-25 사용자 지적: 마찰·긍정이 한눈에 안 읽힘) ── */
+
+test('장부 막대 — 제곱근 눈금, 0이 아니면 최소 3px, 0이면 0', () => {
+  assert.equal(laneHeight(0, 10, 30), 0);
+  assert.equal(laneHeight(10, 10, 30), 30);
+  assert.equal(laneHeight(1, 100, 30), 3, '1/100 → sqrt 0.1 × 30 = 3');
+  assert.equal(laneHeight(1, 10000, 30), 3, '아주 작아도 3px');
+  assert.ok(Math.abs(laneHeight(25, 100, 40) - 20) < 1e-9, 'sqrt(0.25) × 40');
+});
+
+test('🔴 장부 막대는 분모가 0·NaN이어도 유한하고 줄 높이를 넘지 않는다', () => {
+  for (const [c, m, h] of [[3, 0, 30], [3, NaN, 30], [NaN, 5, 30], [50, 5, 30], [2, 1, -4]]) {
+    const v = laneHeight(c, m, h);
+    assert.ok(Number.isFinite(v), `${c}/${m}`);
+    assert.ok(v <= Math.max(3, h), `${c}/${m} → ${v}`);
   }
 });

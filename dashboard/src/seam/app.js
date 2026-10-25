@@ -7,7 +7,7 @@
 
 import {
   EVENTS, F, P, WD, STEADY_MIN,
-  sum, ratio, healthOf, safeMax, frac, fmtD, pct, esc,
+  sum, ratio, healthOf, safeMax, laneHeight, frac, fmtD, pct, esc,
   splitWindow, periodOptions, defaultPeriod, isEmpty,
   dailyGap, worstDay, topCause, headline, deltaOf, storyFacts,
   actions, briefLines, briefText, weekdayFold, threadRows,
@@ -80,16 +80,21 @@ export function mount(teams, { demo }) {
     const worst = worstDay(rows);
     if (state.sel == null || state.sel >= n) state.sel = worst ?? n - 1;
 
-    const base = H - 30 - LED / 2, half = LED / 2 - 6;
+    // 장부: 이름표가 붙은 두 줄, 줄마다 기준선 — 마찰 위 줄, 긍정 아래 줄(섞이지 않게). 막대는 둘 다 위로 자란다.
+    const laneH = LED / 2 - 4, fBase = H - 30 - LED / 2 - 4, pBase = H - 30 - 2;
     const fC = rows.map((d) => sum([d], F)), pC = rows.map((d) => sum([d], P));
-    const cMax = safeMax([...fC, ...pC]), bw = Math.max(2, Math.min(10, step * 0.46));
-    let marks = `<line class="ledger-base" x1="${L}" y1="${base}" x2="${W - R}" y2="${base}"/>`;
+    const cMax = safeMax([...fC, ...pC]), bw = Math.max(3, Math.min(12, step * 0.5));
+    const hOf = (c) => laneHeight(c, cMax, laneH - 4);
+    let marks = `<line class="ledger-base" x1="${L}" y1="${fBase}" x2="${W - R}" y2="${fBase}"/><line class="ledger-base" x1="${L}" y1="${pBase}" x2="${W - R}" y2="${pBase}"/>`;
     rows.forEach((d, i) => {
-      const fh = Math.sqrt(fC[i] / cMax) * half, ph = Math.sqrt(pC[i] / cMax) * half; // 제곱근 — 한두 건인 날도 보이게
-      if (fC[i]) marks += `<rect class="snagmark" data-i="${i}" x="${(x(i) - bw / 2).toFixed(1)}" y="${(base - 1 - fh).toFixed(1)}" width="${bw.toFixed(1)}" height="${fh.toFixed(1)}" rx="${(bw / 2).toFixed(1)}"/>`;
-      if (pC[i]) marks += `<rect class="stitchmark" data-i="${i}" x="${(x(i) - bw / 2).toFixed(1)}" y="${(base + 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${ph.toFixed(1)}" rx="${(bw / 2).toFixed(1)}"/>`;
+      if (fC[i]) marks += `<rect class="snagmark" x="${(x(i) - bw / 2).toFixed(1)}" y="${(fBase - hOf(fC[i])).toFixed(1)}" width="${bw.toFixed(1)}" height="${hOf(fC[i]).toFixed(1)}" rx="2"/>`;
+      if (pC[i]) marks += `<rect class="stitchmark" x="${(x(i) - bw / 2).toFixed(1)}" y="${(pBase - hOf(pC[i])).toFixed(1)}" width="${bw.toFixed(1)}" height="${hOf(pC[i]).toFixed(1)}" rx="2"/>`;
     });
-    marks += `<text class="ledger-k" x="${W - R}" y="${base - half - 4}" text-anchor="end">마찰 신호 ↑</text><text class="ledger-k" x="${W - R}" y="${base + half + 12}" text-anchor="end">긍정 신호 ↓</text>`;
+    const fSum = fC.reduce((t, v) => t + v, 0), pSum = pC.reduce((t, v) => t + v, 0);
+    marks += narrow
+      ? `<text class="ledger-k f" x="${L}" y="${fBase - laneH + 8}">마찰 신호 ${fSum}건</text><text class="ledger-k p" x="${L}" y="${pBase - laneH + 8}">긍정 신호 ${pSum}건</text>`
+      : `<text class="ledger-k f" x="${L - 12}" y="${fBase - 4}" text-anchor="end">마찰 신호</text><text class="ledger-n" x="${L - 12}" y="${fBase - 18}" text-anchor="end">${fSum}건</text>
+         <text class="ledger-k p" x="${L - 12}" y="${pBase - 4}" text-anchor="end">긍정 신호</text><text class="ledger-n" x="${L - 12}" y="${pBase - 18}" text-anchor="end">${pSum}건</text>`;
 
     let weekends = '', axis = '';
     rows.forEach((d, i) => {
@@ -125,7 +130,7 @@ export function mount(teams, { demo }) {
       <g id="hits">${rows.map((_, i) => `<rect class="hit" data-i="${i}" x="${(x(i) - step / 2).toFixed(1)}" y="0" width="${step.toFixed(1)}" height="${H - 30}"/>`).join('')}</g>`;
     svg.querySelectorAll('.strand').forEach((p) => p.style.setProperty('--len', Math.ceil(p.getTotalLength())));
     svg.classList.remove('drawn'); void svg.getBBox(); svg.classList.add('drawn');
-    svg._geo = { x, mid, gap, H };
+    svg._geo = { x, mid, gap, H, fBase, pBase, fC, pC, hOf };
     svg.tabIndex = 0;
     svg.setAttribute('aria-label', '날짜 선택 — 왼쪽·오른쪽 화살표로 날짜를 옮겨요');
     placeCursor(rows);
@@ -133,11 +138,13 @@ export function mount(teams, { demo }) {
 
   function placeCursor(rows) {
     const svg = $('weave'), g = svg._geo, i = state.sel;
-    svg.querySelector('#cursor').innerHTML = `<line class="cursor" x1="${g.x(i)}" y1="12" x2="${g.x(i)}" y2="${g.H - 30}"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid - g.gap[i] / 2}" r="4.5"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid + g.gap[i] / 2}" r="4.5"/>`;
+    svg.querySelector('#cursor').innerHTML = `<line class="cursor" x1="${g.x(i)}" y1="12" x2="${g.x(i)}" y2="${g.H - 30}"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid - g.gap[i] / 2}" r="4.5"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid + g.gap[i] / 2}" r="4.5"/>
+      <text class="cursor-n f" x="${g.x(i) + 8}" y="${g.fBase - g.hOf(g.fC[i]) + 4}">${g.fC[i]}</text><text class="cursor-n p" x="${g.x(i) + 8}" y="${g.pBase - g.hOf(g.pC[i]) + 4}">${g.pC[i]}</text>`;
+    $('th-day').textContent = fmtD(rows[i].date);
     const d = rows[i], fN = sum([d], F), pN = sum([d], P), ref = d.c.refined || 0;
-    const chips = EVENTS.map((e) => `<span class="chip ${e.kind === 'f' ? 'snag' : 'stitch'}${d.c[e.id] ? '' : ' zero'}"><b class="num">${d.c[e.id] || 0}</b>${e.label}</span>`).join('');
+    const chipRow = (kind) => EVENTS.filter((e) => e.kind === kind).map((e) => `<span class="chip ${kind === 'f' ? 'snag' : 'stitch'}${d.c[e.id] ? '' : ' zero'}"><b class="num">${d.c[e.id] || 0}</b>${e.label}</span>`).join('');
     $('day').innerHTML = `<div class="day-date num">${fmtD(d.date)}<small>${WD[d.wd]}요일 · 다듬은 메시지 ${ref}건</small></div>
-      <div><div class="chips">${chips}</div></div>
+      <div class="chip-rows"><div class="chip-row"><span class="chip-k f">마찰 신호 ${fN}건</span><div class="chips">${chipRow('f')}</div></div><div class="chip-row"><span class="chip-k p">긍정 신호 ${pN}건</span><div class="chips">${chipRow('p')}</div></div></div>
       <div class="day-note">${ref === 0 ? '이날은 다듬은 메시지가 없어요.' : `다듬은 글 ${ref}건에서 마찰 신호 ${fN}건 · 긍정 신호 ${pN}건${fN > ref ? ' — 한 글에서 신호가 여러 개 잡히기도 해요' : ''}${ref < STEADY_MIN ? ' · 글이 적은 날이라 흐름 판단에는 덜 반영했어요' : ''}`}</div>`;
     const { cur, prev } = windowRows();
     drawThreads(cur, prev);
@@ -159,11 +166,13 @@ export function mount(teams, { demo }) {
 
   function drawThreads(cur, prev) {
     const sel = state.sel, n = cur.length, w = 600, h = 44, bw = w / n;
+    // 고른 날은 빨간 막대 대신 회색 세로 띠로 — 막대 색은 그대로 둔다(2026-10-25 사용자 지적).
+    const band = sel == null ? '' : `<rect class="selband" x="${(sel * bw).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${h}"/>`;
     $('threads').innerHTML = threadRows(cur, prev).map((e) => {
-      const bars = e.vals.map((v, i) => {
+      const bars = band + e.vals.map((v, i) => {
         if (!v) return '';
         const bh = Math.max(3, (v / e.max) * (h - 6));
-        return `<rect class="${i === sel ? 'hl' : e.kind === 'f' ? 's' : 'p'}" x="${(i * bw + bw * 0.18).toFixed(1)}" y="${(h - 2 - bh).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" height="${bh.toFixed(1)}"/>`;
+        return `<rect class="${e.kind === 'f' ? 's' : 'p'}" x="${(i * bw + bw * 0.18).toFixed(1)}" y="${(h - 2 - bh).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" height="${bh.toFixed(1)}"/>`;
       }).join('');
       return `<div class="thread">
         <div class="thread-name"><span class="thread-tag ${e.kind === 'f' ? 'snag' : 'stitch'}">${e.kind === 'f' ? '마찰' : '긍정'}</span><br>${e.label}<small>${e.desc}</small></div>
@@ -308,7 +317,9 @@ export function mount(teams, { demo }) {
     $('kick').textContent = `최근 ${state.days}일`;
     const hl = headline(cur, prev, state.days, subject);
     $('hl').innerHTML = hl.thin ? `${esc(hl.lead)} <span class="thin">${esc(hl.thin)}</span> ${esc(hl.rest)}` : esc(hl.lead);
-    roll($('idx'), healthOf(cur));
+    const h = healthOf(cur);
+    $('idx').classList.toggle('is-empty', h == null);
+    roll($('idx'), h);
     const dl = $('delta'), delta = deltaOf(cur, prev, state.days);
     dl.hidden = !delta;
     if (delta) { dl.className = `delta ${delta.dir}`; dl.textContent = delta.text; }

@@ -97,7 +97,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .gap { fill: url(#gapfill); }
 .stitchmark { fill: var(--stitch); }
 .ledger-base { stroke: var(--loom-rule); }
-.ledger-k { fill: var(--loom-dim); font-size: 10.5px; }
+.ledger-k { font-size: 11.5px; font-weight: 800; }
+.ledger-k.f { fill: var(--snag-text); } .ledger-k.p { fill: var(--stitch-text); }
+.ledger-n { fill: var(--loom-dim); font-size: 11px; font-weight: 600; }
+.cursor-n { font-size: 11px; font-weight: 800; }
+.cursor-n.f { fill: var(--snag-text); } .cursor-n.p { fill: var(--stitch-text); }
 .snagmark { fill: var(--snag); }
 .seamline { stroke: var(--seam); stroke-width: 1.2; stroke-dasharray: 2 5; opacity: .55; }
 .axis text { fill: var(--loom-dim); font-size: 11px; }
@@ -119,6 +123,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .day-date { font-size: 28px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
 .day-date small { display: block; font-size: 12.5px; font-weight: 600; letter-spacing: 0; color: var(--loom-dim); margin-top: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-rows { display: grid; gap: 10px; }
+.chip-row { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 12px; align-items: center; }
+.chip-k { font-size: 12.5px; font-weight: 800; }
+.chip-k.f { color: var(--snag); } .chip-k.p { color: var(--stitch); }
+@media (max-width: 860px) { .chip-row { grid-template-columns: 1fr; gap: 6px; } }
 .chip { display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 12px; border-radius: 999px; background: var(--loom-fill); font-size: 13px; }
 .chip b { font-weight: 800; }
 .chip.snag b { color: var(--snag); } .chip.stitch b { color: var(--stitch); }
@@ -150,7 +159,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .spark { width: 100%; height: 44px; display: block; }
 .spark rect { rx: 1.5; }
 .spark .s { fill: var(--snag); } .spark .p { fill: var(--stitch); } .spark .base { stroke: var(--rule); }
-.spark .hl { fill: var(--seam); }
+.spark .selband { fill: var(--hollow); }
 .thread-total { text-align: right; }
 .thread-total b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; }
 .thread-total span { font-size: 12px; color: var(--ink-3); }
@@ -277,3 +286,5 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 /* 예시 데이터 표시는 좁은 화면에서도 남긴다 — 실제 팀 지표로 오해하지 않게. */
 @media (max-width: 480px) { .demo:not([hidden]) { display: inline; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+/* 빈 팀의 지수 자리 — 148px 「—」가 검은 막대처럼 보여 작고 흐리게(2026-10-25) */
+.index-n.is-empty { font-size: clamp(40px, 6vw, 64px); color: var(--loom-dim); letter-spacing: 0; }

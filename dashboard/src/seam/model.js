@@ -138,6 +138,16 @@ export function isEmpty(rows) {
   return rows.every((d) => Object.values(d.c).every((v) => !v));
 }
 
+/**
+ * 장부 막대 높이 — 제곱근 눈금, 0이 아니면 최소 3px(한두 건인 날도 보이게). 0이면 0.
+ * 🔴 분모는 `safeMax`처럼 1 아래로 내려가지 않는다.
+ */
+export function laneHeight(count, max, laneH) {
+  if (!Number.isFinite(count) || count <= 0) return 0;
+  const m = Number.isFinite(max) && max >= 1 ? max : 1;
+  return Math.max(3, Math.sqrt(Math.min(1, count / m)) * Math.max(0, laneH));
+}
+
 /* ── 하루 단위 ────────────────────────────────────────────────────────── */
 
 /** 그날 마찰 신호 / 다듬은 글, 1에서 자른다(벌어짐 폭에만 쓴다 — 화면에 %로 보이지 않는다). */
