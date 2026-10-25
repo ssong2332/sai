@@ -57,6 +57,8 @@ import { readConfig } from './config.js';
 import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
+import { handleTeam } from './teamRoute.js';
+import { googleClientsFromEnv } from './google/clients.js';
 
 /**
  * 🔴 `mode` 라우팅 표 — `functions/index.js` `MODES`와 **같은 코어·같은 로그 필드**다(2026-10-24 이식).
@@ -128,6 +130,7 @@ export function resolveProvider(requested, keys) {
  * @param {typeof fetch} [deps.fetchImpl] provider 호출에 넘길 fetch(테스트는 가짜 응답 — 모든 provider 공용).
  * @param {object} [deps.cache] refine 코어 캐시 스토어.
  * @param {{decode?: object, decisions?: object, reply?: object}} [deps.caches] 나머지 mode의 캐시 스토어.
+ * @param {(env: object) => object|null} [deps.google] env → Google 클라이언트(`google/clients.js`). 테스트는 가짜 Firestore를 넘긴다.
  * @param {() => number} [deps.now]
  * @param {{log: Function, warn: Function, error: Function}} [deps.logger] 기본 console.
  */
@@ -141,6 +144,7 @@ export function createHandler(deps = {}) {
     caches = {},
     now = () => Date.now(),
     logger = console,
+    google = (env) => googleClientsFromEnv(env),
   } = deps;
   // mode마다 스토어 하나 — Functions(`refineCache`·`decodeCache`·…)와 같다. 같은 isolate 메모리 전용 클래스다.
   const modeCaches = {
@@ -199,7 +203,18 @@ export function createHandler(deps = {}) {
         // 코어 판정표와 같게 — `adaptive`만 켬, 나머지(없음 포함)는 끔.
         thinking: thinkingSwitch(config.thinking),
         usageStore: safeStoreKind(storeFor, env, logger),
+        // 팀 API(/v1/team) — 서비스 계정 시크릿이 있어야 ready.
+        team: safeGoogle(google, env, logger) ? 'ready' : 'unavailable',
       });
+    }
+
+    // 팀 API — 판정은 functions/*.js 그대로(teamRoute.js 헤더). 설정 누락은 교정과 같게 500.
+    if (url.pathname === '/v1/team') {
+      if (config.missing.length > 0) {
+        logger.error(`[team] 설정 누락: ${config.missing.join(',')}`);
+        return json(500, { error: 'server misconfigured' });
+      }
+      return handleTeam(request, { config, google: safeGoogle(google, env, logger), json, logger, jwks, now });
     }
 
     if (url.pathname !== '/v1/refine') return json(404, { error: 'not found' });
@@ -340,6 +355,16 @@ function resolveStore(storeFor, env, logger) {
   } catch (error) {
     logger.error(`[usage] 저장소 준비 실패 — 상한 없이 통과: ${error?.code ?? error?.name ?? 'unknown'}`);
     return createNoopUsageStore();
+  }
+}
+
+/** env → Google 클라이언트. 못 만들면 null(사유 코드만 로그) — 팀 API는 503으로 드러난다. */
+function safeGoogle(google, env, logger) {
+  try {
+    return google(env);
+  } catch (error) {
+    logger.error(`[google] 준비 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+    return null;
   }
 }
 
