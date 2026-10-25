@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 
 import {
   uploadFriction,
+  MAX_UPLOAD_DAYS,
   listTeams,
   getTeam,
   setActiveTeam,
@@ -86,13 +87,13 @@ test('올릴 것이 없으면 네트워크를 타지 않는다', async () => {
   assert.equal(called, false);
 });
 
-test('🔴 서버가 반영한 만큼만 로컬에서 뺀다 — 부분 성공에서 카운트가 사라지면 안 된다', async () => {
+test('🔴 응답이 성공이면 보낸 날을 다 뺀다 — 서버가 안 받은 값은 다시 보내도 받지 않는다 (0.1.24)', async () => {
   const store = installStorage({ 'sai.team': TEAM });
   signedIn(store);
   await recordFrictionEvent(FRICTION_EVENTS.MISREAD, { teamId: TEAM.teamId, now: MON });
   await recordFrictionEvent(FRICTION_EVENTS.VENTING, { teamId: TEAM.teamId, now: new Date(2026, 7, 18, 10, 0) });
 
-  // 서버가 하루치만 받아들였다고 응답한다.
+  // 서버가 하루치만 받아들였다고 응답한다 — 처리는 했지만 다른 날은 0건으로 본 것이다.
   const fetchImpl = async () => ({
     ok: true,
     status: 200,
@@ -101,12 +102,34 @@ test('🔴 서버가 반영한 만큼만 로컬에서 뺀다 — 부분 성공�
 
   const out = await uploadFriction({ fetchImpl });
   assert.equal(out.uploaded, 1);
-  const left = await takeFrictionBatch(TEAM.teamId);
-  assert.deepEqual(
-    left.map((d) => d.dateKey),
-    ['2026-08-18'],
-    '반영되지 않은 날짜가 사라졌다',
-  );
+  assert.deepEqual(await takeFrictionBatch(TEAM.teamId), []);
+});
+
+test('🔴 서버가 모르는 카운트만 남은 날이 대기열을 막지 않는다 (2026-10-26 실측 회귀)', async () => {
+  // 운영 Functions가 L34 맥락 카운트를 몰라 `accepted`에서 빠졌고, 그 날이 남아 31일이 앞을 막았다.
+  const byDay = {};
+  for (let d = 1; d <= 40; d += 1) {
+    const date = new Date(2026, 6, d);
+    const k = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    byDay[k] = { refined: 2, misread: 1, decoded: 3 };
+  }
+  const store = installStorage({ 'sai.team': TEAM, 'sai.friction.pending': { byTeam: { [TEAM.teamId]: byDay } } });
+  signedIn(store);
+
+  const sentSizes = [];
+  // 서버 흉내 — 아는 키만 받아 돌려준다(`decoded`는 모름).
+  const fetchImpl = async (_url, options) => {
+    const { days } = JSON.parse(options.body);
+    sentSizes.push(days.length);
+    const accepted = days.map(({ dateKey, counts }) => ({ dateKey, counts: { refined: counts.refined, misread: counts.misread } }));
+    return { ok: true, status: 200, json: async () => ({ accepted }) };
+  };
+
+  await uploadFriction({ fetchImpl });
+  assert.equal((await takeFrictionBatch(TEAM.teamId)).length, 9, '처리한 31일이 남아 앞을 막는다');
+  await uploadFriction({ fetchImpl });
+  assert.deepEqual(await takeFrictionBatch(TEAM.teamId), [], '남은 9일이 올라가지 않았다');
+  assert.deepEqual(sentSizes, [MAX_UPLOAD_DAYS, 9], '한 번에 31일 넘게 보냈다 — 서버는 앞 31일만 처리한다');
 });
 
 test('🔴 업로드가 실패하면 카운트를 남긴다 — 다음 기회에 다시 올라가야 한다', async () => {

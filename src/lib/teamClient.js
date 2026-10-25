@@ -404,11 +404,19 @@ export async function setMemberDashboardAccess(uid, canView, { fetchImpl = globa
   );
 }
 
+/** 한 번에 올리는 최대 날 수 — 서버 `MAX_BATCH_DAYS`와 같다. */
+export const MAX_UPLOAD_DAYS = 31;
+
 /**
  * 쌓인 마찰 카운트를 올린다.
  *
- * 🔴 **서버가 반영했다고 응답한 만큼만** 로컬에서 뺀다. "성공했으니 전부 지워"로 하면 서버가
- *    버린 항목(형식 오류·상한 초과)이 조용히 사라진다.
+ * 🔴 **한 번에 `MAX_UPLOAD_DAYS`(31)일까지만, 오래된 날부터** 보낸다 — 서버(`functions/teams.js`
+ *    `MAX_BATCH_DAYS`)가 앞의 31일만 처리하고 나머지는 말없이 버린다.
+ * 🔴 **응답이 성공이면 보낸 날의 보낸 값을 통째로 뺀다** (2026-10-26 고침, 0.1.24). 예전에는 서버가
+ *    「받았다」고 돌려준 값만 뺐는데, 서버가 모르는 카운트(운영 Functions가 L34 맥락 6종을 모름)는
+ *    영영 받아들여지지 않아 그 날이 대기열에 남았고, 남은 31일이 앞을 막아 **그 뒤 날짜가 하나도
+ *    올라가지 않았다**(실측: 120일 중 31일이 막고 89일 정지). 서버가 처리하고도 안 받은 값은 다시
+ *    보내도 받지 않으므로 들고 있을 이유가 없다.
  * 🔴 팀이 없으면 **아무것도 하지 않는다** — 개인 사용자의 카운트는 어디에도 올라가지 않는다.
  * @returns {Promise<{uploaded: number}>} 반영된 날짜 수. 팀이 없거나 보낼 것이 없으면 0.
  */
@@ -441,12 +449,12 @@ export async function uploadFriction({ fetchImpl = globalThis.fetch } = {}) {
       bucket === LEGACY_TEAM_BUCKET ? active : teams.find((item) => item.teamId === bucket);
     if (!target) continue;
 
-    const days = await takeFrictionBatch(bucket);
+    const days = (await takeFrictionBatch(bucket)).slice(0, MAX_UPLOAD_DAYS);
     if (days.length === 0) continue;
 
     const result = await callTeamApi('friction', { teamId: target.teamId, days }, fetchImpl);
     const accepted = Array.isArray(result?.accepted) ? result.accepted : [];
-    await clearSentFriction(bucket, accepted);
+    await clearSentFriction(bucket, days);
     uploaded += accepted.length;
   }
   return { uploaded };
