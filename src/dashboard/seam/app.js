@@ -2,7 +2,7 @@
  * Seam 화면 그리기 — 시안(`seam/template.html`)의 렌더링을 그대로 옮겼다.
  *
  * 🔴 숫자·문장은 전부 `model.js`(순수 함수)에서 받는다. 여기는 SVG·HTML 조각을 만들고 사건을 잇는다.
- * 🔴 팀 이름 같은 바깥 문자열은 `esc()`를 거친다 — 주소창에서 온 값을 HTML로 해석하지 않는다.
+ * 🔴 팀 이름 같은 바깥 문자열은 `esc()`를 거친다 — 사용자가 지은 팀 이름을 HTML로 해석하지 않는다.
  */
 
 import {
@@ -11,8 +11,9 @@ import {
   splitWindow, periodOptions, defaultPeriod, isEmpty,
   dailyGap, worstDay, topCause, headline, deltaOf, storyFacts,
   actions, briefLines, briefText, weekdayFold, threadRows,
-  pickDays, selectedSummary, dayStrip, dayTable,
+  pickDays, selectedSummary, dayStrip, dayTable, PERIODS,
 } from './model.js';
+import { daysNeeded } from '../range.js';
 
 const THEME_KEY = 'sai-dashboard-theme';
 /** 「실마다 따로 보기」 보기 방식(흐름/날짜별) — 이 브라우저의 편의 설정일 뿐이다. */
@@ -37,22 +38,42 @@ function path(pts) {
 }
 
 /**
- * @param {Array<{a: string, b: string, rows: object[], coverageDays: number}>} teams
- * @param {{demo: boolean}} opts
+ * @param {Array<{a: string, b: string, rows: object[], coverageDays: number, status?: string}>} teams
+ *   `status` — 'ready'(그릴 수 있음) · 'idle'(아직 안 읽음) · 'loading' · 'error'. 없으면 'ready'.
+ * @param {object} opts
+ * @param {boolean} opts.demo 예시 데이터인가 — 상단·바닥에 밝힌다.
+ * @param {(i: number, days: number) => Promise<{rows: object[], coverageDays: number}>} [opts.load]
+ *   확장 페이지만 준다. 팀 `i`의 최근 `days`일이 읽혀 있게 하고 지금까지 읽은 것을 돌려준다(빠진 날만 읽는다).
+ *   🔴 없으면(웹 예시) 받은 자료 범위 안에서만 그린다 — 예전과 같다.
+ * @param {number} [opts.initial] 처음 고른 팀 번호.
+ * @param {number} [opts.otherDays] 「맡은 관계 나란히」에서 다른 팀을 읽을 날 수.
+ * @param {(next: 'light'|'dark') => void} [opts.saveTheme] 밝기 버튼 — 없으면 이 브라우저(localStorage)에만 기억한다.
+ * @param {(error: unknown) => string} [opts.errorText] 읽기 실패를 사람 말로.
+ * @param {string} [opts.sourceLine] 바닥 줄의 출처 문구.
  */
-export function mount(teams, { demo }) {
+export function mount(teams, opts = {}) {
+  const { demo = false, load = null, otherDays = 30, saveTheme = null } = opts;
+  const errorText = opts.errorText ?? (() => '불러오지 못했어요');
+  const lazy = typeof load === 'function';
   const subject = demo ? '두 팀 사이' : '팀과 동료들 사이';
+  for (const t of teams) if (!t.status) t.status = 'ready';
+  const first = Number.isInteger(opts.initial) && teams[opts.initial] ? opts.initial : 0;
   // picked·anchor·focus는 「날짜별」의 고른 날·Shift 기준 날·키보드 위치(이번 기간 rows 안의 칸 번호).
-  const state = { team: 0, days: defaultPeriod(teams[0].coverageDays), sel: null, view: readView(), picked: null, anchor: null, focus: null, showZero: false };
+  // compare — 「앞 기간과 비교」를 위해 더 읽어도 되는가. 웹 예시는 자료가 이미 다 있으므로 늘 켜져 있다.
+  const state = { team: first, days: lazy ? 30 : defaultPeriod(teams[first].coverageDays), compare: !lazy, sel: null, view: readView(), picked: null, anchor: null, focus: null, showZero: false };
+  /** 진행 중인 읽기 · 실패한 읽기({message, want}). 화면은 둘 중 하나만 말한다. */
+  const net = { busy: false, error: null, seq: 0 };
   let briefCopy = '';
   let shown = null;
+  const periodsOf = (t) => (lazy ? PERIODS : periodOptions(t.coverageDays));
 
   const team = () => teams[state.team];
   const pairLabel = (t) => `${t.a} ↔ ${t.b}`;
   const windowRows = () => splitWindow(team().rows, state.days);
 
   $('demo').hidden = !demo;
-  $('foot-src').textContent = demo ? '사이 Team Health · 예시 데이터' : '사이 Team Health · 확장에서 넘겨받은 팀 합계';
+  $('demo-note').hidden = !demo;
+  $('foot-src').textContent = opts.sourceLine ?? (demo ? '사이 Team Health · 예시 데이터' : '사이 Team Health · 팀 합계');
 
   /* ── 숫자 굴리기 ── */
   function roll(el, to, digits = 1) {
@@ -304,6 +325,10 @@ export function mount(teams, { demo }) {
 
   function drawCompare() {
     $('cmp').innerHTML = teams.map((t, i) => {
+      if (t.status !== 'ready' || !t.rows.length) {
+        const msg = t.status === 'error' ? '읽지 못했어요 — 누르면 다시 읽어요' : t.status === 'loading' ? '불러오는 중…' : `이 칸이 보이면 최근 ${otherDays}일을 읽어요`;
+        return `<button type="button" class="cm cm-wait" data-i="${i}" aria-current="${i === state.team}"><span class="cm-h"><b>${esc(t.a)}</b> ↔ ${esc(t.b)}</span><span class="cm-n num">—</span><span class="cm-d">${msg}</span></button>`;
+      }
       const { cur, prev } = splitWindow(t.rows, Math.min(state.days, t.rows.length));
       const a = ratio(cur), b = prev.length ? ratio(prev) : null, h = healthOf(cur);
       const daily = dailyGap(cur);
@@ -313,13 +338,38 @@ export function mount(teams, { demo }) {
       const area = top + ' ' + path(daily.map((_, k) => [x(k), mid + g[k] / 2]).reverse()).replace(/^M/, 'L') + ' Z';
       const diff = a != null && b != null ? (a - b) * 100 : null;
       return `<button type="button" class="cm" data-i="${i}" aria-current="${i === state.team}"><span class="cm-h"><b>${esc(t.a)}</b> ↔ ${esc(t.b)}</span><span class="cm-n num">${h == null ? '—' : h.toFixed(1)}</span>
-        <span class="cm-d ${diff == null ? '' : diff > 0 ? 'up' : 'down'}">${a == null ? '아직 쌓인 신호가 없어요' : diff == null ? '비교할 앞 기간 없음' : `마찰 비율 ${Math.abs(diff).toFixed(1)}%p ${diff > 0 ? '늘었어요' : '줄었어요'}`}</span>
+        <span class="cm-d ${diff == null ? '' : diff > 0 ? 'up' : 'down'}">${a == null ? '아직 쌓인 신호가 없어요' : diff == null ? '비교할 앞 기간 없음' : `마찰 비율 ${Math.abs(diff).toFixed(1)}%p ${diff > 0 ? '늘었어요' : '줄었어요'}`}${t.rows.length < state.days ? ` · 최근 ${t.rows.length}일만 읽었어요` : ''}</span>
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="g" d="${area}"/><path class="a" d="${top}"/><path class="b" d="${bot}"/></svg></button>`;
     }).join('');
     $('cmp').querySelectorAll('.cm').forEach((btn) => btn.addEventListener('click', () => {
       selectTeam(Number(btn.dataset.i));
       window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
     }));
+    // 🔴 비교에 자료가 모자란 팀이 있으면 그렇다고 말한다 — 짧은 범위로 그린 것을 숨기지 않는다.
+    const note = $('cmp-note');
+    const short = teams.filter((t) => t.status === 'ready' && t.rows.length && t.rows.length < state.days).length;
+    const parts = [];
+    if (lazy && teams.length > 1) parts.push(`다른 팀은 이 칸이 화면에 들어올 때 팀마다 최근 ${otherDays}일만 읽어요.`);
+    if (short) parts.push(`${short}개 팀은 고른 기간(${state.days}일)보다 짧게 읽어서, 읽은 날까지만 그렸어요. 그 팀을 누르면 필요한 만큼 더 읽어요.`);
+    note.hidden = parts.length === 0;
+    note.textContent = parts.join(' ');
+  }
+
+  /** 「맡은 관계 나란히」 — 아직 안 읽은 팀을 하나씩 읽는다(확장 페이지만). */
+  async function loadOthers() {
+    for (let i = 0; i < teams.length; i += 1) {
+      const t = teams[i];
+      if (t.status !== 'idle') continue;
+      t.status = 'loading';
+      drawCompare();
+      try {
+        Object.assign(t, await load(i, otherDays));
+        t.status = 'ready';
+      } catch {
+        t.status = 'error';
+      }
+      drawCompare();
+    }
   }
 
   function drawBrief(cur, prev, acts) {
@@ -332,7 +382,7 @@ export function mount(teams, { demo }) {
 
   function drawRange() {
     const t = team();
-    const opts = periodOptions(t.coverageDays);
+    const opts = periodsOf(t);
     const wrap = $('range');
     wrap.querySelectorAll('button').forEach((b) => b.remove());
     opts.forEach((d) => {
@@ -341,15 +391,68 @@ export function mount(teams, { demo }) {
       btn.dataset.days = String(d);
       btn.textContent = `${d}일`;
       btn.setAttribute('aria-pressed', String(d === state.days));
-      btn.addEventListener('click', () => { state.days = d; render(); });
+      btn.disabled = net.busy;
+      btn.addEventListener('click', () => request({ days: d }));
       wrap.appendChild(btn);
     });
-    // 🔴 앞 기간이 자료 범위 밖이면 비교를 만들지 않는다 — 그 이유를 숨기지 않는다.
-    const note = $('range-note');
-    const noPrev = t.coverageDays < state.days * 2;
-    note.hidden = !noPrev;
-    if (noPrev) note.textContent = `확장이 최근 ${t.coverageDays}일 자료만 보내서, 이 기간은 앞 기간과 비교하지 않아요.`;
+    drawRangeNote();
     knobNow();
+  }
+
+  /**
+   * 기간 아래 한 줄 — 읽는 중 · 실패(다시 시도) · 앞 기간 자료가 없음(더 읽기) · 앞 기간이 비어 비교 안 함.
+   * 🔴 앞 기간이 자료 범위 밖이면 비교를 만들지 않는다 — 그 이유를 숨기지 않는다.
+   */
+  function drawRangeNote() {
+    const t = team();
+    const note = $('range-note');
+    let html = '';
+    if (net.busy) {
+      html = '필요한 날짜를 더 불러오는 중이에요…';
+    } else if (net.error) {
+      html = `${esc(net.error.message)} <button type="button" class="textbtn" data-act="retry">다시 시도</button>`;
+    } else if (t.coverageDays < state.days * 2) {
+      html = lazy
+        ? `앞 ${state.days}일 자료는 아직 읽지 않아서 비교하지 않았어요. <button type="button" class="textbtn" data-act="compare">앞 ${state.days}일과 비교하기</button> <span class="range-cost">(${state.days * 2 - t.coverageDays}일치를 더 읽어요)</span>`
+        : esc(`최근 ${t.coverageDays}일 자료만 있어서, 이 기간은 앞 기간과 비교하지 않아요.`);
+    } else if (!splitWindow(t.rows, state.days).prev.length) {
+      html = esc(`앞 ${state.days}일에는 다듬은 글이 없어서 비교하지 않았어요.`);
+    }
+    note.hidden = html === '';
+    note.innerHTML = html;
+  }
+
+  /**
+   * 기간·비교·팀 바꾸기의 단일 입구. 확장 페이지면 **모자란 날만** 먼저 읽고, 다 읽은 뒤에 화면을 바꾼다.
+   * 🔴 읽기에 실패하면 화면은 그대로 두고(지어낸 숫자를 그리지 않는다) 실패와 「다시 시도」만 보인다.
+   * 🔴 연달아 누르면 마지막 요청만 화면에 반영한다.
+   */
+  async function request(next) {
+    const want = { team: state.team, days: state.days, compare: state.compare, ...next };
+    const t = teams[want.team];
+    const seq = ++net.seq;
+    const need = lazy ? daysNeeded(want.days, want.compare) : 0;
+    if (lazy && (t.status !== 'ready' || t.coverageDays < need)) {
+      net.busy = true; net.error = null;
+      drawRange();
+      try {
+        Object.assign(t, await load(want.team, need));
+        t.status = 'ready';
+      } catch (error) {
+        if (seq !== net.seq) return;
+        net.busy = false;
+        net.error = { message: errorText(error), want };
+        drawRange();
+        return;
+      }
+      if (seq !== net.seq) return;
+      net.busy = false;
+    }
+    net.error = null;
+    const teamChanged = want.team !== state.team;
+    state.team = want.team; state.days = want.days; state.compare = want.compare;
+    if (teamChanged) { $('team').value = String(state.team); shown = null; }
+    render();
   }
 
   function placeKnob(btn) {
@@ -365,7 +468,7 @@ export function mount(teams, { demo }) {
 
   function render() {
     const t = team();
-    if (!periodOptions(t.coverageDays).includes(state.days)) state.days = defaultPeriod(t.coverageDays);
+    if (!periodsOf(t).includes(state.days)) state.days = lazy ? 30 : defaultPeriod(t.coverageDays);
     const { cur, prev } = windowRows();
     state.sel = null;
     // 기간·팀이 바뀌면 칸 번호의 뜻이 바뀐다 — 고른 날을 비우고 위에서 고른 날로 다시 시작한다.
@@ -400,11 +503,23 @@ export function mount(teams, { demo }) {
   }
 
   function selectTeam(i) {
-    state.team = i;
-    $('team').value = String(i);
-    shown = null;
-    render();
+    if (!teams[i]) return;
+    if (!lazy) {
+      state.team = i;
+      $('team').value = String(i);
+      shown = null;
+      render();
+      return;
+    }
+    if (teams[i].status === 'error') teams[i].status = 'idle';
+    request({ team: i });
   }
+
+  $('range-note').addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'compare') request({ compare: true });
+    if (act === 'retry' && net.error) request(net.error.want);
+  });
 
   /* ── 사건 ── */
   const weave = $('weave');
@@ -486,12 +601,15 @@ export function mount(teams, { demo }) {
 
   const sel = $('team');
   sel.innerHTML = teams.map((t, i) => `<option value="${i}">${esc(pairLabel(t))}</option>`).join('');
+  sel.value = String(state.team); // 처음 고른 팀(`?team=`)을 선택 상자에도 보인다.
   sel.addEventListener('change', () => selectTeam(Number(sel.value)));
 
   $('theme').addEventListener('click', () => {
     const root = document.documentElement;
     const dark = root.dataset.theme ? root.dataset.theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
     root.dataset.theme = dark ? 'light' : 'dark';
+    // 확장 페이지는 확장 설정(`sai.theme`)에 쓴다 — 사이드패널·설정 페이지와 같은 값이다.
+    if (saveTheme) { saveTheme(root.dataset.theme); return; }
     try { localStorage.setItem(THEME_KEY, root.dataset.theme); } catch { /* 저장이 막혀도 이번 화면에서는 바뀐다 */ }
   });
 
@@ -512,4 +630,16 @@ export function mount(teams, { demo }) {
   });
 
   render();
+
+  // 「맡은 관계 나란히」의 다른 팀은 그 칸이 화면 가까이 올 때만 읽는다(확장 페이지).
+  if (lazy && teams.some((t) => t.status === 'idle')) {
+    if (typeof IntersectionObserver === 'function') {
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some((en) => en.isIntersecting)) { io.disconnect(); loadOthers(); }
+      }, { rootMargin: '200px' });
+      io.observe($('cmp'));
+    } else {
+      loadOthers();
+    }
+  }
 }

@@ -17,10 +17,10 @@ import {
   EVENTS, F, P, buildRows, splitWindow, periodOptions, defaultPeriod, ratio, healthOf, sum,
   worstDay, dailyGap, topCause, headline, deltaOf, storyFacts, actions, briefLines, briefText,
   weekdayFold, threadRows, safeMax, frac, isEmpty, esc, dateKey, laneHeight,
-} from '../dashboard/src/seam/model.js';
-import { computeHealthMetrics } from '../dashboard/src/healthIndex.js';
-import { FRICTION_IDS, POSITIVE_IDS, readLiveScenarios, coverageDaysOf } from '../dashboard/src/liveData.js';
-import { demoTeams } from '../dashboard/src/seam/demoData.js';
+} from '../src/dashboard/seam/model.js';
+import { computeHealthMetrics } from '../src/dashboard/seam/healthIndex.js';
+import { FRICTION_IDS, POSITIVE_IDS } from '../src/dashboard/seam/signals.js';
+import { demoTeams } from '../src/dashboard/seam/demoData.js';
 
 const TODAY = new Date(2026, 9, 25); // 2026-10-25 (일)
 const key = (back) => dateKey(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - back));
@@ -28,7 +28,7 @@ const row = (c, wd = 1) => ({ date: TODAY, wd, c });
 
 /* ── ① 날짜 줄 ── */
 
-test('신호 8종이 liveData 극성과 같다 — 시안 문구만 따로 둔다', () => {
+test('신호 8종이 signals.js 극성과 같다 — 시안 문구만 따로 둔다', () => {
   assert.deepEqual([...F].sort(), [...FRICTION_IDS].sort());
   assert.deepEqual([...P].sort(), [...POSITIVE_IDS].sort());
   for (const e of EVENTS) assert.ok(e.label && e.desc, e.id);
@@ -219,19 +219,8 @@ test('🔴 팀 이름의 HTML은 글자로만 그린다', () => {
 
 /* ── 실데이터 경로 ── */
 
-function encode(payload) {
-  return Buffer.from(unescape(encodeURIComponent(JSON.stringify(payload))), 'binary').toString('base64');
-}
-
-test('자료 범위(days)를 확장 페이로드에서 읽는다 — 없으면 옛 확장의 30일', () => {
-  assert.equal(coverageDaysOf({ days: 120 }), 120);
-  assert.equal(coverageDaysOf({}), 30);
-  assert.equal(coverageDaysOf({ days: 'x' }), 30);
-  assert.equal(coverageDaysOf({ days: 9999 }), 30);
-  const [s] = readLiveScenarios(`#sai=${encode({ days: 120, teams: [{ teamName: '팀', counts: {}, byDate: {} }] })}`);
-  assert.equal(s.coverageDays, 120);
-  assert.equal(s.label, '최근 120일');
-});
+// 🔴 0.1.21 — `#sai=` 경로(coverageDaysOf·readLiveScenarios)는 없앴다. 자료 범위는 확장 대시보드의 캐시가 정한다
+//    (`test/dashboardOnDemand.unit.test.js`).
 
 test('예시 데이터는 실데이터와 같은 모양(byDate 120일)으로 같은 길을 지난다', () => {
   const teams = demoTeams(TODAY);

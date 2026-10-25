@@ -84,6 +84,8 @@ export default [
         getComputedStyle: 'readonly',
         MutationObserver: 'readonly',
         ResizeObserver: 'readonly',
+        IntersectionObserver: 'readonly',
+        history: 'readonly',
         Element: 'readonly',
         Node: 'readonly',
         HTMLElement: 'readonly',

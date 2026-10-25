@@ -16,9 +16,10 @@
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
     <script>
-      // 옛 확장(0.1.17 이하)은 팀 대시보드를 첫 화면 주소 + `#sai=…`로 연다 — 그 데이터째로 /dashboard/에 넘긴다.
+      // 옛 확장(0.1.17 이하)은 팀 대시보드를 첫 화면 주소 + `#sai=…`로 연다 — /dashboard/(예시)로 넘긴다.
+      // 🔴 0.1.21 — 주소의 팀 데이터는 넘기지 않고 버린다. 실제 팀 지표는 확장 안 대시보드에서만 본다.
       if (location.pathname === '/' && location.hash.indexOf('#sai=') === 0) {
-        location.replace('/dashboard/' + location.hash);
+        location.replace('/dashboard/');
       }
     </script>
     <script>

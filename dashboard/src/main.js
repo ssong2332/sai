@@ -1,24 +1,27 @@
 /**
- * 사이 Team Health 진입점 — 시안 「Seam」(2026-10-25 사용자 승인).
+ * 사이 Team Health — **웹 예시 전용** 진입점 (`/dashboard/`, 시안 「Seam」).
  *
- * 🔴 **실데이터가 있으면 그것만 그린다**(`#sai=`, `liveData.js`). 예시와 섞으면 어느 수치가 진짜인지
- *    아무도 모른다. 없거나 깨졌으면 예시 데이터로 열고, 상단·바닥에 「예시 데이터」라고 밝힌다.
- * 🔴 실데이터에는 팀 이름이 하나뿐이다 — 상대 쪽 이름을 지어내지 않고 「주고받은 동료들」로 둔다.
+ * 🔴 2026-10-25 (0.1.21) — 실제 팀 지표는 **확장 안 대시보드**(`src/dashboard/`)에서만 본다. 이 페이지는
+ *    주소의 `#sai=`를 읽지 않는다 — 팀 합계가 URL·방문 기록에 남지 않게 하려는 것이다. 옛 확장이 `#sai=`를
+ *    붙여 열어도 무시하고 주소에서 지운다(이 탭의 현재 기록만 바뀐다 — 이미 남은 방문 기록은 지우지 못한다).
+ * 🔴 화면 코드는 확장과 **같은 한 벌**이다(`src/dashboard/seam/`). 여기서는 예시 데이터만 넣는다.
  */
 
-import './seam/seam.css';
-import { readLiveScenarios } from './liveData.js';
-import { buildRows } from './seam/model.js';
-import { demoTeams } from './seam/demoData.js';
-import { mount } from './seam/app.js';
+import '../../src/dashboard/seam/seam.css';
+import { mountSeamMarkup } from '../../src/dashboard/seam/markup.js';
+import { buildRows } from '../../src/dashboard/seam/model.js';
+import { demoTeams } from '../../src/dashboard/seam/demoData.js';
+import { mount } from '../../src/dashboard/seam/app.js';
 
-export const OTHER_SIDE = '주고받은 동료들';
+if (/[#&]sai=/.test(location.hash)) {
+  try {
+    history.replaceState(null, '', location.pathname + location.search);
+  } catch {
+    /* 바꾸지 못해도 읽지는 않는다 */
+  }
+}
 
-const live = readLiveScenarios();
+mountSeamMarkup(document.getElementById('seam'));
 const today = new Date();
-const source = live.length
-  ? live.map((s) => ({ a: s.teamName, b: OTHER_SIDE, byDate: s.byDate, coverageDays: s.coverageDays }))
-  : demoTeams(today);
-const teams = source.map((t) => ({ ...t, rows: buildRows(t.byDate, t.coverageDays, today) }));
-
-mount(teams, { demo: live.length === 0 });
+const teams = demoTeams(today).map((t) => ({ ...t, rows: buildRows(t.byDate, t.coverageDays, today) }));
+mount(teams, { demo: true, sourceLine: '사이 Team Health · 예시 데이터 — 실제 팀 지표는 확장 안에서 봐요' });

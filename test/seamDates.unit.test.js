@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 
 import {
   F, P, buildRows, dateKey, rangeIndices, pickDays, selectedSummary, heatLevel, dayStrip, dayTable, DAY_COLS_MAX,
-} from '../dashboard/src/seam/model.js';
+} from '../src/dashboard/seam/model.js';
 
 const TODAY = new Date(2026, 9, 25); // 2026-10-25 (일)
 const key = (back) => dateKey(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - back));

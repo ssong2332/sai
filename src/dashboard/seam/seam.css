@@ -356,3 +356,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   .dt th, .dt td { padding: 9px 10px; }
   .dt .tot { width: 4rem; }
 }
+
+/* ── 0.1.21: 예시 안내 · 읽기 상태 줄 · 아직 안 읽은 팀 칸 (확장 페이지와 웹 예시 공용) ── */
+.demo-note { margin: 0; padding: 10px 16px; text-align: center; font-size: 13px; background: var(--snag-tint); color: var(--ink); border-bottom: 1px solid var(--rule); }
+.demo-note b { color: var(--snag-text); margin-right: 2px; }
+.range-note .textbtn { color: var(--loom-ink); font-size: 12.5px; padding: 0 2px; text-decoration-color: currentColor; }
+.range-cost { opacity: .8; }
+.cmp-note { margin-top: 10px; color: var(--ink-3); }
+.cm-wait .cm-d { color: var(--loom-dim); font-weight: 600; }
+.range button:disabled { opacity: .5; cursor: progress; }

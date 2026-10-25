@@ -175,6 +175,8 @@ export const FEATURES = {
  * 🔴 2026-10-25 — 호스팅 첫 화면은 소개 사이트(`site/`), 대시보드는 `/dashboard/` (`scripts/build-hosting.mjs`).
  *    배포 완료 후 실제 URL을 curl로 확인하고 이 주석을 갱신한다(Lessons #10 — 배포 성공과 URL
  *    동작은 별개).
+ * 🔴 0.1.21(2026-10-25)부터 이 주소는 **예시 데이터 전용**이고 확장은 여기로 보내지 않는다 — 실제 팀 지표는
+ *    확장 페이지 `src/dashboard/`(`src/lib/dashboardPage.js`). 지금 이 상수를 import하는 곳은 없다(제거 후보).
  */
 export const DASHBOARD_URL = 'https://sai-global-msg-2026.web.app/dashboard/';
 
