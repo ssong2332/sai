@@ -11,8 +11,8 @@ import { useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 import { useLoadingMessages } from './useLoadingMessages.js';
 import { REPLY_INTENTS, REPLY_INTENT_LABELS } from '../core/reply/prompt.js';
-import { REPLY_QUESTIONS } from '../core/reply/questions.js';
-import { verifyReplyDraft } from '../core/reply/verify.js';
+import { buildPlaceholderQuestions } from '../core/reply/questions.js';
+import { verifyReplyDraft, collectPlaceholders } from '../core/reply/verify.js';
 import { copyToClipboard } from './applyText.js';
 
 const URGENCY_ORDER = { LOW: 0, NORMAL: 1, CRITICAL: 2 };
@@ -47,7 +47,7 @@ export default function DecodePopup({
   onToast,
   /** S40 — 초안이 옆 패널로 나갔으면 여기서는 방향 줄만 그린다. */
   replySideBySide = false,
-  replyAsk = null,
+  replyAsk = false,
   replyAnswers = {},
   onReplyAnswersChange,
   onReplySubmit,
@@ -152,7 +152,6 @@ export default function DecodePopup({
                       recommended={result.recommendedReply}
                       onPick={onReply}
                       intent={replyIntent}
-                      askIntent={replyAsk}
                       loading={replyLoading}
                       autoOn={replyAuto}
                       onToggleAuto={onToggleReplyAuto}
@@ -160,7 +159,7 @@ export default function DecodePopup({
                     {/* 🔴 좁은 창에서만 여기 이어 붙인다 — 넓으면 형제 패널이 같은 것을 그린다. */}
                     {!replySideBySide && (
                       <ReplyPanel
-                        askIntent={replyAsk}
+                        askOpen={replyAsk}
                         answers={replyAnswers}
                         onAnswersChange={onReplyAnswersChange}
                         onSubmit={onReplySubmit}
@@ -205,7 +204,6 @@ export default function DecodePopup({
 export function ReplyIntentBar({
   onPick,
   intent,
-  askIntent,
   loading,
   recommended,
   autoOn,
@@ -225,11 +223,11 @@ export function ReplyIntentBar({
       <p className="sai-reply-hint">
         {autoOn
           ? '질문 없이 바로 초안을 만들어요. 채울 값은 대괄호로 비워 둬요.'
-          : '몇 가지 물어보고 빈칸이 적은 초안을 만들어요.'}
+          : '초안을 만든 뒤, 비워 둔 칸만 물어보고 채워 넣어요.'}
       </p>
       <div className="sai-reply-intents" role="group" aria-label="회신 방향 선택">
         {REPLY_INTENTS.map((key) => {
-          const active = intent === key || askIntent === key;
+          const active = intent === key;
           const isRecommended = recommended === key;
           return (
             <button
@@ -266,7 +264,7 @@ export function ReplyIntentBar({
  *    같은 컴포넌트가 두 자리를 모두 맡으므로 내용이 갈라질 일이 없다.
  */
 export function ReplyPanel({
-  askIntent,
+  askOpen = false,
   answers,
   onAnswersChange,
   onSubmit,
@@ -302,18 +300,14 @@ export function ReplyPanel({
     onToast?.(ok ? '회신 초안을 복사했어요 (Ctrl+V)' : '복사하지 못했어요. 직접 선택해 복사해 주세요.');
   }
 
+  /**
+   * 🔴 L29 — 질문은 **모델이 낸 초안**의 자리표시자에서 만든다. 편집본에서 만들면 사용자가 칸을
+   *    하나 채울 때마다 질문이 사라지며 입력란이 흔들린다.
+   */
+  const questions = modelDraft === null ? [] : buildPlaceholderQuestions(collectPlaceholders(modelDraft));
+
   const body = (
     <>
-      {askIntent && (
-        <QuestionCard
-          intent={askIntent}
-          answers={answers}
-          onChange={onAnswersChange}
-          onSubmit={onSubmit}
-          onSkip={onSkip}
-        />
-      )}
-
       {loading && (
         <span className="sai-loading">
           {loadingText}
@@ -327,6 +321,15 @@ export function ReplyPanel({
 
       {!loading && !error && draft !== null && (
         <>
+          {askOpen && questions.length > 0 && (
+            <QuestionCard
+              questions={questions}
+              answers={answers}
+              onChange={onAnswersChange}
+              onSubmit={onSubmit}
+              onSkip={onSkip}
+            />
+          )}
           {/**
            * 🔴 **편집 가능하다** (v5). 자리표시자를 채우는 자리가 여기다 — 모국어에서 채운 뒤
            *    다듬기가 번역한다. 읽기 전용으로 두면 사용자는 빈칸을 **번역된 외국어 쪽에서**
@@ -455,55 +458,43 @@ export function ReplyPanel({
 }
 
 /**
- * 초안 작성 전 사전 질문 (S37 후속).
+ * 초안의 빈칸 질문 (S37 후속 → L29 2026-10-25 재설계).
  *
- * 🔴 **답을 강제하지 않는다.** 「질문 없이 만들기」가 항상 있고, 빈 항목은 초안에서 자리표시자로
- *    남는다. 답을 강제하면 빨리 초안만 보고 싶은 사용자가 아무 칩이나 누르고, 사실이 아닌 값이
- *    초안에 박힌다 — 자리표시자보다 나쁜 결과다.
- * 🔴 객관식 칩과 직접 입력은 **같은 슬롯 하나**를 공유한다. 둘 다 살려 두면 어느 쪽이 초안에
- *    들어갔는지 화면만 봐서는 알 수 없다.
+ * 🔴 **질문 = 이 초안의 자리표시자.** 예전엔 의도별 고정 질문을 초안 전에 물어서, 메시지와 무관한
+ *    질문(출시 지연 메시지에 「무엇을 소개할까요?」)이 나왔다. 이제 초안이 실제로 비운 칸만 묻는다.
+ * 🔴 **답을 강제하지 않는다.** 빈 칸은 자리표시자로 남고 「건너뛰기」가 항상 있다. 답을 강제하면
+ *    사실이 아닌 값이 초안에 박힌다 — 자리표시자보다 나쁜 결과다.
+ * 🔴 객관식 칩은 없다 — 빈칸마다 내용이 달라 미리 정한 후보가 맞을 리 없다(고정 칩이 L29의 원인).
  */
-function QuestionCard({ intent, answers, onChange, onSubmit, onSkip }) {
-  const questions = REPLY_QUESTIONS[intent] ?? [];
-
+function QuestionCard({ questions, answers, onChange, onSubmit, onSkip }) {
   function set(id, value) {
     onChange({ ...answers, [id]: value });
   }
 
   return (
     <div className="sai-reply-ask">
-      <p className="sai-reply-ask-head">몇 가지만 알려 주시면 빈칸 없는 초안이 나와요</p>
-      {questions.map((item) => (
+      <p className="sai-reply-ask-head">초안에 빈칸이 {questions.length}개 있어요 — 알려 주시면 채워 넣을게요</p>
+      {questions.map((item, index) => (
         <div key={item.id} className="sai-reply-ask-item">
-          <div className="sai-reply-ask-q">{item.question}</div>
-          <div className="sai-reply-ask-options">
-            {item.options.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={`sai-reply-ask-chip${answers[item.id] === option ? ' sai-reply-ask-chip-on' : ''}`}
-                onClick={() => set(item.id, answers[item.id] === option ? '' : option)}
-                aria-pressed={answers[item.id] === option}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
+          <label className="sai-reply-ask-q" htmlFor={`sai-reply-ask-${index}`}>
+            {item.label}
+          </label>
           <input
+            id={`sai-reply-ask-${index}`}
             type="text"
             className="sai-reply-ask-input"
-            placeholder="직접 입력"
-            value={item.options.includes(answers[item.id]) ? '' : answers[item.id] ?? ''}
+            placeholder={`비워 두면 ${item.placeholder} 그대로 남아요`}
+            value={answers[item.id] ?? ''}
             onChange={(event) => set(item.id, event.target.value)}
           />
         </div>
       ))}
       <div className="sai-reply-ask-actions">
         <button type="button" className="sai-reply-ask-skip" onClick={onSkip}>
-          질문 없이 만들기
+          건너뛰기
         </button>
         <button type="button" className="sai-reply-copy" onClick={onSubmit}>
-          초안 만들기
+          채워 넣기
         </button>
       </div>
     </div>

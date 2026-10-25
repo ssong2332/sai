@@ -19,9 +19,11 @@ import {
   findUnverifiedSpecifics,
 } from '../src/core/reply/verify.js';
 import {
-  REPLY_QUESTIONS,
+  buildPlaceholderQuestions,
   buildAnswerList,
   answersToText,
+  fillPlaceholders,
+  MAX_PLACEHOLDER_QUESTIONS,
 } from '../src/core/reply/questions.js';
 
 const SOURCE = 'Could you review PR #482? We need it before the release.';
@@ -218,30 +220,104 @@ test('사용자가 답하지 않은 값은 여전히 잡는다', () => {
   assert.deepEqual(findUnverifiedSpecifics('Let us meet at 3pm.', SOURCE, '이번 주 안'), ['3']);
 });
 
-test('답변은 화면 상태에서 서버 계약 형태로 바뀐다', () => {
-  const list = buildAnswerList('schedule', { why: '자료 대기 중', when: '다음 주' });
-  assert.deepEqual(list, [
-    { question: REPLY_QUESTIONS.schedule[0].question, answer: '자료 대기 중' },
-    { question: REPLY_QUESTIONS.schedule[1].question, answer: '다음 주' },
-  ]);
-  assert.equal(answersToText(list), '자료 대기 중 다음 주');
+/* ── L29 — 질문 = 초안의 자리표시자 ─────────────────────────────────── */
+
+/** L18 발견 D1의 그 메시지 — 출시 지연. 자동 모드 초안이 정확히 이 두 칸을 비웠다. */
+const DELAY_DRAFT =
+  '출시 일정 문의 감사합니다. 이번 지연은 [지연 이유] 때문이며, 현재 [예상 일정]을 목표로 하고 있어요. ' +
+  '변동이 생기면 바로 알려 드릴게요.';
+
+test('🔴 L29 — 질문은 초안이 비운 칸에서 나온다 (메시지와 무관한 고정 질문이 아니다)', () => {
+  const questions = buildPlaceholderQuestions(collectPlaceholders(DELAY_DRAFT));
+  assert.deepEqual(
+    questions.map((q) => q.label),
+    ['지연 이유', '예상 일정'],
+  );
+  assert.ok(
+    questions.every((q) => !/소개|협업|팀 규모/.test(q.label)),
+    '의도별 고정 질문이 섞였다',
+  );
 });
 
-test('🔴 답하지 않은 항목은 빠진다 — 빈 값을 보내면 모델이 그걸 사실로 취급한다', () => {
-  assert.deepEqual(buildAnswerList('schedule', { why: '   ', when: '내일' }), [
-    { question: REPLY_QUESTIONS.schedule[1].question, answer: '내일' },
-  ]);
-  assert.deepEqual(buildAnswerList('schedule', {}), []);
-  assert.deepEqual(buildAnswerList('accept', { nope: 'x' }), []);
+test('자리표시자가 없으면 묻지 않는다 — 고정 질문으로 되돌아가지 않는다', () => {
+  assert.deepEqual(buildPlaceholderQuestions(collectPlaceholders('검토 감사합니다. 반영할게요.')), []);
+  assert.deepEqual(buildPlaceholderQuestions([]), []);
 });
 
-test('의도 3종 모두 질문 세트를 갖는다', () => {
-  for (const intent of REPLY_INTENTS) {
-    assert.ok(REPLY_QUESTIONS[intent]?.length > 0, `${intent}: 질문이 없다`);
-    for (const item of REPLY_QUESTIONS[intent]) {
-      assert.ok(item.options.length >= 2, `${intent}/${item.id}: 객관식 후보가 부족하다`);
-    }
-  }
+test('같은 자리표시자는 한 번만 묻고, 개수 상한을 넘기지 않는다', () => {
+  const draft = '[날짜]에 보내고 [날짜]에 확인할게요.';
+  assert.equal(buildPlaceholderQuestions(collectPlaceholders(draft)).length, 1);
+  const many = Array.from({ length: 10 }, (_, i) => `[칸${i}]`);
+  assert.equal(buildPlaceholderQuestions(many).length, MAX_PLACEHOLDER_QUESTIONS);
+  assert.deepEqual(buildPlaceholderQuestions(['[ ]', 7, null]), []);
+});
+
+test('🔴 답하지 않은 칸은 빠진다 — 빈 값을 대입하면 경고도 없이 문장에 구멍이 난다', () => {
+  const questions = buildPlaceholderQuestions(collectPlaceholders(DELAY_DRAFT));
+  const list = buildAnswerList(questions, { '[지연 이유]': '   ', '[예상 일정]': '다음 주' });
+  assert.deepEqual(list, [{ placeholder: '[예상 일정]', question: '예상 일정', answer: '다음 주' }]);
+  assert.deepEqual(buildAnswerList(questions, {}), []);
+  assert.deepEqual(buildAnswerList(questions, { '[없는 칸]': 'x' }), []);
+  assert.equal(answersToText(list), '다음 주');
+});
+
+test('답은 상한 길이로 자른다', () => {
+  const questions = buildPlaceholderQuestions(['[이유]']);
+  const [item] = buildAnswerList(questions, { '[이유]': 'a'.repeat(500) });
+  assert.equal(item.answer.length, 200);
+});
+
+test('🔴 L29 — 답은 자리표시자에 대입된다 (LLM 재호출 없음), 답 안 한 칸은 남는다', () => {
+  const questions = buildPlaceholderQuestions(collectPlaceholders(DELAY_DRAFT));
+  const list = buildAnswerList(questions, { '[지연 이유]': 'QA에서 결함 발견' });
+  const filled = fillPlaceholders(DELAY_DRAFT, list);
+  assert.ok(filled.includes('QA에서 결함 발견 때문이며'));
+  assert.ok(filled.includes('[예상 일정]'), '답하지 않은 칸이 사라졌다');
+  assert.deepEqual(collectPlaceholders(filled), ['[예상 일정]']);
+});
+
+test('같은 자리표시자가 여러 번 나오면 전부 채운다', () => {
+  const filled = fillPlaceholders('[날짜]에 보내고 [날짜]에 확인할게요.', [
+    { placeholder: '[날짜]', answer: '금요일' },
+  ]);
+  assert.equal(filled, '금요일에 보내고 금요일에 확인할게요.');
+});
+
+test('사용자가 이미 지운 자리표시자는 건너뛴다 — 편집본을 덮어쓰지 않는다', () => {
+  const edited = '직접 고친 문장이에요.';
+  assert.equal(fillPlaceholders(edited, [{ placeholder: '[날짜]', answer: '금요일' }]), edited);
+});
+
+test('🔴 한국어 조사를 대입한 값의 받침에 맞춘다', () => {
+  const fill = (draft, answer) => fillPlaceholders(draft, [{ placeholder: '[이유]', answer }]);
+  assert.equal(fill('[이유]로 늦어져요.', '자료 대기 중'), '자료 대기 중으로 늦어져요.');
+  assert.equal(fill('[이유]으로 늦어져요.', '검토 지연'), '검토 지연으로 늦어져요.');
+  assert.equal(fill('[이유]으로 늦어져요.', '서버 문제'), '서버 문제로 늦어져요.');
+  assert.equal(fill('[이유]으로 늦어져요.', '인력 이동 일정 조율'), '인력 이동 일정 조율로 늦어져요.');
+  assert.equal(fill('[이유]를 말씀드려요.', '일정'), '일정을 말씀드려요.');
+  assert.equal(fill('[이유]이 있어요.', '변수'), '변수가 있어요.');
+  assert.equal(fill('[이유]는 확인 중이에요.', '원인'), '원인은 확인 중이에요.');
+  assert.equal(fill('[이유]와 함께', '일정'), '일정과 함께');
+  assert.equal(fill('[이유]과 함께', '결과'), '결과와 함께');
+});
+
+test('조사 판정이 서지 않으면 모델이 쓴 그대로 둔다', () => {
+  const fill = (draft, answer) => fillPlaceholders(draft, [{ placeholder: '[날짜]', answer }]);
+  // 값이 숫자·영문으로 끝나면 읽는 법이 갈린다
+  assert.equal(fill('[날짜]를 목표로 해요.', '11/3'), '11/3를 목표로 해요.');
+  assert.equal(fill('[날짜]를 목표로 해요.', 'Q4'), 'Q4를 목표로 해요.');
+  // 조사 뒤에 한글이 바로 붙으면 조사가 아닐 수 있다(「이후」)
+  assert.equal(fill('[날짜]이후 연락드려요.', '금요일'), '금요일이후 연락드려요.');
+  // 조사가 없으면 그대로
+  assert.equal(fill('[날짜] 전까지', '금요일'), '금요일 전까지');
+});
+
+test('🔴 대입한 값은 검증기가 「사용자 값」으로 본다 — 채울수록 「확인 필요」가 늘면 안 된다', () => {
+  const source = 'When will the launch happen, and why the delay?';
+  const list = [{ placeholder: '[예상 일정]', question: '예상 일정', answer: '11월 3일' }];
+  const filled = fillPlaceholders('[예상 일정]을 목표로 하고 있어요.', list);
+  assert.deepEqual(verifyReplyDraft({ draft: filled }, source, answersToText(list)).unverified, []);
+  assert.ok(verifyReplyDraft({ draft: filled }, source, '').unverified.length > 0, '전제 확인');
 });
 
 test('🔴 답변도 지시문에 이어 붙이지 않고 별도 필드로 간다 (프롬프트 주입 방어)', () => {

@@ -72,8 +72,8 @@ export const REPLY_PROMPT_VERSION = 'reply-v7';
 
 /**
  * 회신 의도 6종. 🔴 이 키 집합이 계약이다 — `schema.js`·`decode/schema.js`가 화이트리스트로
- * 강제하고, 화면 버튼과 질문 세트도 이 목록에서 나온다. 늘리려면 네 곳(여기·reply/schema·
- * decode/schema·questions)을 함께 고친다.
+ * 강제하고, 화면 버튼도 이 목록에서 나온다. 늘리려면 세 곳(여기·reply/schema·decode/schema)을
+ * 함께 고친다. (질문은 L29부터 의도별 고정 세트가 아니라 초안의 자리표시자에서 나온다 — `questions.js`.)
  *
  * 🔴 3종 → 6종 (v4, 2026-08-14 실확장 실측). 협업 문의 메시지("귀사에 대해, 어떤 협력을 찾고
  *    계신지 말씀해 주실 수 있나요?")에 **셋 중 맞는 게 하나도 없었다** — 수락도 일정 조율도

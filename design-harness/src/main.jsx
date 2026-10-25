@@ -215,7 +215,8 @@ function DecodeScene({ variant }) {
         />
       )}
       {variant === 'ask' && (
-        <ReplyPanel standalone onClose={noop} askIntent="clarify" answers={{}} onAnswersChange={noop} onSubmit={noop} onSkip={noop} result={null} loading={false} error="" sourceText="" />
+        // L29 — 질문 카드는 초안의 자리표시자에서 나온다: 초안과 함께 열린 상태를 그린다.
+        <ReplyPanel standalone onClose={noop} askOpen answers={{}} onAnswersChange={noop} onSubmit={noop} onSkip={noop} result={REPLY_RESULT} draftText={REPLY_RESULT.draft} onDraftTextChange={noop} onRefine={noop} loading={false} error="" sourceText="Thanks for the update! Just a few minor comments." sentAnswerText="" />
       )}
     </div>
   );
