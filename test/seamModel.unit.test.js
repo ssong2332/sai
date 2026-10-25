@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 
 import {
   EVENTS, F, P, buildRows, periodRows, periodOptions, defaultPeriod, ratio, healthOf, sum,
-  worstDay, dailyGap, topCause, headline, flowPill, storyFacts, weeklyFlow, flowSentence, actions, briefLines, briefText,
+  worstDay, dailyGap, topCause, headline, flowPill, storyFacts, weeklyFlow, flowSentence, flowScaleTop, actions, briefLines, briefText,
   weekdayFold, signalMap, safeMax, frac, isEmpty, esc, dateKey, laneHeight,
 } from '../src/dashboard/seam/model.js';
 import { computeHealthMetrics } from '../src/dashboard/seam/healthIndex.js';
@@ -159,6 +159,17 @@ test('그날 가장 많은 마찰 원인 — 없으면 null', () => {
 });
 
 /* ── 문장 ── */
+
+test('🔴 주별 막대 축은 흐름에 넣은 주로만 — 이틀짜리 주의 500%가 축을 늘리지 않는다', () => {
+  const rows = weekRows([6, 5, 4, 3], 20, 2);
+  rows[0].c = { refined: 1, misread: 5 };
+  rows[1].c = {};
+  const fl = weeklyFlow(rows);
+  assert.equal(fl.weeks[0].ratio, 5, '9/26 주 — 글 1건에 신호 5건');
+  assert.equal(flowScaleTop(fl.weeks), 0.3, '넣은 주 최대 30%');
+  assert.equal(flowScaleTop(weeklyFlow(weekRows([1, 1], 4)).weeks), 0.3, '넣은 주가 없으면 전부로 (25% → 30%)');
+  assert.equal(flowScaleTop([]), 0.1);
+});
 
 test('제목 — 주별 흐름으로 말한다, 말할 수 없으면 비율만 · 빈 팀', () => {
   assert.equal(headline([row({ refined: 100, misread: 10 })], 30, '팀과 동료들 사이').rest, '마찰 비율 10.0%');

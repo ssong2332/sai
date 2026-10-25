@@ -362,6 +362,15 @@ export function weeklyFlow(rows) {
   };
 }
 
+/**
+ * 주별 막대의 세로축 끝(0~1, 10% 단위로 올림). 🔴 흐름에 넣은 주로만 정한다 — 기간 끝에 걸린 이틀짜리 주가
+ * 글 1~2건으로 500%가 나와도 축을 늘리지 않는다(2026-10-26 실브라우저에서 막대가 바닥에 붙었다). 넣은 주가 없으면 전부로.
+ */
+export function flowScaleTop(weeks) {
+  const base = weeks.some((w) => w.used) ? weeks.filter((w) => w.used) : weeks;
+  return Math.max(0.1, Math.ceil(Math.max(0, ...base.map((w) => w.ratio ?? 0)) * 10) / 10);
+}
+
 /** 흐름 판정을 한 문장으로 — 화면 「흐름」 꼭지와 회의용 한 장이 같은 말을 쓴다. */
 export function flowSentence(flow) {
   const v = flow.verdict;

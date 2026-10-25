@@ -9,7 +9,7 @@ import {
   EVENTS, F, P, WD, STEADY_MIN,
   sum, ratio, healthOf, safeMax, laneHeight, frac, fmtD, pct, esc,
   periodRows, periodOptions, defaultPeriod, isEmpty,
-  dailyGap, worstDay, topCause, headline, flowPill, storyFacts, weeklyFlow, flowSentence,
+  dailyGap, worstDay, topCause, headline, flowPill, storyFacts, weeklyFlow, flowSentence, flowScaleTop,
   actions, briefLines, briefText, weekdayFold,
   pickDays, rangeIndices, selectedSummary, signalMap, PERIODS,
 } from './model.js';
@@ -193,7 +193,8 @@ export function mount(teams, opts = {}) {
     const body = m.groups.map((g) => `<tr class="grp ${g.kind}"><th scope="colgroup" colspan="${cols}">${g.label}<span class="num">이번 ${g.tot}건${sel ? ` · 고른 날 ${g.sel}건` : ''}</span></th></tr>`
       + g.rows.map((r) => `<tr${r.tot ? '' : ' class="none"'}><th scope="row" class="lab">${r.label}<small>${r.desc}</small></th>${cells(r, g.kind)}${nums(r)}</tr>`).join('')).join('');
 
-    $('smap').innerHTML = `<table style="--n:${n}"><caption class="sr">신호별 날짜별 건수${sel ? ` — 고른 ${m.picked.length}일` : ''}</caption>
+    // 60일 넘는 기간(90일)은 칸을 좁혀 데스크톱 폭 안에 넣는다 — 합계 열이 스크롤 끝에 숨지 않게(2026-10-26 실브라우저).
+    $('smap').innerHTML = `<table style="--n:${n}"${n > 60 ? ' class="long"' : ''}><caption class="sr">신호별 날짜별 건수${sel ? ` — 고른 ${m.picked.length}일` : ''}</caption>
       <colgroup><col class="lab-c">${'<col>'.repeat(n)}<col class="nc-c">${sel ? '<col class="nc-c">' : ''}</colgroup>
       <thead><tr><th scope="col" class="lab corner"></th>${dayHead}${numHead}</tr></thead>
       <tbody><tr class="ref"><th scope="row" class="lab">다듬은 글<small>신호를 센 바탕이 된 글</small></th>${refBars}${nums(m.refined)}</tr>${body}</tbody></table>`;
@@ -232,13 +233,13 @@ export function mount(teams, opts = {}) {
     const W = Math.max(320, Math.round(svg.parentNode.clientWidth || 900)), narrow = W < 560;
     const H = narrow ? 190 : 220, L = 40, R = 8, T = 24, B = 34;
     const step = (W - L - R) / Math.max(1, ws.length), bw = Math.min(48, step * 0.62);
-    const top = Math.max(0.1, Math.ceil(Math.max(0, ...ws.map((w) => w.ratio ?? 0)) * 10) / 10);
+    const top = flowScaleTop(ws);
     const y = (r) => T + (H - T - B) * (1 - Math.min(r, top) / top);
     const cx = (i) => L + step * (i + 0.5);
     const every = step >= 40 ? 1 : 2;
     const grid = [0, top / 2, top].map((r) => `<line class="g" x1="${L}" x2="${W - R}" y1="${y(r)}" y2="${y(r)}"/><text class="ax" x="${L - 6}" y="${y(r) + 4}" text-anchor="end">${Math.round(r * 100)}%</text>`).join('');
     const bars = ws.map((w) => {
-      const r = w.ratio ?? 0, cls = !w.full ? 'part' : w.used ? 'use' : 'thin';
+      const r = w.ratio ?? 0, cls = `${!w.full ? 'part' : w.used ? 'use' : 'thin'}${r > top ? ' over' : ''}`;
       const why = w.used ? '' : w.full ? ' — 다듬은 글이 적어 흐름 판단에서 뺐어요' : ` — ${w.days}일뿐이라 흐름 판단에서 뺐어요`;
       const tipText = `${fmtD(w.start)} ~ ${fmtD(w.end)} · 마찰 비율 ${w.ratio == null ? '—' : pct(r)} · 다듬은 글 ${w.refined}건${why}`;
       return `<g class="wk ${cls}"><title>${esc(tipText)}</title>
