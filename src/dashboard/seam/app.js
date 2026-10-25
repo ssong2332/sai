@@ -413,10 +413,14 @@ export function mount(teams, opts = {}) {
       html = `${esc(net.error.message)} <button type="button" class="textbtn" data-act="retry">다시 시도</button>`;
     } else if (t.coverageDays < state.days * 2) {
       html = lazy
-        ? `앞 ${state.days}일 자료는 아직 읽지 않아서 비교하지 않았어요. <button type="button" class="textbtn" data-act="compare">앞 ${state.days}일과 비교하기</button> <span class="range-cost">(${state.days * 2 - t.coverageDays}일치를 더 읽어요)</span>`
+        ? `앞 ${state.days}일 자료는 아직 읽지 않아서 비교하지 않았어요. <button type="button" class="textbtn" data-act="compare">앞 ${state.days}일과 비교하기</button> <span class="range-cost">(${state.days * 2 - t.coverageDays}일치를 더 읽어 모두 ${state.days * 2}일을 봐요)</span>`
         : esc(`최근 ${t.coverageDays}일 자료만 있어서, 이 기간은 앞 기간과 비교하지 않아요.`);
-    } else if (!splitWindow(t.rows, state.days).prev.length) {
-      html = esc(`앞 ${state.days}일에는 다듬은 글이 없어서 비교하지 않았어요.`);
+    } else {
+      const { cur, prev } = splitWindow(t.rows, state.days);
+      // 비교 중이면 두 기간의 날짜와 합친 날 수를 밝힌다 — 「앞 30일과 비교」가 60일을 보고 있다는 걸 숨기지 않는다.
+      html = prev.length
+        ? esc(`앞 ${state.days}일(${fmtD(prev[0].date)}~${fmtD(prev.at(-1).date)})과 이번 ${state.days}일(${fmtD(cur[0].date)}~${fmtD(cur.at(-1).date)})을 비교하고 있어요 · 모두 ${state.days * 2}일`)
+        : esc(`앞 ${state.days}일에는 다듬은 글이 없어서 비교하지 않았어요.`);
     }
     note.hidden = html === '';
     note.innerHTML = html;
