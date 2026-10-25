@@ -520,11 +520,19 @@ function Section({ label, children }) {
 }
 
 function UrgencyGap({ surface, actual, gap, reason }) {
-  const surfacePct = (URGENCY_ORDER[surface] ?? 1) * 50;
-  const actualPct = (URGENCY_ORDER[actual] ?? 1) * 50;
+  /**
+   * 🔴 v2(2026-10-24) — 점 두 개 대신 **막대 두 줄**(표면 · 실제). 로고의 「어긋난 두 바」를 그대로
+   *    긴급도 차이에 쓴다: 두 막대의 길이 차이가 곧 표면과 실제의 차이다. 실제 막대는 표면 길이에서
+   *    출발해 실제 길이로 자란다(`--from`). 단계는 Low·Normal·High 3칸 — 숫자 점수가 아니다(필수 9).
+   * 🔴 판정 문구는 위 머리줄이 이미 말한다 — 막대는 그림이라 `aria-hidden`.
+   */
+  const surfaceStep = (URGENCY_ORDER[surface] ?? 1) + 1;
+  const actualStep = (URGENCY_ORDER[actual] ?? 1) + 1;
+  const actualKey = actual in URGENCY_ORDER ? actual : 'NORMAL';
+  const surfaceKey = surface in URGENCY_ORDER ? surface : 'NORMAL';
 
   return (
-    <div className="sai-decode-section">
+    <div className="sai-decode-section sai-decode-gap">
       <div className="sai-decode-gap-head">
         <span className="sai-decode-section-label">체감 긴급도</span>
         {gap ? (
@@ -535,14 +543,32 @@ function UrgencyGap({ surface, actual, gap, reason }) {
           <span className="sai-decode-gap-same">표면과 실제가 같아요</span>
         )}
       </div>
-      <div className="sai-decode-gap-track">
-        <span className="sai-decode-gap-fill" style={{ width: `${Math.max(surfacePct, actualPct)}%` }} />
-        <span className="sai-decode-gap-dot" style={{ left: `${surfacePct}%` }} title="표면" />
-        <span
-          className="sai-decode-gap-dot sai-decode-gap-dot-actual"
-          style={{ left: `${actualPct}%` }}
-          title="실제"
-        />
+      <div className="sai-decode-gap-bars" aria-hidden="true">
+        <span className="sai-decode-gap-row">
+          <span className="sai-decode-gap-key">표면</span>
+          <span className="sai-decode-gap-track">
+            <span
+              className="sai-decode-gap-fill sai-decode-gap-fill-surface"
+              style={{ width: `${(surfaceStep / 3) * 100}%` }}
+            />
+          </span>
+          {/* A2 — 줄 끝 단계 이름(서술 단계, 점수 아님). 머리줄과 같은 말이라 막대 묶음째 aria-hidden. */}
+          <span className={`sai-decode-gap-lvl sai-urgency-${surfaceKey.toLowerCase()}`}>
+            {URGENCY_LABEL[surfaceKey]}
+          </span>
+        </span>
+        <span className="sai-decode-gap-row">
+          <span className="sai-decode-gap-key">실제</span>
+          <span className="sai-decode-gap-track">
+            <span
+              className={`sai-decode-gap-fill sai-decode-gap-fill-actual sai-urgency-${actualKey.toLowerCase()}`}
+              style={{ width: `${(actualStep / 3) * 100}%`, '--from': surfaceStep / actualStep }}
+            />
+          </span>
+          <span className={`sai-decode-gap-lvl sai-urgency-${actualKey.toLowerCase()}`}>
+            {URGENCY_LABEL[actualKey]}
+          </span>
+        </span>
       </div>
       {reason && <p className="sai-decode-gap-reason">{reason}</p>}
     </div>
