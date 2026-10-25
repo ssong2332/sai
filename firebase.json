@@ -13,9 +13,13 @@
     }
   ],
   "hosting": {
-    "public": "dashboard/dist",
-    "predeploy": ["npm --prefix dashboard run build"],
+    "public": "hosting-dist",
+    "predeploy": ["node scripts/build-hosting.mjs"],
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/dashboard/**", "destination": "/dashboard/index.html" },
+      { "source": "**", "destination": "/index.html" }
+    ],
     "headers": [
       {
         "source": "**",

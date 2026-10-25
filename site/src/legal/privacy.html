@@ -1,9 +1,9 @@
-<!-- dashboard/public/privacy.html의 <main> 본문을 글자 그대로 옮겼다(2026-10-24). 내용을 고치려면 원본을 먼저 고친다. -->
+<!-- dashboard/public/privacy.html의 <main> 본문 — scripts/build-hosting.mjs가 만든다. 손으로 고치지 않는다. -->
 <h1>SAI 개인정보처리방침</h1>
-      <p class="meta">시행일: 【시행일】 · 운영자: 박수홍</p>
+      <p class="meta">시행일: 2026년 10월 25일 · 운영자: 박수홍</p>
 
       <p class="key">
-        <b>한 줄 요약</b> — SAI는 교정·해석을 위해 선택한 문장을 AI 서비스(Google Gemini API)로 보내지만,
+        <b>한 줄 요약</b> — SAI는 교정·해석을 위해 선택한 문장을 AI 서비스(Anthropic Claude API, 장애·한도 때만 Groq)로 보내지만,
         <b>메시지 본문을 SAI 서버나 데이터베이스에 저장하지 않습니다.</b> 서버에 남는 것은 계정 정보,
         직접 입력한 설정·용어집, 그리고 횟수 같은 숫자뿐입니다.
       </p>
@@ -73,8 +73,8 @@
       <h2>2. 메시지 본문은 어떻게 다뤄지나요</h2>
       <ul>
         <li>
-          이용자가 드래그해 교정·해석을 요청한 문장은 결과를 만들기 위해 SAI 서버(Google Cloud
-          Functions, 서울 리전)를 거쳐 <b>AI 서비스로 전송</b>됩니다.
+          이용자가 드래그해 교정·해석을 요청한 문장은 결과를 만들기 위해 SAI 서버(Cloudflare Workers —
+          이용자와 가까운 Cloudflare 데이터센터에서 실행)를 거쳐 <b>AI 서비스로 전송</b>됩니다.
         </li>
         <li>
           SAI 서버는 이 문장을 <b>데이터베이스나 로그에 저장하지 않습니다.</b> 같은 요청을 빠르게 다시
@@ -128,12 +128,28 @@
           </thead>
           <tbody>
             <tr>
-              <td>Google LLC (Gemini API)</td>
-              <td>미국 등 Google 데이터센터 소재국</td>
+              <td>Anthropic PBC (Claude API)</td>
+              <td>미국</td>
               <td>교정·해석 요청 문장, 직전 대화(켠 경우), 설정·용어집·수신자 태그</td>
               <td>AI 교정·해석 결과 생성</td>
               <td>요청할 때마다 암호화된 네트워크로 전송</td>
-              <td>SAI가 저장하지 않음. Google은 위반 탐지 목적 로그만 제한된 기간 보관(아래 참고)</td>
+              <td>SAI가 저장하지 않음. Anthropic은 받은 날부터 30일 이내 삭제(아래 참고)</td>
+            </tr>
+            <tr>
+              <td>Groq, Inc. (GroqCloud API)</td>
+              <td>미국</td>
+              <td>위 Anthropic과 같음 — <b>Anthropic이 장애·한도로 응답하지 못한 요청만</b></td>
+              <td>AI 교정·해석 결과 생성(예비)</td>
+              <td>해당 요청 때 암호화된 네트워크로 전송</td>
+              <td>SAI가 저장하지 않음. Groq은 기본적으로 보관하지 않음(아래 참고)</td>
+            </tr>
+            <tr>
+              <td>Cloudflare, Inc. (Workers)</td>
+              <td>이용자와 가까운 Cloudflare 데이터센터 소재국(국외 포함)</td>
+              <td>교정·해석 요청 문장과 위 항목, 로그인 확인용 토큰</td>
+              <td>요청 처리·AI 서비스로 중계</td>
+              <td>요청할 때마다 암호화된 네트워크로 전송</td>
+              <td>저장하지 않음(처리 중 메모리에만 있고, 2번의 결과 캐시 외에는 남지 않음)</td>
             </tr>
             <tr>
               <td>Google LLC (Firebase Authentication)</td>
@@ -144,7 +160,7 @@
               <td>계정 삭제 시까지</td>
             </tr>
             <tr>
-              <td>Google LLC (Firestore · Cloud Functions)</td>
+              <td>Google LLC (Firestore)</td>
               <td>대한민국(서울 리전)</td>
               <td>1번 표의 Firestore 항목</td>
               <td>데이터 저장·요청 처리</td>
@@ -155,9 +171,10 @@
         </table>
       </div>
       <p>
-        운영자는 Gemini API를 <b>유료 이용 조건</b>(결제 계정이 연결된 프로젝트)으로 사용합니다. 이 조건에서
-        Google은 전송된 문장과 결과를 <b>자사 제품 개선에 사용하지 않으며</b>, 정책 위반을 탐지·방지하기 위한
-        목적으로만 제한된 기간 기록합니다(Gemini API 추가 약관). 【L02: 유료 조건 확인 전 게시 금지】
+        Anthropic은 API로 받은 문장과 결과를 <b>AI 모델 학습에 사용하지 않으며</b>, 받은 날부터 30일 이내에
+        삭제합니다. 다만 Anthropic의 이용 정책 위반으로 판정된 요청은 더 오래 보관될 수 있습니다(Anthropic
+        개인정보 안내). Groq은 API로 받은 문장과 결과를 기본적으로 보관하지 않으며, 서비스 안정성 점검이나
+        악용 조사를 위해 최대 30일 기록할 수 있습니다(Groq 데이터 안내).
       </p>
       <p>
         공휴일 확인을 위해 공휴일 조회 서비스(Nager.Date)에 <b>국가 코드와 연도만</b> 보냅니다. 개인을
@@ -192,4 +209,4 @@
         이 방침이 바뀌면 시행 7일 전(이용자 권리에 중요한 변경은 30일 전)에 이 페이지에 알립니다.
       </p>
 
-      <p class="meta"><a href="/terms">이용약관</a></p>
+      <p class="meta"><a href="./terms.html">이용약관</a></p>
