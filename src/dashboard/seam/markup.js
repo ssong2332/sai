@@ -102,20 +102,15 @@ export const SEAM_MARKUP = `
       </div>
     </section>
 
-    <section aria-labelledby="th-h">
+    <section aria-labelledby="map-h">
       <div class="sec-h">
         <div>
-          <h2 id="th-h">실마다 따로 보기</h2>
-          <p id="th-p-flow">신호 여덟 가지를 날짜별로 풀었어요. 회색 세로 띠가 위에서 고른 날(<b id="th-day"></b>)이에요. 오른쪽 숫자는 바로 앞 같은 길이 기간과 비교한 변화예요.</p>
-          <p id="th-p-dates" hidden>고른 날의 신호만 표로 모았어요. 칸 색이 짙을수록 그날 마찰 신호가 많아요. 여러 날을 누르면 나란히 놓이고, Shift를 누른 채 누르면 사이의 날을 한 번에 골라요.</p>
-        </div>
-        <div class="seg" role="group" aria-label="보기 방식" id="th-view">
-          <button type="button" data-view="flow" aria-pressed="true">흐름</button>
-          <button type="button" data-view="dates" aria-pressed="false">날짜별</button>
+          <h2 id="map-h">어떤 신호가, 언제</h2>
+          <p>신호 여덟 가지를 날마다 한 칸씩 놓았어요. 칸이 짙을수록 그 신호가 그날 많았어요(신호마다 가장 많았던 날이 가장 짙어요). 날짜를 누르면 그날, 끌거나 Shift를 누른 채 누르면 사이의 날을 골라 오른쪽 합계로 봐요.</p>
         </div>
       </div>
-      <div class="threads" id="threads"></div>
-      <div class="dates" id="dates" hidden></div>
+      <div class="smap-top" id="smap-top"></div>
+      <div class="smap-wrap" id="smap-wrap"><div class="smap" id="smap"></div><div class="smap-tip" id="smap-tip" hidden></div></div>
     </section>
 
     <section aria-labelledby="wd-h">
