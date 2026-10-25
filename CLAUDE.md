@@ -52,6 +52,7 @@
 | Worker 콜드 CPU 추정(배포 번들 그대로·새 프로세스) | `npm --prefix workers/refine run bench:cold -- --runs 31` (먼저 build:dry. 🔴 run 수가 적으면 흔들린다 — 5회 11~17ms. Node 추정 — 실제는 배포 후 `wrangler tail` cpuTime) | 2026-10-23 |
 | 디자인 하네스(콘텐츠 팝업 목업 렌더·스크린샷, 개발 전용 — 🔴 실브라우저 unpacked 확인을 대신하지 않는다) | `npm --prefix design-harness run dev` → `http://127.0.0.1:5199/` (`?theme=dark` · `?scene=<id>` · `?v=1` 이전 시안 비교. 첫 기동 ~40초. 루트 `npm install` 필요) | 2026-10-24 |
 | 디자인 하네스 — 사이드패널·결정 화면(가짜 `chrome.*` 목업 저장소, 네트워크 차단) | 같은 서버에서 `http://127.0.0.1:5199/sidepanel.html` · `/decisions.html` (`?theme=dark`, 사이드패널 `?onboarding=new`). 창 폭 ~400px로 본다 | 2026-10-24 |
+| 디자인 하네스 — 확장 설정 페이지 | 같은 서버에서 `http://127.0.0.1:5199/settings.html#general` (패널은 해시: `#activation` `#integrations` `#blocked` `#data` …) | 2026-10-25 |
 | Worker 로컬 workerd(가짜 키·가짜 Claude, 🔴 배포 금지 설정) | `npm --prefix workers/refine run dev:mock` → `http://127.0.0.1:8790` (`/__dev/token`으로 시험 토큰) | 2026-10-23 |
 | 소개·설정 웹사이트(`site/`) 설치 | `site/` 안에서 `npm install` — 🔴 `npm --prefix site install`은 쓰지 않는다: `site/package.json`에 `"sai": "file:.."`를 몰래 넣는다(2026-10-24 실측) | 2026-10-24 |
 | 웹사이트 빌드 | `npm --prefix site run build` | 2026-10-24 |

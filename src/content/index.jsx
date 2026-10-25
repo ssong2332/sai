@@ -14,6 +14,7 @@ import tokensCss from '../styles/tokens.css?inline';
 import motionCss from '../styles/motion.css?inline';
 import contentCss from './content.css?inline';
 import SaiOverlay from './SaiOverlay.jsx';
+import SiteGate from './SiteGate.jsx';
 import { getLocal, STORAGE_KEYS } from '../lib/storage.js';
 // 시안 A2 — 번들 서체를 호스트 문서에 고유 이름(`SaiPretendard`)으로 등록한다(Shadow root 안 @font-face 대신).
 import { registerSaiFont } from '../lib/saiFont.js';
@@ -91,7 +92,12 @@ function mount() {
     });
   }
 
-  createRoot(mountPoint).render(<SaiOverlay />);
+  // 🔴 2026-10-25 — 설정 페이지의 「통합」·「사이 버튼을 표시하지 않을 사이트」를 따른다(`SiteGate.jsx`).
+  createRoot(mountPoint).render(
+    <SiteGate>
+      <SaiOverlay />
+    </SiteGate>,
+  );
 }
 
 // document_idle에 실행되지만 방어적으로 한 번 더 확인한다.
