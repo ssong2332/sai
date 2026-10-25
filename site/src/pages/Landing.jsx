@@ -743,6 +743,59 @@ function SidePanel() {
       </div>
       <Segmented options={TABS} value={tab} onChange={setTab} mode="pressed" label="사이드 패널 탭" className="ptabs" />
       <div className="pbody" ref={ref}>
+        {tab === 'home' && (
+          <HomeBody on={on} back={back} setBack={setBack} why={why} setWhy={setWhy} />
+        )}
+        {tab !== 'home' &&
+          TAB_CARDS[tab].map((card) => (
+            <div className="pcard" key={card.title}>
+              <h4>
+                {card.title} {card.meta && <small>{card.meta}</small>}
+              </h4>
+              {card.chips && (
+                <div className="pchips">
+                  {card.chips.map((c, i) => (
+                    <span key={c} className={i === 0 ? 'on' : undefined}>
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {card.rows?.map(([a, b]) => (
+                <div className="slot" key={a}>
+                  <span>{a}</span>
+                  <span>{b}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+      </div>
+    </Reveal>
+  );
+}
+
+/** 탭마다 실제 사이드 패널의 카드 순서를 따른다(`src/sidepanel/App.jsx` — 팀·보관함·프로필 탭). 예시 데이터. */
+const TAB_CARDS = {
+  team: [
+    { title: '팀 관리', meta: '플랫폼팀 · 3명', rows: [['나', '팀장'], ['Miguel', '팀원'], ['Aiko', '팀원']] },
+    { title: '팀 용어집', meta: '모두에게 같이 적용', rows: [['배포', 'deploy'], ['검수', 'QA review']] },
+    { title: '초대 코드', rows: [['SAI-7K2Q', '7일 동안 유효']] },
+  ],
+  archive: [
+    { title: '내 용어집', rows: [['릴리스', 'release'], ['v2.4', '원문 유지']] },
+    { title: '스니펫', rows: [['Could you review this today?', '복사']] },
+    { title: '예약 알림', meta: '1건', rows: [['Miguel에게 보내기', '상대 내일 09:00']] },
+  ],
+  profile: [
+    { title: '1순위 — 내 상황', chips: ['코드 리뷰', '장애 대응', '일정 조율', '진행 보고'] },
+    { title: '2순위 — AI가 학습한 내 수정 패턴', rows: [['문장을 더 짧게', '5번 고침'], ['요청은 질문형으로', '3번 고침']] },
+    { title: '내가 대화하는 사람들', rows: [['Miguel', '직접적 표현 선호'], ['Aiko', '오전 응답 빠름']] },
+  ],
+};
+
+function HomeBody({ on, back, setBack, why, setWhy }) {
+  return (
+    <>
         <div className="pcard">
           <h4>
             오늘의 사이 <small>오늘 0시부터</small>
@@ -794,8 +847,7 @@ function SidePanel() {
             />
           </div>
         </div>
-      </div>
-    </Reveal>
+    </>
   );
 }
 

@@ -1278,6 +1278,26 @@ button.step.on:hover {
 .slot.best {
   background: var(--dusk-tint);
 }
+.pcard h4 + .slot {
+  margin-top: 0;
+}
+.pchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pchips span {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--sunken);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mut);
+}
+.pchips span.on {
+  background: var(--ink);
+  color: var(--bg);
+}
 .toggle {
   display: flex;
   justify-content: space-between;
