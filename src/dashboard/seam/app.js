@@ -418,9 +418,11 @@ export function mount(teams, opts = {}) {
     } else {
       const { cur, prev } = splitWindow(t.rows, state.days);
       // 비교 중이면 두 기간의 날짜와 합친 날 수를 밝힌다 — 「앞 30일과 비교」가 60일을 보고 있다는 걸 숨기지 않는다.
+      const before = t.rows.slice(-state.days * 2, -state.days);
+      const span = (rows) => `${fmtD(rows[0].date)}~${fmtD(rows.at(-1).date)}`;
       html = prev.length
-        ? esc(`앞 ${state.days}일(${fmtD(prev[0].date)}~${fmtD(prev.at(-1).date)})과 이번 ${state.days}일(${fmtD(cur[0].date)}~${fmtD(cur.at(-1).date)})을 비교하고 있어요 · 모두 ${state.days * 2}일`)
-        : esc(`앞 ${state.days}일에는 다듬은 글이 없어서 비교하지 않았어요.`);
+        ? esc(`앞 ${state.days}일(${span(prev)})과 이번 ${state.days}일(${span(cur)})을 비교하고 있어요 · 모두 ${state.days * 2}일`)
+        : esc(`앞 ${state.days}일(${span(before)})까지 모두 ${state.days * 2}일을 읽었지만, 그 기간에 다듬은 글이 없어서 비교하지 않았어요.`);
     }
     note.hidden = html === '';
     note.innerHTML = html;
