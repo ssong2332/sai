@@ -111,6 +111,7 @@ import {
   removeTeamGlossaryEntry,
   uploadFriction,
   fetchAllTeamsFriction,
+  DASHBOARD_DAYS,
   refreshAllMemberships,
   listTeamMembers,
   setMemberDashboardAccess,
@@ -1736,7 +1737,9 @@ function TeamDashboardCard({ team, onToast }) {
        * 🔴 **지표가 0건인 팀도 넣는다.** 빼면 그 팀을 고른 사용자에게 다른 팀 지표가 열린다
        *    (실측으로 겪었다) — 빈 팀은 빈 팀으로 보여준다.
        */
-      const reports = await fetchAllTeamsFriction({ days: 30 });
+      // 🔴 120일 — 대시보드가 60일을 바로 앞 60일과 비교한다. 받은 날짜 수(`days`)를 함께 실어,
+      //    대시보드가 자료가 닿지 않는 기간·비교를 지어내지 않게 한다(옛 확장은 30일만 보냈다).
+      const reports = await fetchAllTeamsFriction({ days: DASHBOARD_DAYS });
       if (reports.length === 0) {
         onToast('아직 지표를 볼 수 있는 팀이 없어요 — 데모 데이터로 열게요');
         window.open(DASHBOARD_URL, '_blank', 'noopener');
@@ -1749,7 +1752,7 @@ function TeamDashboardCard({ team, onToast }) {
       ];
       const payload = btoa(
         // 🔴 `encodeURIComponent`를 거쳐야 한글 팀 이름이 `btoa`에서 깨지지 않는다.
-        unescape(encodeURIComponent(JSON.stringify({ teams: ordered }))),
+        unescape(encodeURIComponent(JSON.stringify({ teams: ordered, days: DASHBOARD_DAYS }))),
       );
       window.open(`${DASHBOARD_URL}#sai=${payload}`, '_blank', 'noopener');
     } catch {

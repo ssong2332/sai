@@ -562,6 +562,27 @@ export async function removeTeamGlossaryEntry(id, { fetchImpl = globalThis.fetch
   await firestore(`/teams/${team.teamId}/glossary/${id}`, { method: 'DELETE', fetchImpl });
 }
 
+/** 대시보드가 기간을 비교하려고 읽는 날짜 수(최근 60일 + 바로 앞 60일). */
+export const DASHBOARD_DAYS = 120;
+/** 운영에서 검증된 batchGet 한 번의 문서 수. */
+export const FRICTION_BATCH_SIZE = 30;
+
+/**
+ * 최근 `days`일의 마찰 문서 이름을 `size`개씩 묶어 돌려준다(오늘부터 거꾸로, 로컬 날짜 기준).
+ * 순수 함수 — `test/frictionBatches.unit.test.js`가 잠근다.
+ */
+export function frictionDocBatches({ base, teamId, days, today = new Date(), size = FRICTION_BATCH_SIZE }) {
+  const wanted = [];
+  for (let back = 0; back < days; back += 1) {
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back);
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    wanted.push(`${base}/${teamId}_${key}`);
+  }
+  const batches = [];
+  for (let i = 0; i < wanted.length; i += size) batches.push(wanted.slice(i, i + size));
+  return batches;
+}
+
 /**
  * 팀의 마찰·긍정 카운트를 최근 N일치 읽어 합산한다.
  *
@@ -578,19 +599,20 @@ export async function fetchTeamFriction({ days = 30, fetchImpl = globalThis.fetc
   if (!team) return null;
 
   const base = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/frictionCounts`;
-  const wanted = [];
-  const today = new Date();
-  for (let back = 0; back < days; back += 1) {
-    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back);
-    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    wanted.push(`${base}/${team.teamId}_${key}`);
+  /**
+   * 🔴 **30건씩 나눠 읽는다** (2026-10-25 — 대시보드 기간 비교로 120일). 운영에서 검증된 요청
+   *    모양은 「batchGet 1회 = 문서 30개」뿐이다. 한 번에 120개를 보내면 규칙 평가(문서마다
+   *    `get()`/`exists()`)가 다른 한도에 닿는지 확인하지 못했으므로, 검증된 크기를 여러 번 보낸다.
+   */
+  const result = [];
+  for (const documents of frictionDocBatches({ base, teamId: team.teamId, days })) {
+    const page = await firestore(':batchGet', {
+      method: 'POST',
+      body: { documents },
+      fetchImpl,
+    });
+    if (Array.isArray(page)) result.push(...page);
   }
-
-  const result = await firestore(':batchGet', {
-    method: 'POST',
-    body: { documents: wanted },
-    fetchImpl,
-  });
 
   /**
    * 🔴 **날짜별로도 돌려준다** (2026-08-16). 합계 하나만 넘기면 대시보드에서 기간을 고를 수
