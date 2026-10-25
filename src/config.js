@@ -171,16 +171,6 @@ export const FEATURES = {
 };
 
 /**
- * S18 — B2B 웹 대시보드 URL. `dashboard/`(별도 Vite 앱)를 Firebase Hosting에 배포한 주소.
- * 🔴 2026-10-25 — 호스팅 첫 화면은 소개 사이트(`site/`), 대시보드는 `/dashboard/` (`scripts/build-hosting.mjs`).
- *    배포 완료 후 실제 URL을 curl로 확인하고 이 주석을 갱신한다(Lessons #10 — 배포 성공과 URL
- *    동작은 별개).
- * 🔴 0.1.21(2026-10-25)부터 이 주소는 **예시 데이터 전용**이고 확장은 여기로 보내지 않는다 — 실제 팀 지표는
- *    확장 페이지 `src/dashboard/`(`src/lib/dashboardPage.js`). 지금 이 상수를 import하는 곳은 없다(제거 후보).
- */
-export const DASHBOARD_URL = 'https://sai-global-msg-2026.web.app/dashboard/';
-
-/**
  * 관리용 웹사이트 (`site/`, 2026-10-24 — `docs/WebSplit.md` 「C — 로컬 브리지」).
  *
  * 웹이 `externally_connectable` 메시지로 확장에 직접 말을 건다 — **데이터는 `chrome.storage.local`에

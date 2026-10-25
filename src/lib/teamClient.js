@@ -698,50 +698,6 @@ export async function fetchTeamFriction({ days = 30, fetchImpl = globalThis.fetc
 }
 
 /**
- * 소속된 **모든 팀**의 지표를 모은다 (2026-08-16 — 대시보드 팀 전환).
- *
- * 🔴 **0.1.21(2026-10-25)부터 사이드패널은 이 함수를 부르지 않는다.** 대시보드가 확장 페이지(`src/dashboard/`)가
- *    되어 `fetchFrictionDays`로 필요한 팀·날만 읽는다. 아래 설명은 웹 대시보드 시절의 이유다.
- *
- * 🔴 대시보드는 로그인이 없는 별도 페이지라 스스로 팀을 바꿔 읽을 수 없다. 그래서 확장이
- *    한 번에 다 읽어 넘긴다 — 웹페이지에서 드롭다운으로 전환하는 것이 목적이다.
- * 🔴 **열람 권한이 없는 팀은 뺀다.** 규칙이 어차피 거절하지만, 목록에 이름만 떠도 "볼 수 있는데
- *    안 열린다"로 읽힌다.
- * 🔴 한 팀이 실패해도 나머지는 넘긴다 — 팀 하나의 오류로 대시보드 전체가 데모로 떨어지면 안 된다.
- * @returns {Promise<Array<{teamId, teamName, counts}>>} 지표가 하나도 없는 팀은 빠진다.
- */
-export async function fetchAllTeamsFriction({ days = 30, fetchImpl = globalThis.fetch } = {}) {
-  const teams = await listTeams();
-  const viewable = teams.filter((team) => team.role === 'owner' || team.canViewDashboard === true);
-  const active = await getTeam();
-
-  const reports = [];
-  for (const team of viewable) {
-    try {
-      await setActiveTeam(team.teamId); // `fetchTeamFriction`이 활성 팀을 본다.
-      const report = await fetchTeamFriction({ days, fetchImpl });
-      /**
-       * 🔴 **지표가 0건이어도 목록에 넣는다** (2026-08-16 실측이 잡은 결함). 예전에는 0건인 팀을
-       *    빼 버려서, 「132」를 골라 대시보드를 열면 **데이터가 있는 다른 팀**이 열렸다 —
-       *    리더가 남의 팀 지표를 자기 팀 것으로 읽는 사고다. 빈 팀은 **빈 팀으로 보여준다.**
-       * 🔴 날짜별도 함께 넘긴다 — 대시보드가 기간을 다시 계산하려면 원자료가 필요하다.
-       */
-      reports.push({
-        teamId: team.teamId,
-        teamName: team.name,
-        counts: report?.counts ?? {},
-        byDate: report?.byDate ?? {},
-      });
-    } catch {
-      /* 이 팀만 건너뛴다 */
-    }
-  }
-  // 🔴 보고 있던 팀을 반드시 되돌린다 — 대시보드를 한 번 열면 활성 팀이 바뀌어 있으면 안 된다.
-  if (active) await setActiveTeam(active.teamId);
-  return reports;
-}
-
-/**
  * `/v1/refine` payload의 `glossary` 형태로 바꾼다.
  * 🔴 `scope: 'team'`이 핵심이다 — 프롬프트가 `personal > team > ai` 우선순위를 이 값으로 가른다
  *    (`core/refine/prompt.js`의 `glossaryRules()`). 개인 용어와 같은 `scope`로 보내면
