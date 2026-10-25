@@ -8,8 +8,8 @@
 import {
   EVENTS, F, P, WD, STEADY_MIN,
   sum, ratio, healthOf, safeMax, laneHeight, frac, fmtD, pct, esc,
-  splitWindow, periodOptions, defaultPeriod, isEmpty,
-  dailyGap, worstDay, topCause, headline, deltaOf, storyFacts,
+  periodRows, periodOptions, defaultPeriod, isEmpty,
+  dailyGap, worstDay, topCause, headline, flowPill, storyFacts, weeklyFlow, flowSentence, flowScaleTop,
   actions, briefLines, briefText, weekdayFold,
   pickDays, rangeIndices, selectedSummary, signalMap, PERIODS,
 } from './model.js';
@@ -54,8 +54,8 @@ export function mount(teams, opts = {}) {
   for (const t of teams) if (!t.status) t.status = 'ready';
   const first = Number.isInteger(opts.initial) && teams[opts.initial] ? opts.initial : 0;
   // picked·anchor·focus는 「날짜별」의 고른 날·Shift 기준 날·키보드 위치(이번 기간 rows 안의 칸 번호).
-  // compare — 「앞 기간과 비교」를 위해 더 읽어도 되는가. 웹 예시는 자료가 이미 다 있으므로 늘 켜져 있다.
-  const state = { team: first, days: lazy ? 30 : defaultPeriod(teams[first].coverageDays), compare: !lazy, sel: null, picked: [], anchor: null, focus: null, dragging: false };
+  // 🔴 2026-10-26 사용자 결정 — 「앞 기간과 비교」는 뺐다. 기간은 오늘까지 N일 하나뿐이다.
+  const state = { team: first, days: lazy ? 30 : defaultPeriod(teams[first].coverageDays), sel: null, picked: [], anchor: null, focus: null, dragging: false };
   /** 진행 중인 읽기 · 실패한 읽기({message, want}). 화면은 둘 중 하나만 말한다. */
   const net = { busy: false, error: null, seq: 0 };
   let briefCopy = '';
@@ -64,7 +64,7 @@ export function mount(teams, opts = {}) {
 
   const team = () => teams[state.team];
   const pairLabel = (t) => `${t.a} ↔ ${t.b}`;
-  const windowRows = () => splitWindow(team().rows, state.days);
+  const windowRows = () => periodRows(team().rows, state.days);
 
   $('demo').hidden = !demo;
   $('demo-note').hidden = !demo;
@@ -169,10 +169,10 @@ export function mount(teams, opts = {}) {
 
   /* ── 신호 지도: 신호 × 날짜 (2026-10-26 — 「흐름/날짜별」 두 보기를 하나로) ── */
   function drawMap() {
-    const { cur, prev } = windowRows();
-    const m = signalMap(cur, prev, state.picked), n = cur.length;
+    const cur = windowRows();
+    const m = signalMap(cur, state.picked), n = cur.length;
     const focusI = Math.max(0, Math.min(n - 1, state.focus ?? m.picked[m.picked.length - 1] ?? n - 1));
-    const sel = m.picked.length > 0, cmp = prev.length > 0;
+    const sel = m.picked.length > 0;
     // 날짜 숫자는 한 달 길이까지 모두, 그보다 길면 달 첫날·월요일만. 칸 안 숫자는 2주 보기에서만.
     const allNums = n <= 31, inCell = n <= 14;
     const dayHead = m.days.map((d) => {
@@ -183,20 +183,19 @@ export function mount(teams, opts = {}) {
       return `<th scope="col" class="d${d.weekend ? ' wk' : ''}${d.on ? ' on' : ''}"><button type="button" class="dh" data-i="${d.i}" tabindex="${d.i === focusI ? 0 : -1}" aria-pressed="${d.on}" aria-label="${fmtD(d.date)} ${WD[d.wd]}요일">${show ? `<span class="dh-t">${top}</span><span class="dh-n num">${d.date.getDate()}</span>` : '<span class="dh-tick"></span>'}</button></th>`;
     }).join('');
     const span = (a, b) => (a.getTime() === b.getTime() ? shortD(a) : `${shortD(a)}~${shortD(b)}`);
-    const numHead = (cmp ? `<th scope="col" class="nc prevc">앞 ${state.days}일<small>${span(prev[0].date, prev[prev.length - 1].date)}</small></th>` : '')
-      + `<th scope="col" class="nc">이번 ${state.days}일<small>${span(cur[0].date, cur[n - 1].date)}</small></th>`
+    const numHead = `<th scope="col" class="nc">이번 ${state.days}일<small>${span(cur[0].date, cur[n - 1].date)}</small></th>`
       + (sel ? `<th scope="col" class="nc selc">고른 ${m.picked.length}일<small>${span(m.first, m.last)}</small></th>` : '');
-    const diff = (r) => (r.pt == null || r.pt === r.tot ? '' : `<small class="dv ${r.dir}">${r.tot > r.pt ? '+' : '−'}${Math.abs(r.tot - r.pt)}</small>`);
-    const nums = (r) => `${cmp ? `<td class="nc prevc num">${r.pt}</td>` : ''}<td class="nc num">${r.tot}${diff(r)}</td>${sel ? `<td class="nc selc num">${r.sel}</td>` : ''}`;
+    const nums = (r) => `<td class="nc num">${r.tot}</td>${sel ? `<td class="nc selc num">${r.sel}</td>` : ''}`;
     const tdc = (i, cls) => `c ${cls}${m.days[i].on ? ' on' : ''}${m.days[i].weekend ? ' wk' : ''}`;
     const cells = (r, kind) => r.vals.map((v, i) => `<td class="${tdc(i, `${kind} lv${r.levels[i]}`)}" data-i="${i}" data-v="${v}" data-k="${r.label}">${inCell && v ? `<span class="num">${v}</span>` : ''}</td>`).join('');
     const refBars = m.refined.vals.map((v, i) => `<td class="${tdc(i, 'rf')}" data-i="${i}" data-v="${v}" data-k="다듬은 글"><i style="height:${Math.round((v / m.refined.max) * 100)}%"></i></td>`).join('');
-    const cols = 1 + n + (cmp ? 1 : 0) + 1 + (sel ? 1 : 0);
-    const body = m.groups.map((g) => `<tr class="grp ${g.kind}"><th scope="colgroup" colspan="${cols}">${g.label}<span class="num">이번 ${g.tot}건${cmp && g.pt !== g.tot ? ` · 앞 기간 ${g.pt}건` : ''}${sel ? ` · 고른 날 ${g.sel}건` : ''}</span></th></tr>`
+    const cols = 1 + n + 1 + (sel ? 1 : 0);
+    const body = m.groups.map((g) => `<tr class="grp ${g.kind}"><th scope="colgroup" colspan="${cols}">${g.label}<span class="num">이번 ${g.tot}건${sel ? ` · 고른 날 ${g.sel}건` : ''}</span></th></tr>`
       + g.rows.map((r) => `<tr${r.tot ? '' : ' class="none"'}><th scope="row" class="lab">${r.label}<small>${r.desc}</small></th>${cells(r, g.kind)}${nums(r)}</tr>`).join('')).join('');
 
-    $('smap').innerHTML = `<table style="--n:${n}"><caption class="sr">신호별 날짜별 건수${sel ? ` — 고른 ${m.picked.length}일` : ''}</caption>
-      <colgroup><col class="lab-c">${'<col>'.repeat(n)}${cmp ? '<col class="nc-c">' : ''}<col class="nc-c">${sel ? '<col class="nc-c">' : ''}</colgroup>
+    // 60일 넘는 기간(90일)은 칸을 좁혀 데스크톱 폭 안에 넣는다 — 합계 열이 스크롤 끝에 숨지 않게(2026-10-26 실브라우저).
+    $('smap').innerHTML = `<table style="--n:${n}"${n > 60 ? ' class="long"' : ''}><caption class="sr">신호별 날짜별 건수${sel ? ` — 고른 ${m.picked.length}일` : ''}</caption>
+      <colgroup><col class="lab-c">${'<col>'.repeat(n)}<col class="nc-c">${sel ? '<col class="nc-c">' : ''}</colgroup>
       <thead><tr><th scope="col" class="lab corner"></th>${dayHead}${numHead}</tr></thead>
       <tbody><tr class="ref"><th scope="row" class="lab">다듬은 글<small>신호를 센 바탕이 된 글</small></th>${refBars}${nums(m.refined)}</tr>${body}</tbody></table>`;
 
@@ -212,18 +211,49 @@ export function mount(teams, opts = {}) {
     if (b) b.focus();
   }
 
-  function drawStory(cur, prev) {
-    const s = storyFacts(cur, prev);
+  function drawStory(cur) {
+    const s = storyFacts(cur), fl = s.flow;
+    const tone = fl.verdict.kind === 'down' ? 'p' : fl.verdict.kind === 'up' ? 's' : '';
     $('story').innerHTML = `
       <article class="beat"><div class="beat-k">흐름</div>
-        <p class="beat-t">${s.trend <= 0 ? `기간 후반에 마찰 비율이 <em class="p">${pct(s.early ?? 0)} → ${pct(s.late ?? 0)}</em>로 내려왔어요.` : `기간 후반에 마찰 비율이 <em class="s">${pct(s.early ?? 0)} → ${pct(s.late ?? 0)}</em>로 올라갔어요.`}</p>
-        <p class="beat-n">앞 ${state.days}일 전체는 ${s.b == null ? '자료 없음' : pct(s.b)}, 이번 기간 전체는 ${s.a == null ? '—' : pct(s.a)}.</p></article>
+        <p class="beat-t">${tone ? `<em class="${tone}">${esc(flowSentence(fl))}</em>` : esc(flowSentence(fl))}</p>
+        <p class="beat-n">이 기간 전체는 ${s.a == null ? '—' : pct(s.a)} · 주별 막대는 아래 「주마다 본 흐름」에 있어요.</p></article>
       <article class="beat"><div class="beat-k">가장 큰 원인</div>
         <p class="beat-t">${s.fTot ? `마찰의 <em class="s">${Math.round(s.topShare * 100)}%</em>가 「${s.top.label}」에서 나왔어요.` : '이 기간에는 마찰 신호가 없었어요.'}</p>
         <p class="beat-n">그중 <b class="num">${s.clr}</b>건은 교정을 거쳐 명확한 요청으로 나갔어요 (감지 ${s.mis}건 대비 ${s.mis ? Math.round((s.clr / s.mis) * 100) : 0}%).</p></article>
       <article class="beat"><div class="beat-k">요일</div>
         <p class="beat-t">${s.offTop ? `오프타임 강행은 <em class="r">${WD[s.offTop.wd]}요일</em>에 가장 많았어요.` : '이 기간에는 오프타임 강행이 없었어요.'}</p>
         <p class="beat-n">${s.offTop ? `${s.offTop.count}건 — 마감이 몰리는 요일엔 예약 제안을 먼저 써 보세요.` : '퇴근 시간 뒤 메시지는 모두 예약으로 나갔어요.'}</p></article>`;
+  }
+
+  /* ── 주마다 본 흐름 (2026-10-26 — 앞 기간 비교 대신, 판정표는 model.js weeklyFlow) ── */
+  function drawFlow(cur) {
+    const fl = weeklyFlow(cur), ws = fl.weeks, v = fl.verdict;
+    const svg = $('flow');
+    const W = Math.max(320, Math.round(svg.parentNode.clientWidth || 900)), narrow = W < 560;
+    const H = narrow ? 190 : 220, L = 40, R = 8, T = 24, B = 34;
+    const step = (W - L - R) / Math.max(1, ws.length), bw = Math.min(48, step * 0.62);
+    const top = flowScaleTop(ws);
+    const y = (r) => T + (H - T - B) * (1 - Math.min(r, top) / top);
+    const cx = (i) => L + step * (i + 0.5);
+    const every = step >= 40 ? 1 : 2;
+    const grid = [0, top / 2, top].map((r) => `<line class="g" x1="${L}" x2="${W - R}" y1="${y(r)}" y2="${y(r)}"/><text class="ax" x="${L - 6}" y="${y(r) + 4}" text-anchor="end">${Math.round(r * 100)}%</text>`).join('');
+    const bars = ws.map((w) => {
+      const r = w.ratio ?? 0, cls = `${!w.full ? 'part' : w.used ? 'use' : 'thin'}${r > top ? ' over' : ''}`;
+      const why = w.used ? '' : w.full ? ' — 다듬은 글이 적어 흐름 판단에서 뺐어요' : ` — ${w.days}일뿐이라 흐름 판단에서 뺐어요`;
+      const tipText = `${fmtD(w.start)} ~ ${fmtD(w.end)} · 마찰 비율 ${w.ratio == null ? '—' : pct(r)} · 다듬은 글 ${w.refined}건${why}`;
+      return `<g class="wk ${cls}"><title>${esc(tipText)}</title>
+        <rect x="${(cx(w.i) - bw / 2).toFixed(1)}" y="${y(r).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, y(0) - y(r)).toFixed(1)}" rx="3"/>
+        ${w.ratio == null || (narrow && step < 30) ? '' : `<text class="vl" x="${cx(w.i)}" y="${y(r) - 6}" text-anchor="middle">${Math.round(r * 100)}%</text>`}
+        ${w.i % every ? '' : `<text class="ax" x="${cx(w.i)}" y="${H - 12}" text-anchor="middle">${shortD(w.start)}</text>`}</g>`;
+    }).join('');
+    const line = v.kind === 'thin' ? '' : `<line class="trend ${v.kind}" x1="${cx(v.fromI)}" y1="${y(v.from)}" x2="${cx(v.toI)}" y2="${y(v.to)}"/>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = `<desc id="flow-desc">${esc(`${ws.length}주의 마찰 비율. ${flowSentence(fl)}.`)}</desc>${grid}${bars}${line}`;
+    const wk = (w) => `${shortD(w.start)}~${shortD(w.end)}`;
+    $('flow-say').innerHTML = v.kind === 'thin'
+      ? esc(`흐름에 넣을 수 있는 주가 ${fl.used}개예요 — 7일을 채우고 다듬은 글이 30건 넘는 주가 3개부터 흐름을 말해요.`)
+      : `가장 높았던 주 <b>${wk(fl.hi)}</b> <span class="num">${pct(fl.hi.ratio)}</span> · 가장 낮았던 주 <b>${wk(fl.lo)}</b> <span class="num">${pct(fl.lo.ratio)}</span>`;
   }
 
   function drawRhythm(cur) {
@@ -239,7 +269,7 @@ export function mount(teams, opts = {}) {
 
   function drawActs(list) {
     $('acts').innerHTML = list.length
-      ? list.map((a, i) => `<li class="act${a.hot ? ' hot' : ''}"><span class="act-n num">${i + 1}</span><div><h3>${a.title}</h3><p>${a.body}</p></div><div class="act-why"><b class="num">${a.why}</b>${a.tag}${a.hot ? ' · 늘고 있음' : ''}</div></li>`).join('')
+      ? list.map((a, i) => `<li class="act${a.hot ? ' hot' : ''}"><span class="act-n num">${i + 1}</span><div><h3>${a.title}</h3><p>${a.body}</p></div><div class="act-why"><b class="num">${a.why}</b>${a.tag}${a.hot ? ' · 많은 편' : ''}</div></li>`).join('')
       : '<li class="act"><span class="act-n">✓</span><div><h3>지금은 따로 손볼 곳이 보이지 않아요</h3><p>이번 기간에는 한쪽으로 몰린 마찰이 없어요.</p></div></li>';
   }
 
@@ -273,12 +303,11 @@ export function mount(teams, opts = {}) {
     return `<svg viewBox="0 0 ${W} ${H}" role="img"><line class="base" x1="0" y1="${H - 17.5}" x2="${W}" y2="${H - 17.5}"/>${g}${tick(0)}${tick(Math.floor(n / 2))}${tick(n - 1)}</svg>`;
   }
 
-  function drawInbound(cur, prev) {
+  function drawInbound(cur) {
     const dec = sum(cur, ['decoded']), gapN = sum(cur, ['decodeUrgencyGap']);
-    const pd = prev.length ? sum(prev, ['decoded']) : 0, pg = prev.length ? sum(prev, ['decodeUrgencyGap']) : 0;
-    const r = frac(gapN, dec), pr = pd ? frac(pg, pd) : null;
+    const r = frac(gapN, dec);
     const view = cur.map((d) => ({ ...d, c: { ...d.c, decodeSame: Math.max(0, (d.c.decoded || 0) - (d.c.decodeUrgencyGap || 0)) } }));
-    $('inbound').innerHTML = `<div class="panel-top"><div><b class="num">${dec}</b>뜻 풀기로 연 글<span class="new">새 지표</span></div><div><b class="num">${Math.round(r * 100)}%</b>겉말과 의도가 달랐음${pr == null ? '' : ` · 앞 기간 ${Math.round(pr * 100)}%`}</div></div>
+    $('inbound').innerHTML = `<div class="panel-top"><div><b class="num">${dec}</b>뜻 풀기로 연 글<span class="new">새 지표</span></div><div><b class="num">${Math.round(r * 100)}%</b>겉말과 의도가 달랐음</div></div>
       ${bars(view, [{ k: 'decodeUrgencyGap', cls: 'inb-gap' }, { k: 'decodeSame', cls: 'inb-bar' }], 150)}
       <div class="key"><span><i style="background:var(--focus)"></i>의도가 달랐던 글</span><span><i style="background:var(--bar)"></i>겉말 그대로였던 글</span></div>`;
   }
@@ -298,16 +327,16 @@ export function mount(teams, opts = {}) {
         const msg = t.status === 'error' ? '읽지 못했어요 — 누르면 다시 읽어요' : t.status === 'loading' ? '불러오는 중…' : `이 칸이 보이면 최근 ${otherDays}일을 읽어요`;
         return `<button type="button" class="cm cm-wait" data-i="${i}" aria-current="${i === state.team}"><span class="cm-h"><b>${esc(t.a)}</b> ↔ ${esc(t.b)}</span><span class="cm-n num">—</span><span class="cm-d">${msg}</span></button>`;
       }
-      const { cur, prev } = splitWindow(t.rows, Math.min(state.days, t.rows.length));
-      const a = ratio(cur), b = prev.length ? ratio(prev) : null, h = healthOf(cur);
+      const cur = periodRows(t.rows, Math.min(state.days, t.rows.length));
+      const a = ratio(cur), h = healthOf(cur), kind = weeklyFlow(cur).verdict.kind;
       const daily = dailyGap(cur);
       const W = 300, H = 64, mid = 32, n = cur.length, x = (k) => 4 + (k * (W - 8)) / Math.max(1, n - 1);
       const g = daily.map((v) => 3 + Math.sqrt(Math.min(1, v / 0.6)) * 26);
       const top = path(daily.map((_, k) => [x(k), mid - g[k] / 2])), bot = path(daily.map((_, k) => [x(k), mid + g[k] / 2]));
       const area = top + ' ' + path(daily.map((_, k) => [x(k), mid + g[k] / 2]).reverse()).replace(/^M/, 'L') + ' Z';
-      const diff = a != null && b != null ? (a - b) * 100 : null;
+      const flowWord = { down: '낮아지는 흐름', up: '높아지는 흐름', flat: '비슷한 흐름' }[kind];
       return `<button type="button" class="cm" data-i="${i}" aria-current="${i === state.team}"><span class="cm-h"><b>${esc(t.a)}</b> ↔ ${esc(t.b)}</span><span class="cm-n num">${h == null ? '—' : h.toFixed(1)}</span>
-        <span class="cm-d ${diff == null ? '' : diff > 0 ? 'up' : 'down'}">${a == null ? '아직 쌓인 신호가 없어요' : diff == null ? '비교할 앞 기간 없음' : `마찰 비율 ${Math.abs(diff).toFixed(1)}%p ${diff > 0 ? '늘었어요' : '줄었어요'}`}${t.rows.length < state.days ? ` · 최근 ${t.rows.length}일만 읽었어요` : ''}</span>
+        <span class="cm-d ${kind === 'up' || kind === 'down' ? kind : ''}">${a == null ? '아직 쌓인 신호가 없어요' : `마찰 비율 ${pct(a)}${flowWord ? ` · ${flowWord}` : ''}`}${t.rows.length < state.days ? ` · 최근 ${t.rows.length}일만 읽었어요` : ''}</span>
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="g" d="${area}"/><path class="a" d="${top}"/><path class="b" d="${bot}"/></svg></button>`;
     }).join('');
     $('cmp').querySelectorAll('.cm').forEach((btn) => btn.addEventListener('click', () => {
@@ -341,8 +370,8 @@ export function mount(teams, opts = {}) {
     }
   }
 
-  function drawBrief(cur, prev, acts) {
-    const lines = briefLines(cur, prev, state.days);
+  function drawBrief(cur, acts) {
+    const lines = briefLines(cur, state.days);
     const next = acts[0];
     $('brief').innerHTML = `<div class="brief-grid"><ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul>
       <div class="next"><b>이번 주에 하나만 한다면</b><p>${next ? next.title : '지금처럼 유지하기'}</p><small>${next ? next.why : ''}</small></div></div>`;
@@ -369,8 +398,8 @@ export function mount(teams, opts = {}) {
   }
 
   /**
-   * 기간 아래 한 줄 — 읽는 중 · 실패(다시 시도) · 앞 기간 자료가 없음(더 읽기) · 앞 기간이 비어 비교 안 함.
-   * 🔴 앞 기간이 자료 범위 밖이면 비교를 만들지 않는다 — 그 이유를 숨기지 않는다.
+   * 기간 아래 한 줄 — 읽는 중 · 실패(다시 시도) · 자료가 고른 기간보다 짧음. 그 밖에는 숨긴다.
+   * 🔴 짧게 읽은 기간을 고른 기간처럼 보이게 하지 않는다 — 몇 일만 그렸는지 밝힌다.
    */
   function drawRangeNote() {
     const t = team();
@@ -380,33 +409,23 @@ export function mount(teams, opts = {}) {
       html = '필요한 날짜를 더 불러오는 중이에요…';
     } else if (net.error) {
       html = `${esc(net.error.message)} <button type="button" class="textbtn" data-act="retry">다시 시도</button>`;
-    } else if (t.coverageDays < state.days * 2) {
-      html = lazy
-        ? `앞 ${state.days}일 자료는 아직 읽지 않아서 비교하지 않았어요. <button type="button" class="textbtn" data-act="compare">앞 ${state.days}일과 비교하기</button> <span class="range-cost">(${state.days * 2 - t.coverageDays}일치를 더 읽어 모두 ${state.days * 2}일을 봐요)</span>`
-        : esc(`최근 ${t.coverageDays}일 자료만 있어서, 이 기간은 앞 기간과 비교하지 않아요.`);
-    } else {
-      const { cur, prev } = splitWindow(t.rows, state.days);
-      // 비교 중이면 두 기간의 날짜와 합친 날 수를 밝힌다 — 「앞 30일과 비교」가 60일을 보고 있다는 걸 숨기지 않는다.
-      const before = t.rows.slice(-state.days * 2, -state.days);
-      const span = (rows) => `${fmtD(rows[0].date)}~${fmtD(rows.at(-1).date)}`;
-      html = prev.length
-        ? esc(`앞 ${state.days}일(${span(prev)})과 이번 ${state.days}일(${span(cur)})을 비교하고 있어요 · 모두 ${state.days * 2}일`)
-        : esc(`앞 ${state.days}일(${span(before)})까지 모두 ${state.days * 2}일을 읽었지만, 그 기간에 다듬은 글이 없어서 비교하지 않았어요.`);
+    } else if (t.coverageDays < state.days) {
+      html = esc(`최근 ${t.coverageDays}일 자료만 있어서, 그 날들까지만 그렸어요.`);
     }
     note.hidden = html === '';
     note.innerHTML = html;
   }
 
   /**
-   * 기간·비교·팀 바꾸기의 단일 입구. 확장 페이지면 **모자란 날만** 먼저 읽고, 다 읽은 뒤에 화면을 바꾼다.
+   * 기간·팀 바꾸기의 단일 입구. 확장 페이지면 **모자란 날만** 먼저 읽고, 다 읽은 뒤에 화면을 바꾼다.
    * 🔴 읽기에 실패하면 화면은 그대로 두고(지어낸 숫자를 그리지 않는다) 실패와 「다시 시도」만 보인다.
    * 🔴 연달아 누르면 마지막 요청만 화면에 반영한다.
    */
   async function request(next) {
-    const want = { team: state.team, days: state.days, compare: state.compare, ...next };
+    const want = { team: state.team, days: state.days, ...next };
     const t = teams[want.team];
     const seq = ++net.seq;
-    const need = lazy ? daysNeeded(want.days, want.compare) : 0;
+    const need = lazy ? daysNeeded(want.days) : 0;
     if (lazy && (t.status !== 'ready' || t.coverageDays < need)) {
       net.busy = true; net.error = null;
       drawRange();
@@ -425,7 +444,7 @@ export function mount(teams, opts = {}) {
     }
     net.error = null;
     const teamChanged = want.team !== state.team;
-    state.team = want.team; state.days = want.days; state.compare = want.compare;
+    state.team = want.team; state.days = want.days;
     if (teamChanged) { $('team').value = String(state.team); shown = null; }
     render();
   }
@@ -444,19 +463,19 @@ export function mount(teams, opts = {}) {
   function render() {
     const t = team();
     if (!periodsOf(t).includes(state.days)) state.days = lazy ? 30 : defaultPeriod(t.coverageDays);
-    const { cur, prev } = windowRows();
+    const cur = windowRows();
     state.sel = null;
     // 기간·팀이 바뀌면 칸 번호의 뜻이 바뀐다 — 고른 날을 비우고 위에서 고른 날로 다시 시작한다.
     state.picked = []; state.anchor = null; state.focus = null;
     $('kick').textContent = `최근 ${state.days}일`;
-    const hl = headline(cur, prev, state.days, subject);
+    const hl = headline(cur, state.days, subject);
     $('hl').innerHTML = hl.thin ? `${esc(hl.lead)} <span class="thin">${esc(hl.thin)}</span> ${esc(hl.rest)}` : esc(hl.lead);
     const h = healthOf(cur);
     $('idx').classList.toggle('is-empty', h == null);
     roll($('idx'), h);
-    const dl = $('delta'), delta = deltaOf(cur, prev, state.days);
-    dl.hidden = !delta;
-    if (delta) { dl.className = `delta ${delta.dir}`; dl.textContent = delta.text; }
+    const dl = $('delta'), pill = flowPill(cur);
+    dl.hidden = !pill;
+    if (pill) { dl.className = `delta ${pill.dir}`; dl.textContent = pill.text; }
     drawRange();
     drawWeave(cur);
 
@@ -464,12 +483,13 @@ export function mount(teams, opts = {}) {
     $('empty').hidden = !empty;
     $('filled').hidden = empty;
     if (!empty) {
-      drawStory(cur, prev);
-      const acts = actions(cur, prev);
-      drawBrief(cur, prev, acts);
+      drawStory(cur);
+      drawFlow(cur);
+      const acts = actions(cur);
+      drawBrief(cur, acts);
       drawActs(acts);
       drawSaved(cur);
-      drawInbound(cur, prev);
+      drawInbound(cur);
       drawTemp(cur);
       drawRhythm(cur);
       drawMap();
@@ -492,7 +512,6 @@ export function mount(teams, opts = {}) {
 
   $('range-note').addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'compare') request({ compare: true });
     if (act === 'retry' && net.error) request(net.error.want);
   });
 
@@ -503,7 +522,7 @@ export function mount(teams, opts = {}) {
    * 커서가 지나가기만 해도(pointermove) 여러 날 고른 것이 지워지면 안 된다.
    */
   function pick(i, commit = false) {
-    const rows = windowRows().cur;
+    const rows = windowRows();
     state.sel = Math.max(0, Math.min(rows.length - 1, i));
     placeCursor(rows);
     if (commit) {
@@ -531,7 +550,7 @@ export function mount(teams, opts = {}) {
    * | 날짜 머리에서 ←/→ | 옮겨서 그 하루 · Shift면 기준 날부터 늘림 · Esc는 선택 지움 |
    */
   const smap = $('smap'), tipEl = $('smap-tip'), smapWrap = $('smap-wrap');
-  const nDays = () => windowRows().cur.length;
+  const nDays = () => windowRows().length;
   function setPicked(next, focus) {
     if (focus != null) state.focus = focus;
     const same = next.length === state.picked.length && next.every((v, k) => v === state.picked[k]);
@@ -561,7 +580,7 @@ export function mount(teams, opts = {}) {
     // 칸 말풍선 — 그날·그 신호의 건수. 날짜 머리 위에서는 띄우지 않는다.
     const cell = e.target.closest('td.c');
     if (!cell) { tipEl.hidden = true; return; }
-    const d = windowRows().cur[i];
+    const d = windowRows()[i];
     tipEl.textContent = `${fmtD(d.date)} (${WD[d.wd]}) · ${cell.dataset.k} ${cell.dataset.v}건`;
     tipEl.hidden = false;
     const box = smapWrap.getBoundingClientRect(), r = cell.getBoundingClientRect(), w = tipEl.offsetWidth;
@@ -637,9 +656,10 @@ export function mount(teams, opts = {}) {
       if (window.innerWidth === lastW) return;
       lastW = window.innerWidth;
       const s = state.sel;
-      drawWeave(windowRows().cur);
+      drawWeave(windowRows());
       state.sel = s;
-      placeCursor(windowRows().cur);
+      placeCursor(windowRows());
+      if (!$('filled').hidden) drawFlow(windowRows());
     }, 150);
   });
 

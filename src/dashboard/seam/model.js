@@ -2,7 +2,8 @@
  * Seam 대시보드 — **순수 계산만** 모은 모듈 (2026-10-25, 시안 「Seam」 이식).
  *
  * 🔴 DOM을 만지지 않는다. 화면(`app.js`)은 여기서 나온 숫자·문장을 그리기만 한다 —
- *    `test/seamModel.unit.test.js`가 이 파일만으로 집계·비교·할 일 규칙·문장을 잠근다.
+ *    `test/seamModel.unit.test.js`가 이 파일만으로 집계·주별 흐름·할 일 규칙·문장을 잠근다.
+ * 🔴 2026-10-26 사용자 결정 — 「앞 기간과 비교」는 뺐다. 기간(오늘까지 N일) 안의 흐름만 말한다.
  * 🔴 팀 단위 합계만 다룬다. 사람을 가리키는 값은 입력에도 출력에도 없다(Spec 필수 9 G1/G2).
  * 🔴 건강도 지수는 `healthIndex.js`의 `computeHealthMetrics` 하나로만 계산한다(100 − 마찰/다듬은 글).
  * 🔴 하루 단위로는 비율(%)을 보이지 않는다 — 신호 수가 메시지 수를 넘을 수 있다. 날마다는 건수로 말한다.
@@ -34,8 +35,8 @@ export const EVENTS = SEAM_ORDER.map((id) => ({
 export const F = EVENTS.filter((e) => e.kind === 'f').map((e) => e.id);
 export const P = EVENTS.filter((e) => e.kind === 'p').map((e) => e.id);
 export const WD = ['일', '월', '화', '수', '목', '금', '토'];
-/** 시안이 고를 수 있게 한 기간. */
-export const PERIODS = [14, 30, 60];
+/** 고를 수 있는 기간(오늘까지 N일). 2026-10-26 — 90일 추가, 비교는 뺐다. */
+export const PERIODS = [14, 30, 60, 90];
 /** 이보다 적게 다듬은 날은 한두 건으로 비율이 튀므로 「가장 벌어진 날」로 고르지 않는다. */
 export const STEADY_MIN = 5;
 
@@ -122,15 +123,9 @@ export function defaultPeriod(coverageDays) {
   return opts.includes(30) ? 30 : opts[opts.length - 1];
 }
 
-/**
- * 이번 기간과 **바로 앞 같은 길이 기간**으로 나눈다.
- * 🔴 앞 기간이 자료 범위 밖이거나, 그 안에 다듬은 글이 하나도 없으면 `prev = []` —
- *    화면은 「비교할 앞 기간 없음」이라고 말한다. 0과 비교해 「늘었어요」를 지어내지 않는다.
- */
-export function splitWindow(rows, days) {
-  const cur = rows.slice(-days);
-  const prev = rows.length >= days * 2 ? rows.slice(-days * 2, -days) : [];
-  return { cur, prev: sum(prev, ['refined']) > 0 ? prev : [] };
+/** 이번 기간 — 오늘까지 `days`일. 자료가 그보다 짧으면 있는 만큼. */
+export function periodRows(rows, days) {
+  return rows.slice(-days);
 }
 
 /** 이 기간에 기록된 숫자가 하나라도 있는가. */
@@ -185,25 +180,24 @@ export const labelOf = (id) => EVENTS.find((e) => e.id === id)?.label ?? id;
 
 /**
  * 히어로 제목. `subject`는 「두 팀 사이」(예시) 또는 「팀과 동료들 사이」(실데이터).
+ * 🔴 앞 기간과 비교하지 않는다 — 이 기간 안의 주별 흐름(`weeklyFlow`)만 말한다. 흐름을 말할 수 없으면 비율만.
  * @returns {{lead: string, thin: string|null, rest: string}} 화면은 thin만 얇게 그린다.
  */
-export function headline(cur, prev, days, subject) {
-  const a = ratio(cur), b = prev.length ? ratio(prev) : null;
+export function headline(cur, days, subject) {
+  const a = ratio(cur);
   if (a == null) return { lead: isEmpty(cur) ? '아직 쌓인 신호가 없어요' : '이 기간에는 다듬은 글이 없어요', thin: null, rest: '' };
-  if (b == null) return { lead: `${subject},`, thin: `지난 ${days}일 동안`, rest: `마찰 비율 ${pct(a)}` };
-  const diff = (a - b) * 100;
-  if (Math.abs(diff) < 0.5) return { lead: `${subject}가`, thin: `앞 ${days}일과`, rest: '거의 같아요' };
-  return diff < 0
-    ? { lead: `${subject}가`, thin: `앞 ${days}일보다`, rest: '더 촘촘해졌어요' }
-    : { lead: `${subject}가`, thin: `앞 ${days}일보다`, rest: '조금 벌어졌어요' };
+  const { kind } = weeklyFlow(cur).verdict;
+  if (kind === 'down') return { lead: `${subject}가`, thin: `지난 ${days}일 동안`, rest: '점점 촘촘해지고 있어요' };
+  if (kind === 'up') return { lead: `${subject}가`, thin: `지난 ${days}일 동안`, rest: '조금씩 벌어지고 있어요' };
+  if (kind === 'flat') return { lead: `${subject}가`, thin: `지난 ${days}일 동안`, rest: '고르게 이어지고 있어요' };
+  return { lead: `${subject},`, thin: `지난 ${days}일 동안`, rest: `마찰 비율 ${pct(a)}` };
 }
 
-/** 히어로의 변화 알약. 비교할 앞 기간이 없으면 null. */
-export function deltaOf(cur, prev, days) {
-  const a = ratio(cur), b = prev.length ? ratio(prev) : null;
-  if (a == null || b == null) return null;
-  const diff = (a - b) * 100;
-  return { dir: diff > 0 ? 'up' : 'down', text: `앞 ${days}일보다 마찰 비율 ${Math.abs(diff).toFixed(1)}%p ${diff > 0 ? '늘었어요' : '줄었어요'}` };
+/** 히어로의 흐름 알약 — 주별로 오르거나 내릴 때만. 비슷하거나 말할 수 없으면 null. */
+export function flowPill(cur) {
+  const v = weeklyFlow(cur).verdict;
+  if (v.kind !== 'down' && v.kind !== 'up') return null;
+  return { dir: v.kind, text: `주별 마찰 비율 ${pct(v.from)} → ${pct(v.to)}` };
 }
 
 /** 마찰 신호를 많은 순으로. */
@@ -212,18 +206,16 @@ export function frictionRank(rows) {
 }
 
 /** 「이 기간의 이야기」 세 꼭지에 들어갈 숫자. */
-export function storyFacts(cur, prev) {
-  const a = ratio(cur), b = prev.length ? ratio(prev) : null;
-  const half = Math.floor(cur.length / 2);
-  const early = ratio(cur.slice(0, half)), late = ratio(cur.slice(half));
+export function storyFacts(cur) {
+  const a = ratio(cur);
   const byF = frictionRank(cur);
   const fTot = sum(cur, F);
   const off = {};
   cur.forEach((d) => { if (d.c.forceOffHours) off[d.wd] = (off[d.wd] || 0) + d.c.forceOffHours; });
   const offTop = Object.entries(off).sort((x, y) => y[1] - x[1])[0] ?? null;
   return {
-    a, b, early, late,
-    trend: early != null && late != null ? late - early : 0,
+    a,
+    flow: weeklyFlow(cur),
     top: { id: byF[0][0], label: labelOf(byF[0][0]), count: byF[0][1] },
     topShare: fTot ? byF[0][1] / fTot : 0,
     fTot,
@@ -248,26 +240,23 @@ const ADVICE = {
  * | 조건 | 할 일 | 점수 |
  * |---|---|---|
  * | 마찰 신호 k가 마찰의 30% 이상 | ADVICE[k] | 비중 |
- * | k가 앞 기간보다 1.3배 이상 늘고 3건 이상 | ADVICE[k] (늘고 있음) | 비중 + 0.5 |
- * | 뜻 풀기 5건 이상 & 의도 다름 25% 이상 | 상대 팀과 요청 형식 맞추기 (35% 이상이면 늘고 있음 표시) | 그 비율 |
+ * | 뜻 풀기 5건 이상 & 의도 다름 25% 이상 | 상대 팀과 요청 형식 맞추기 (35% 이상이면 강조 표시) | 그 비율 |
  * | Critical이 긴급도 붙은 글의 14% 이상 | 「진짜 급한 것」 기준 정하기 | 비율 + 0.1 |
  * | 팀 용어집 적용이 다듬은 글의 20% 미만 | 용어집 채우기 | 0.2 − 비율 |
  * 🔴 다듬은 글이 하나도 없으면 아무 할 일도 내지 않는다 — 빈 팀에 「용어집을 채우세요」는 근거가 없다.
  * 최대 5개, 점수 순.
+ * 🔴 2026-10-26 — 「앞 기간보다 1.3배」(늘고 있음) 줄은 비교를 빼면서 지웠다.
  */
-export function actions(cur, prev) {
+export function actions(cur) {
   const ref = sum(cur, ['refined']);
   if (!ref) return [];
   const out = [];
   const fTot = sum(cur, F) || 1;
   F.forEach((k) => {
     const now = sum(cur, [k]);
-    const before = prev.length ? sum(prev, [k]) : null;
     const share = now / fTot;
-    const rise = before != null && now >= 3 && now >= before * 1.3;
-    if (now > 0 && (share >= 0.3 || rise)) {
-      let why = `마찰의 ${Math.round(share * 100)}% · ${now}건`;
-      if (rise) why = `앞 기간 ${before}건 → ${now}건`;
+    if (now > 0 && share >= 0.3) {
+      const why = `마찰의 ${Math.round(share * 100)}% · ${now}건`;
       let body = ADVICE[k][1];
       if (k === 'forceOffHours') {
         const by = WD.map(() => 0);
@@ -275,7 +264,7 @@ export function actions(cur, prev) {
         const top = by.indexOf(Math.max(...by));
         body = `${WD[top]}요일에 ${by[top]}건이 몰렸어요. ` + body;
       }
-      out.push({ id: k, score: share + (rise ? 0.5 : 0), hot: rise, title: ADVICE[k][0], body, why, tag: labelOf(k) });
+      out.push({ id: k, score: share, hot: false, title: ADVICE[k][0], body, why, tag: labelOf(k) });
     }
   });
   const dec = sum(cur, ['decoded']), gapN = sum(cur, ['decodeUrgencyGap']);
@@ -297,15 +286,15 @@ export function actions(cur, prev) {
 /* ── 회의에 띄울 한 장 ────────────────────────────────────────────────── */
 
 /** 화면과 복사용 글이 같은 문장을 쓴다. */
-export function briefLines(cur, prev, days) {
-  const a = ratio(cur), b = prev.length ? ratio(prev) : null;
+export function briefLines(cur, days) {
+  const a = ratio(cur);
   const h = healthOf(cur);
   const byF = frictionRank(cur);
   const fTot = sum(cur, F);
   const dec = sum(cur, ['decoded']), gapN = sum(cur, ['decodeUrgencyGap']);
   const mis = sum(cur, ['misread']), clr = sum(cur, ['clear']);
   return [
-    a == null ? '아직 쌓인 신호가 없어요.' : `협업 건강도 ${h.toFixed(1)} — ${b == null ? '비교할 앞 기간이 없어요' : `앞 ${days}일보다 마찰 비율이 ${Math.abs((a - b) * 100).toFixed(1)}%p ${a > b ? '늘었어요' : '줄었어요'}`}.`,
+    a == null ? '아직 쌓인 신호가 없어요.' : `협업 건강도 ${h.toFixed(1)} — 지난 ${days}일 마찰 비율 ${pct(a)}, ${flowSentence(weeklyFlow(cur))}.`,
     fTot
       ? `마찰의 ${Math.round((byF[0][1] / fTot) * 100)}%가 「${labelOf(byF[0][0])}」에서 나왔고, 오해 소지 ${mis}건 중 ${clr}건은 교정을 거쳐 정리됐어요.`
       : '이번 기간에는 마찰 신호가 없어요.',
@@ -315,6 +304,80 @@ export function briefLines(cur, prev, days) {
 
 export function briefText({ pairLabel, days, lines, next }) {
   return `[${pairLabel} · 최근 ${days}일]\n` + lines.map((l, i) => `${i + 1}. ${l}`).join('\n') + (next ? `\n→ 이번 주에 하나만: ${next.title} (${next.why})` : '');
+}
+
+/* ── 기간의 흐름 — 주 단위 (2026-10-26 사용자 승인 판정표) ─────────────── */
+/*
+ * 🔴 판정표 (바꾸면 test/seamModel.unit.test.js 「주별 흐름」을 같이 바꾼다)
+ * | 조건 | 결과 |
+ * |---|---|
+ * | 주는 월~일. 기간 처음·끝에 걸린 주는 그 안의 날만 | `days` < 7 → `full: false`(흐리게) |
+ * | 7일을 다 못 채웠거나 다듬은 글 `FLOW_MIN_REFINED`(30)건 미만 | `used: false` — 흐리게, 문장 판정에서 뺌 |
+ * | 판정에 쓸 수 있는 주가 `FLOW_MIN_WEEKS`(3)개 미만 | `thin` — 「아직 흐름을 말하기엔 일러요」 |
+ * | 쓸 수 있는 주의 비율로 그은 직선 기울기 ≤ −`FLOW_STEP`(1)%p/주 | `down` — 낮아지는 흐름 (첫 주 → 끝 주, 직선 위의 값) |
+ * | 기울기 ≥ +1%p/주 | `up` — 높아지는 흐름 |
+ * | 그 밖 | `flat` — 비슷하게 이어짐 (쓸 수 있는 주 전체 비율) |
+ * | 가장 높았던·낮았던 주 | 쓸 수 있는 주 안에서만. `thin`이면 null |
+ */
+export const FLOW_MIN_REFINED = 30;
+export const FLOW_MIN_WEEKS = 3;
+export const FLOW_STEP = 1;
+
+/** 최소제곱 직선. 점이 하나뿐이면 기울기 0. */
+function fitLine(pts) {
+  const n = pts.length, mx = pts.reduce((s, p) => s + p.x, 0) / n, my = pts.reduce((s, p) => s + p.y, 0) / n;
+  const den = pts.reduce((s, p) => s + (p.x - mx) ** 2, 0);
+  const k = den ? pts.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0) / den : 0;
+  return { k, at: (x) => my + k * (x - mx) };
+}
+
+/** 이번 기간을 주(월~일)로 묶고 흐름을 판정한다. 비율은 0~1(1을 넘을 수 있다 — 신호 수가 글 수를 넘기도 한다). */
+export function weeklyFlow(rows) {
+  const groups = [];
+  for (const d of rows) {
+    const mon = new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate() - ((d.wd + 6) % 7)).getTime();
+    const last = groups[groups.length - 1];
+    if (last && last.mon === mon) last.rows.push(d); else groups.push({ mon, rows: [d] });
+  }
+  const weeks = groups.map((g, i) => {
+    const refined = sum(g.rows, ['refined']), f = sum(g.rows, F), full = g.rows.length === 7;
+    return {
+      i, start: g.rows[0].date, end: g.rows[g.rows.length - 1].date, days: g.rows.length,
+      refined, f, ratio: refined ? f / refined : null, full, used: full && refined >= FLOW_MIN_REFINED,
+    };
+  });
+  const used = weeks.filter((w) => w.used);
+  if (used.length < FLOW_MIN_WEEKS) return { weeks, used: used.length, verdict: { kind: 'thin' }, hi: null, lo: null };
+  const line = fitLine(used.map((w) => ({ x: w.i, y: w.ratio })));
+  const first = used[0], last = used[used.length - 1];
+  const from = Math.max(0, line.at(first.i)), to = Math.max(0, line.at(last.i));
+  const slope = line.k * 100;
+  const kind = slope <= -FLOW_STEP ? 'down' : slope >= FLOW_STEP ? 'up' : 'flat';
+  const avg = used.reduce((s, w) => s + w.f, 0) / used.reduce((s, w) => s + w.refined, 0);
+  const byRatio = [...used].sort((x, y) => y.ratio - x.ratio || x.i - y.i);
+  return {
+    weeks, used: used.length,
+    verdict: { kind, from, to, avg, slope, fromI: first.i, toI: last.i },
+    hi: byRatio[0], lo: byRatio[byRatio.length - 1],
+  };
+}
+
+/**
+ * 주별 막대의 세로축 끝(0~1, 10% 단위로 올림). 🔴 흐름에 넣은 주로만 정한다 — 기간 끝에 걸린 이틀짜리 주가
+ * 글 1~2건으로 500%가 나와도 축을 늘리지 않는다(2026-10-26 실브라우저에서 막대가 바닥에 붙었다). 넣은 주가 없으면 전부로.
+ */
+export function flowScaleTop(weeks) {
+  const base = weeks.some((w) => w.used) ? weeks.filter((w) => w.used) : weeks;
+  return Math.max(0.1, Math.ceil(Math.max(0, ...base.map((w) => w.ratio ?? 0)) * 10) / 10);
+}
+
+/** 흐름 판정을 한 문장으로 — 화면 「흐름」 꼭지와 회의용 한 장이 같은 말을 쓴다. */
+export function flowSentence(flow) {
+  const v = flow.verdict;
+  if (v.kind === 'down') return `주별로 보면 낮아지는 흐름이에요 (${pct(v.from)} → ${pct(v.to)})`;
+  if (v.kind === 'up') return `주별로 보면 높아지는 흐름이에요 (${pct(v.from)} → ${pct(v.to)})`;
+  if (v.kind === 'flat') return `주별로 보면 비슷하게 이어지고 있어요 (약 ${pct(v.avg)})`;
+  return '글이 적은 주가 많아 아직 흐름을 말하기엔 일러요';
 }
 
 /* ── 요일의 결 ────────────────────────────────────────────────────────── */
@@ -389,35 +452,30 @@ export function heatLevel(count, max) {
  * | `vals`·`levels` | 날마다 건수와 색 단계(**그 줄의** 하루 최대 기준 — 드문 신호도 무늬가 보인다) |
  * | `tot` | 이번 기간 합계 |
  * | `sel` | 고른 날 합계. 고른 날이 없으면 null |
- * | `pt` | 앞 같은 길이 기간 합계. 앞 기간이 없으면 null |
- * | `dir` | 앞 기간보다 나빠졌으면 'worse'(마찰↑·긍정↓), 좋아졌으면 'better', 같거나 비교 없음은 '' |
  */
-export function signalMap(cur, prev = [], picked = []) {
+export function signalMap(cur, picked = []) {
   const idx = [...new Set(picked ?? [])].filter((i) => Number.isInteger(i) && i >= 0 && i < cur.length).sort((x, y) => x - y);
-  const hasSel = idx.length > 0, hasPrev = prev.length > 0;
-  const line = (id, kind) => {
+  const hasSel = idx.length > 0;
+  const line = (id) => {
     const vals = cur.map((d) => d.c[id] || 0);
     const max = safeMax(vals);
     const tot = vals.reduce((s, v) => s + v, 0);
-    const pt = hasPrev ? sum(prev, [id]) : null;
-    const worse = pt != null && (kind === 'p' ? tot < pt : tot > pt);
     return {
       vals, max, levels: vals.map((v) => heatLevel(v, max)), tot,
       sel: hasSel ? idx.reduce((s, i) => s + vals[i], 0) : null,
-      pt, dir: pt == null || pt === tot ? '' : worse ? 'worse' : 'better',
     };
   };
   const groups = [['f', '마찰 신호'], ['p', '긍정 신호']].map(([kind, label]) => {
-    const rows = EVENTS.filter((e) => e.kind === kind).map((e) => ({ id: e.id, label: e.label, desc: e.desc, ...line(e.id, kind) }));
+    const rows = EVENTS.filter((e) => e.kind === kind).map((e) => ({ id: e.id, label: e.label, desc: e.desc, ...line(e.id) }));
     const add = (k) => (rows.some((r) => r[k] == null) ? null : rows.reduce((s, r) => s + r[k], 0));
-    return { kind, label, rows, tot: add('tot'), sel: add('sel'), pt: add('pt') };
+    return { kind, label, rows, tot: add('tot'), sel: add('sel') };
   });
   return {
     days: cur.map((d, i) => ({
       i, date: d.date, wd: d.wd, weekend: d.wd === 0 || d.wd === 6,
       monthStart: i === 0 || d.date.getDate() === 1, on: idx.includes(i),
     })),
-    refined: { id: 'refined', label: '다듬은 글', ...line('refined', 'n'), dir: '' },
+    refined: { id: 'refined', label: '다듬은 글', ...line('refined') },
     groups,
     picked: idx,
     first: hasSel ? cur[idx[0]].date : null,

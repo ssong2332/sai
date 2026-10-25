@@ -81,6 +81,13 @@ export const SEAM_MARKUP = `
 
     <section class="story" aria-label="이 기간의 이야기" id="story"></section>
 
+    <section aria-labelledby="flow-h">
+      <div class="sec-h"><div><h2 id="flow-h">주마다 본 흐름</h2><p>이 기간을 주(월~일)로 묶은 마찰 비율이에요. 7일을 다 채우지 못했거나 다듬은 글이 30건 안 되는 주는 흐리게 두고, 흐름을 말할 때 빼요. 점선은 흐름에 넣은 주로 그은 추세선이에요.</p></div></div>
+      <p class="flow-say" id="flow-say" aria-live="polite"></p>
+      <div class="flow-wrap"><svg class="flow" id="flow" role="img" aria-labelledby="flow-desc"></svg></div>
+      <div class="key flow-key" aria-hidden="true"><span><i class="use"></i>흐름에 넣은 주</span><span><i class="thin"></i>글이 적은 주</span><span><i class="part"></i>7일이 안 되는 주(기간 처음·끝)</span><span><i class="tl"></i>추세선</span></div>
+    </section>
+
     <section aria-labelledby="act-h">
       <div class="sec-h"><div><h2 id="act-h">다음에 할 일</h2><p>데이터가 가리키는 곳부터 순서대로 놓았어요. 각 항목 오른쪽은 그렇게 판단한 근거예요.</p></div></div>
       <ol class="acts" id="acts"></ol>

@@ -4,7 +4,7 @@
  * 🔴 이 테스트가 지키는 것:
  *    ① 날짜 고르기 — 켜고 끄기, Shift 범위는 기준~누른 날을 모두 켬, 범위 밖은 무시, 항상 오름차순·중복 없음
  *    ② 고른 날 합계 — 다듬은 글·마찰·긍정이 고른 날만 더해진다(중복 번호를 두 번 세지 않는다)
- *    ③ 신호 지도 — 줄 순서·날마다 값·줄마다 색 단계·고른 날 합계·앞 기간 비교 방향
+ *    ③ 신호 지도 — 줄 순서·날마다 값·줄마다 색 단계·고른 날 합계 (앞 기간 값 없음)
  *    ④ 칸 색 단계 — 0건은 0, 그 밖은 1~4, NaN·0 분모에서도 깨지지 않는다
  *    ⑤ 같은 `rows`(buildRows)만 받는다 — 자료 출처를 가정하지 않는다
  */
@@ -65,7 +65,7 @@ test('selectedSummary — 고른 날만, 중복 번호는 한 번만', () => {
 /* ── ③ 신호 지도 ── */
 
 test('signalMap — 다듬은 글 + 마찰 무리 → 긍정 무리, 날마다 값·합계', () => {
-  const m = signalMap(rows, [], []);
+  const m = signalMap(rows, []);
   assert.deepEqual(m.refined.vals, [6, 3, 0, 8, 1]);
   assert.equal(m.refined.tot, 18);
   assert.deepEqual(m.groups.map((g) => g.kind), ['f', 'p']);
@@ -79,7 +79,7 @@ test('signalMap — 다듬은 글 + 마찰 무리 → 긍정 무리, 날마다 �
 });
 
 test('signalMap — 칸 색은 그 줄의 하루 최대 기준(드문 신호도 가장 많은 날이 4)', () => {
-  const m = signalMap(rows, [], []);
+  const m = signalMap(rows, []);
   const rowOf = (id) => m.groups.flatMap((g) => g.rows).find((r) => r.id === id);
   assert.deepEqual(rowOf('misread').levels, [3, 0, 0, 4, 0]);
   assert.deepEqual(rowOf('venting').levels, [0, 4, 0, 0, 0], '하루 1건뿐이어도 그 줄에선 가장 짙다');
@@ -87,11 +87,11 @@ test('signalMap — 칸 색은 그 줄의 하루 최대 기준(드문 신호도 
 });
 
 test('signalMap — 고른 날 합계는 고른 날만, 없으면 null', () => {
-  const none = signalMap(rows, [], []);
+  const none = signalMap(rows, []);
   assert.equal(none.refined.sel, null);
   assert.equal(none.groups[0].sel, null);
   assert.equal(none.first, null);
-  const m = signalMap(rows, [], [3, 0, 3, 99]);
+  const m = signalMap(rows, [3, 0, 3, 99]);
   assert.deepEqual(m.picked, [0, 3], '중복·범위 밖은 버리고 날짜 순');
   assert.equal(m.refined.sel, 14);
   assert.equal(m.groups[0].sel, 6);
@@ -101,26 +101,17 @@ test('signalMap — 고른 날 합계는 고른 날만, 없으면 null', () => {
   assert.equal(dateKey(m.last), key(1));
 });
 
-test('signalMap — 앞 기간 비교: 마찰은 늘면 worse, 긍정은 줄면 worse, 앞 기간 없으면 null', () => {
-  const prev = buildRows({ [key(9)]: { refined: 10, misread: 1, clear: 5 } }, 5, new Date(2026, 9, 20));
-  const m = signalMap(rows, prev, []);
-  const rowOf = (id) => m.groups.flatMap((g) => g.rows).find((r) => r.id === id);
-  assert.equal(rowOf('misread').pt, 1);
-  assert.equal(rowOf('misread').dir, 'worse');
-  assert.equal(rowOf('clear').pt, 5);
-  assert.equal(rowOf('clear').dir, 'worse', '긍정이 5 → 1로 줄었다');
-  assert.equal(rowOf('sensitiveBlocked').dir, '', '0 → 0은 변화 없음');
-  assert.equal(m.refined.pt, 10);
-  const solo = signalMap(rows, [], []);
-  assert.ok(solo.groups.flatMap((g) => g.rows).every((r) => r.pt == null && r.dir === ''));
-  assert.equal(solo.groups[0].pt, null);
+test('signalMap — 앞 기간 값이 없다(2026-10-26 비교를 뺐다)', () => {
+  const m = signalMap(rows, []);
+  assert.ok(m.groups.flatMap((g) => g.rows).every((r) => !('pt' in r) && !('dir' in r)));
+  assert.equal('pt' in m.groups[0], false);
 });
 
 test('signalMap — 주말·달 첫날 표시', () => {
-  const m = signalMap(rows, [], []);
+  const m = signalMap(rows, []);
   assert.deepEqual(m.days.map((d) => d.weekend), [false, false, false, true, true], '10-24 토 · 10-25 일');
   assert.equal(m.days[0].monthStart, true, '첫 칸은 달을 적는다');
-  const oct = signalMap(buildRows({}, 30, TODAY), [], []);
+  const oct = signalMap(buildRows({}, 30, TODAY), []);
   assert.deepEqual(oct.days.filter((d) => d.monthStart).map((d) => dateKey(d.date)), ['2026-09-26', '2026-10-01']);
 });
 

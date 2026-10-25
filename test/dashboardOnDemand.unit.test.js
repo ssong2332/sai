@@ -2,7 +2,7 @@
  * 확장 안 팀 대시보드 — 필요한 날만 읽기 (2026-10-25, 0.1.21 · 사용자 결정 안 A).
  *
  * 🔴 이 테스트가 지키는 것:
- *    ① 기간 + 비교 → 필요한 날 수 판정표 (14→28 · 30→60 · 60→120, 비교 끔 = 기간)
+ *    ① 기간 → 필요한 날 수 판정표 (14 · 30 · 60 · 90 그대로 — 2026-10-26 「앞 기간 비교」를 뺐다)
  *    ② 이미 읽은 날은 다시 읽지 않는다 — 빠진(더 오래된) 날짜 키만 고른다. 문서가 없던 날도 「읽었음」
  *    ③ 실패한 읽기는 기억하지 않는다(다시 시도하면 같은 날을 읽는다) · 동시 요청은 겹쳐 읽지 않는다
  *    ④ 빈 팀은 빈 팀으로 — 0건이어도 목록에 남고, 지어낸 숫자가 없다
@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 
 import { daysNeeded, recentKeys, missingKeys, coveredDays, INITIAL_DAYS, OTHER_TEAM_DAYS, MAX_DAYS } from '../src/dashboard/range.js';
 import { createFrictionCache } from '../src/dashboard/frictionCache.js';
-import { buildRows, isEmpty, splitWindow } from '../src/dashboard/seam/model.js';
+import { buildRows, isEmpty, periodRows } from '../src/dashboard/seam/model.js';
 import * as signals from '../src/dashboard/seam/signals.js';
 import { dashboardPageUrl, DASHBOARD_PAGE } from '../src/lib/dashboardPage.js';
 import { fetchFrictionDays, listViewableTeams, TEAM_ERRORS } from '../src/lib/teamClient.js';
@@ -25,15 +25,14 @@ const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
 /* ── ① 필요한 날 수 ── */
 
-test('기간 + 비교 → 필요한 날 수 판정표', () => {
-  assert.equal(daysNeeded(14, true), 28);
-  assert.equal(daysNeeded(30, true), 60);
-  assert.equal(daysNeeded(60, true), 120);
-  assert.equal(daysNeeded(14, false), 14);
-  assert.equal(daysNeeded(30, false), 30);
-  assert.equal(daysNeeded(60, false), 60);
-  assert.equal(daysNeeded(undefined, false), INITIAL_DAYS, '형식 밖이면 처음 읽기와 같다');
-  assert.equal(daysNeeded(365, true), MAX_DAYS, '위로는 120일에서 자른다');
+test('기간 → 필요한 날 수 판정표 — 앞 기간을 더 읽지 않는다', () => {
+  assert.equal(daysNeeded(14), 14);
+  assert.equal(daysNeeded(30), 30);
+  assert.equal(daysNeeded(60), 60);
+  assert.equal(daysNeeded(90), 90);
+  assert.equal(daysNeeded(undefined), INITIAL_DAYS, '형식 밖이면 처음 읽기와 같다');
+  assert.equal(daysNeeded(365), MAX_DAYS, '위로는 90일에서 자른다');
+  assert.equal(MAX_DAYS, 90);
   assert.equal(INITIAL_DAYS, 30);
   assert.equal(OTHER_TEAM_DAYS, 30);
 });
@@ -47,10 +46,10 @@ test('최근 N일 날짜 키 — 오래된 날 → 오늘, 달 경계를 넘는�
 
 /* ── ② 빠진 날만 ── */
 
-test('🔴 30일을 읽은 뒤 「30일 + 비교」는 앞 30일만 더 읽는다', () => {
+test('🔴 30일을 읽은 뒤 60일은 더 오래된 30일만 더 읽는다', () => {
   const loaded = new Set(recentKeys(30, TODAY));
   assert.deepEqual(missingKeys(loaded, 30, TODAY), [], '이미 읽은 기간은 다시 읽지 않는다');
-  const more = missingKeys(loaded, daysNeeded(30, true), TODAY);
+  const more = missingKeys(loaded, daysNeeded(60), TODAY);
   assert.equal(more.length, 30);
   assert.equal(more[0], '2026-08-27');
   assert.equal(more[29], '2026-09-25', '읽은 첫날(9/26) 바로 앞까지');
@@ -83,13 +82,13 @@ test('🔴 캐시 — 같은 날은 두 번 읽지 않는다 · 문서 없는 �
   await cache.ensure('t1', 14);
   assert.equal(calls.length, 1, '처음 30일 한 번뿐');
   assert.equal(calls[0].keys.length, 30);
-  await cache.ensure('t1', 60); // 30일 + 비교
-  await cache.ensure('t1', 120); // 60일 + 비교
-  assert.deepEqual(calls.map((c) => c.keys.length), [30, 30, 60], '모자란 날만 더 읽는다');
-  assert.equal(new Set(calls.flatMap((c) => c.keys)).size, 120, '겹친 날 없음');
-  assert.equal(cache.stats.requestedDocs, 120);
+  await cache.ensure('t1', 60);
+  await cache.ensure('t1', 90);
+  assert.deepEqual(calls.map((c) => c.keys.length), [30, 30, 30], '모자란 날만 더 읽는다');
+  assert.equal(new Set(calls.flatMap((c) => c.keys)).size, 90, '겹친 날 없음');
+  assert.equal(cache.stats.requestedDocs, 90);
   const snap = cache.snapshot('t1');
-  assert.equal(snap.coverageDays, 120);
+  assert.equal(snap.coverageDays, 90);
   assert.deepEqual(Object.keys(snap.byDate), ['2026-10-25'], '문서가 있던 날만 값이 있다');
 });
 
@@ -133,14 +132,14 @@ test('동시에 두 번 불러도 겹쳐 읽지 않는다', async () => {
 
 /* ── ④ 빈 팀 ── */
 
-test('🔴 빈 팀은 빈 팀으로 — 신호 0건이어도 30일이 읽히고, 비교할 앞 기간을 지어내지 않는다', async () => {
+test('🔴 빈 팀은 빈 팀으로 — 신호 0건이어도 30일이 읽히고, 지어낸 숫자가 없다', async () => {
   const cache = createFrictionCache({ fetchDays: async () => ({}), today: TODAY });
   await cache.ensure('empty', 30);
   const snap = cache.snapshot('empty');
   const rows = buildRows(snap.byDate, snap.coverageDays, TODAY);
   assert.equal(rows.length, 30);
   assert.ok(isEmpty(rows));
-  assert.deepEqual(splitWindow(rows, 30).prev, []);
+  assert.equal(periodRows(rows, 30).length, 30);
 });
 
 /* ── ⑤ `#sai=` 페이로드 제거 ── */

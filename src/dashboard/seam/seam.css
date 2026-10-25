@@ -293,6 +293,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 /* contain: 표의 최소 폭이 페이지 폭을 밀어내지 않게(좁은 화면은 이 안에서 가로로 민다) */
 .smap-wrap { contain: inline-size; position: relative; margin-top: 10px; background: var(--sheet); border-radius: 20px; overflow-x: auto; overscroll-behavior-x: contain; }
 .smap table { width: 100%; min-width: calc(11rem + var(--n) * 12px + 10rem); table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 13px; user-select: none; -webkit-user-select: none; }
+.smap table.long { min-width: calc(11rem + var(--n) * 9px + 10rem); }
 .smap col.lab-c { width: 11.5rem; }
 .smap col.nc-c { width: 5.5rem; }
 .smap th, .smap td { padding: 0; border: 0; }
@@ -344,10 +345,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .smap thead .nc small { display: block; font-size: 10.5px; font-weight: 600; color: var(--ink-3); }
 .smap td.nc { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
 .smap .ref td.nc { font-size: 13px; font-weight: 700; color: var(--ink-2); }
-.smap .prevc { color: var(--ink-3); }
-.smap td.prevc { font-weight: 600; }
-.smap td.nc .dv { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0; }
-.smap .dv.worse { color: var(--snag-text); } .smap .dv.better { color: var(--stitch-text); }
 .smap .selc { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .smap thead .selc { border-radius: 10px 10px 0 0; color: var(--ink); }
 .smap tr.none td.nc { color: var(--ink-3); }
@@ -355,13 +352,35 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .smap-tip { position: absolute; z-index: 5; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--ink); color: var(--sheet); font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
 
 @media (max-width: 860px) {
-  .smap table { min-width: calc(8.5rem + var(--n) * 18px + 9rem); }
+  .smap table, .smap table.long { min-width: calc(8.5rem + var(--n) * 18px + 9rem); }
   .smap col.lab-c { width: 8.5rem; }
   .smap col.nc-c { width: 4.4rem; }
   .smap .lab { padding-left: 14px; }
   .smap .lab small { display: none; }
   .smap .nc { padding-right: 12px; }
 }
+
+/* ── 주마다 본 흐름 (2026-10-26 — 앞 기간 비교 대신) ── */
+.flow-say { margin: 0 0 6px; font-size: 14px; color: var(--ink-2); }
+.flow-say b { color: var(--ink); font-weight: 700; }
+.flow-wrap { background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 12px 12px 4px; }
+.flow { display: block; width: 100%; height: auto; }
+.flow .g { stroke: var(--rule); }
+.flow .ax { font-size: 11px; fill: var(--ink-3); }
+.flow .vl { font-size: 11px; font-weight: 700; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+.flow .wk.use rect { fill: var(--snag); }
+.flow .wk.thin rect { fill: var(--hollow); }
+.flow .wk.thin .vl, .flow .wk.part .vl { fill: var(--ink-3); font-weight: 400; }
+.flow .wk.part rect { fill: none; stroke: var(--ink-3); stroke-dasharray: 3 3; }
+/* 축보다 큰 주(기간 끝에 걸린 짧은 주) — 축 끝에서 자르고, 숫자는 실제 값 그대로 */
+.flow .wk.over rect { stroke-dasharray: 3 3; stroke-dashoffset: 0; }
+.flow .trend { stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 1 6; stroke: var(--ink-3); }
+.flow .trend.down { stroke: var(--stitch); } .flow .trend.up { stroke: var(--seam); }
+.flow-key { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--ink-3); }
+.flow-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.flow-key i.use { background: var(--snag); } .flow-key i.thin { background: var(--hollow); }
+.flow-key i.part { background: none; border: 1px dashed var(--ink-3); }
+.flow-key i.tl { height: 0; border-top: 2.5px dotted var(--ink-3); background: none; }
 
 /* ── 0.1.21: 예시 안내 · 읽기 상태 줄 · 아직 안 읽은 팀 칸 (확장 페이지와 웹 예시 공용) ── */
 .demo-note { margin: 0; padding: 10px 16px; text-align: center; font-size: 13px; background: var(--snag-tint); color: var(--ink); border-bottom: 1px solid var(--rule); }
