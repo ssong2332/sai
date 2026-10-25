@@ -628,7 +628,7 @@ export async function listViewableTeams() {
 /**
  * 확장 대시보드(`src/dashboard/`) — 팀 하나의 **고른 날짜만** 읽는다 (2026-10-25, 0.1.21).
  *
- * 🔴 활성 팀을 바꾸지 않는다 — `fetchTeamFriction`과 달리 팀을 인자로 받는다. 대시보드 탭에서 팀을 바꿔도
+ * 🔴 활성 팀을 바꾸지 않는다 — 팀을 인자로 받는다. 대시보드 탭에서 팀을 바꿔도
  *    사이드패널이 보고 있던 팀은 그대로다.
  * 🔴 이미 읽은 날을 걸러 내는 것은 부르는 쪽(`src/dashboard/frictionCache.js`)의 일이다. 여기는 받은 키만 읽는다.
  * 🔴 30건씩 batchGet(운영 검증 크기). 문서가 없는 날은 결과에서 빠진다.
@@ -643,58 +643,6 @@ export async function fetchFrictionDays({ teamId, dateKeys, fetchImpl = globalTh
     if (Array.isArray(page)) result.push(...page);
   }
   return decodeFrictionRows(result);
-}
-
-/**
- * 팀의 마찰·긍정 카운트를 최근 N일치 읽어 합산한다.
- *
- * 🔴 **문서 id를 계산해서 batchGet으로 집는다** — 컬렉션을 쿼리하지 않는다. 규칙이 문서마다
- *    팀원 여부를 확인하므로 쿼리는 남의 팀 문서에 걸려 통째로 거절될 수 있고, 복합 색인도
- *    필요해진다. id가 `{teamId}_{dateKey}`로 고정이라 계산이 가능하다.
- * 🔴 없는 날짜는 그냥 빠진다(`missing`) — 0으로 채우지 않는다. "그날 신호가 없었다"와
- *    "그날 아무도 안 썼다"를 구분할 수 없으므로 지어내지 않는다.
- *
- * @returns {Promise<{teamName: string, days: number, counts: object}|null>} 팀이 없으면 null.
- */
-export async function fetchTeamFriction({ days = 30, fetchImpl = globalThis.fetch } = {}) {
-  const team = await getTeam();
-  if (!team) return null;
-
-  const base = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/frictionCounts`;
-  /**
-   * 🔴 **30건씩 나눠 읽는다** (2026-10-25 — 대시보드 기간 비교로 120일). 운영에서 검증된 요청
-   *    모양은 「batchGet 1회 = 문서 30개」뿐이다. 한 번에 120개를 보내면 규칙 평가(문서마다
-   *    `get()`/`exists()`)가 다른 한도에 닿는지 확인하지 못했으므로, 검증된 크기를 여러 번 보낸다.
-   */
-  const result = [];
-  for (const documents of frictionDocBatches({ base, teamId: team.teamId, days })) {
-    const page = await firestore(':batchGet', {
-      method: 'POST',
-      body: { documents },
-      fetchImpl,
-    });
-    if (Array.isArray(page)) result.push(...page);
-  }
-
-  /**
-   * 🔴 **날짜별로도 돌려준다** (2026-08-16). 합계 하나만 넘기면 대시보드에서 기간을 고를 수
-   *    없다 — 「최근 7일」을 눌러도 다시 계산할 원자료가 없기 때문이다. 합계는 편의로 함께 준다.
-   */
-  const counts = {};
-  const byDate = {};
-  for (const row of Array.isArray(result) ? result : []) {
-    if (!row?.found?.fields) continue;
-    const decoded = decodeFields(row.found.fields);
-    const dateKey = typeof decoded.dateKey === 'string' ? decoded.dateKey : null;
-    const day = {};
-    for (const [key, value] of Object.entries(decoded)) {
-      if (typeof value !== 'number') continue; // teamId·dateKey 같은 문자열 필드는 건너뛴다.
-      counts[key] = (counts[key] ?? 0) + value;
-      day[key] = value;
-    }
-    if (dateKey) byDate[dateKey] = day;
-  }
-  return { teamName: team.name, days, counts, byDate };
 }
 
 /**
