@@ -11,6 +11,7 @@
  * 🔴 화면 검토용이다. 이 화면이 맞아도 실브라우저 unpacked 확인 없이 「동작한다」고 하지 않는다.
  */
 import './chromeStub.js';
+import { registerSaiFont } from '../../src/lib/saiFont.js';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
@@ -37,6 +38,9 @@ import {
   REPLY_RESULT,
   VENT_TEXT,
 } from './fixtures.js';
+
+// 실제 콘텐츠 스크립트(`src/content/index.jsx`)와 같은 방식 — 호스트 문서에 FontFace로 등록한다.
+registerSaiFont();
 
 const params = new URLSearchParams(location.search);
 const THEME = params.get('theme') === 'dark' ? 'dark' : 'light';

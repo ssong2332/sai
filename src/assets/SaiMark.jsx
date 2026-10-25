@@ -14,7 +14,7 @@
  * 🔴 3초 루프 모션(`animated`)은 원본 설계 의도를 그대로 따른다 — 원본 주석: "로고와 로딩 상태가
  *    같은 형태를 쓴다". `RefinePopup`·`DecodePopup`의 로딩 문구 옆에 쓴다.
  *
- * 🔴 v2(2026-10-24, `docs/design/DesignSystem-v2.md` §6): 형태·색은 그대로다. keyframes는
+ * 🔴 v2(2026-10-24, `docs/design/DesignSystem-A2.md` §6): 형태·색은 그대로다. keyframes는
  *    `src/styles/motion.css`로 옮겼다. 이 마크의 「어긋남 → 정렬」이 제품 전체 모션의 원형이다 —
  *    플로팅 버튼이 뜰 때 한 번 맞물리고(settle), 로딩 선·이음선·긴급도 막대가 같은 동작을 쓴다.
  *
