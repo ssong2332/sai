@@ -80,7 +80,16 @@ export function sumRecentDays(byDate, days) {
   return out;
 }
 
-function toScenario(entry) {
+/**
+ * 확장이 실어 보낸 날짜 수. 🔴 없으면 30 — 0.1.19 이하 확장은 30일만 보냈고 `days`를 싣지 않았다.
+ *    이 값보다 긴 기간이나, 앞 기간이 이 범위 밖인 비교는 화면이 만들지 않는다(지어내지 않는다).
+ */
+export function coverageDaysOf(payload) {
+  const days = payload?.days;
+  return Number.isInteger(days) && days >= 1 && days <= 366 ? days : 30;
+}
+
+function toScenario(entry, coverageDays = 30) {
   const counts = entry?.counts ?? {};
   const rows = EVENTS.map((event) => ({ ...event, count: safeCount(counts[event.id]) }));
   const refined = safeCount(counts.refined);
@@ -90,7 +99,8 @@ function toScenario(entry) {
      *    **다른 팀 지표**가 열린다. 대신 `empty`로 표시해 화면이 "아직 없다"고 말하게 한다.
      */
     empty: refined === 0 && rows.every((row) => row.count === 0),
-    label: '최근 30일',
+    label: `최근 ${coverageDays}일`,
+    coverageDays,
     // 🔴 날짜별 원자료 — 기간을 다시 계산할 수 있어야 「최근 7일」이 눌러도 바뀌는 버튼이 된다.
     byDate: entry?.byDate ?? {},
     teamId: String(entry?.teamId ?? ''),
@@ -125,5 +135,6 @@ export function readLiveScenarios(hash = globalThis.location?.hash ?? '') {
   }
 
   const list = Array.isArray(parsed?.teams) ? parsed.teams : [];
-  return list.map(toScenario);
+  const coverageDays = coverageDaysOf(parsed);
+  return list.map((entry) => toScenario(entry, coverageDays));
 }
