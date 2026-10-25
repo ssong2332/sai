@@ -3,7 +3,7 @@
  *
  * 🔴 이 테스트가 지키는 것:
  *    ① `byDate` → 오늘까지 이어진 날짜 줄. 없는 날은 0, 허용 밖 키·정수 아닌 값은 버린다
- *    ② 기간 나누기 — 앞 기간이 자료 범위 밖이거나 비었으면 비교하지 않는다(지어내지 않는다)
+ *    ② 기간 = 오늘까지 N일(14·30·60·90) · 주별 흐름 판정표 — 2026-10-26 「앞 기간 비교」를 뺐다
  *    ③ 건강도 지수는 `computeHealthMetrics` 공식 그대로(100 − 마찰/다듬은 글)
  *    ④ 가장 벌어진 날은 다듬은 글 5건 미만인 날을 고르지 않는다
  *    ⑤ 다음에 할 일 판정표 · 빈 팀은 할 일 없음
@@ -14,8 +14,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  EVENTS, F, P, buildRows, splitWindow, periodOptions, defaultPeriod, ratio, healthOf, sum,
-  worstDay, dailyGap, topCause, headline, deltaOf, storyFacts, actions, briefLines, briefText,
+  EVENTS, F, P, buildRows, periodRows, periodOptions, defaultPeriod, ratio, healthOf, sum,
+  worstDay, dailyGap, topCause, headline, flowPill, storyFacts, weeklyFlow, flowSentence, actions, briefLines, briefText,
   weekdayFold, signalMap, safeMax, frac, isEmpty, esc, dateKey, laneHeight,
 } from '../src/dashboard/seam/model.js';
 import { computeHealthMetrics } from '../src/dashboard/seam/healthIndex.js';
@@ -59,30 +59,68 @@ test('byDate가 없거나 이상해도 죽지 않는다', () => {
 /* ── ② 기간 ── */
 
 test('고를 수 있는 기간은 자료 범위 안의 것만 — 옛 확장(30일)은 60일을 내지 않는다', () => {
-  assert.deepEqual(periodOptions(120), [14, 30, 60]);
+  assert.deepEqual(periodOptions(120), [14, 30, 60, 90]);
+  assert.deepEqual(periodOptions(60), [14, 30, 60]);
   assert.deepEqual(periodOptions(30), [14, 30]);
   assert.equal(defaultPeriod(120), 30);
   assert.equal(defaultPeriod(30), 30);
   assert.deepEqual(periodOptions(10), [10]);
 });
 
-test('앞 기간은 바로 앞 같은 길이 — 자료 범위 밖이면 비교하지 않는다', () => {
+test('기간은 오늘까지 N일 — 자료가 짧으면 있는 만큼', () => {
   const rows = buildRows(Object.fromEntries(Array.from({ length: 120 }, (_, i) => [key(i), { refined: 1 }])), 120, TODAY);
-  const w30 = splitWindow(rows, 30);
-  assert.equal(w30.cur.length, 30);
-  assert.equal(w30.prev.length, 30);
-  assert.equal(w30.cur[29].key, key(0));
-  assert.equal(w30.prev[29].key, key(30));
-  assert.equal(splitWindow(rows.slice(-30), 30).prev.length, 0, '30일 자료로 30일을 고르면 앞 기간 없음');
-  assert.equal(splitWindow(rows.slice(-30), 14).prev.length, 14, '30일 자료로 14일은 비교 가능');
+  const cur = periodRows(rows, 30);
+  assert.equal(cur.length, 30);
+  assert.equal(cur[29].key, key(0));
+  assert.equal(cur[0].key, key(29));
+  assert.equal(periodRows(rows.slice(-20), 30).length, 20);
 });
 
-test('🔴 앞 기간에 다듬은 글이 하나도 없으면 비교하지 않는다 — 0과 비교해 「늘었어요」를 만들지 않는다', () => {
-  const rows = buildRows({ [key(0)]: { refined: 10, misread: 2 } }, 60, TODAY);
-  const { prev } = splitWindow(rows, 30);
-  assert.equal(prev.length, 0);
-  assert.equal(deltaOf(splitWindow(rows, 30).cur, prev, 30), null);
-  assert.ok(signalMap(splitWindow(rows, 30).cur, prev, []).groups.every((g) => g.pt == null));
+/* ── ②-1 주별 흐름 (판정표: model.js weeklyFlow) ── */
+
+/** 오늘(10-25 일)까지 `weeks`주 — 주마다 하루 다듬은 글 `perDay`건, 오해 소지 `mis[w]`건(하루). */
+function weekRows(mis, perDay = 20, extraDays = 0) {
+  const n = mis.length * 7 + extraDays, byDate = {};
+  for (let back = 0; back < n; back += 1) {
+    const w = mis.length - 1 - Math.floor(back / 7);
+    byDate[key(back)] = { refined: perDay, misread: mis[Math.max(0, w)] };
+  }
+  return buildRows(byDate, n, TODAY);
+}
+
+test('주별 흐름 — 월~일로 묶는다, 기간 처음에 걸린 주는 흐리게(판정 제외)', () => {
+  const fl = weeklyFlow(weekRows([6, 5, 4, 3], 20, 2)); // 30일: 9/26(토)·9/27(일) + 4주
+  assert.equal(fl.weeks.length, 5);
+  assert.deepEqual(fl.weeks.map((w) => w.days), [2, 7, 7, 7, 7]);
+  assert.equal(fl.weeks[0].used, false, '2일뿐인 주');
+  assert.equal(dateKey(fl.weeks[1].start), '2026-09-28', '월요일');
+  assert.equal(dateKey(fl.weeks[4].end), '2026-10-25');
+  assert.equal(fl.used, 4);
+});
+
+test('주별 흐름 — 낮아짐 · 높아짐 · 비슷함 (주당 ±1%p)', () => {
+  const down = weeklyFlow(weekRows([6, 5, 4, 3]));
+  assert.equal(down.verdict.kind, 'down');
+  assert.ok(Math.abs(down.verdict.from - 0.3) < 1e-9 && Math.abs(down.verdict.to - 0.15) < 1e-9, '직선 위의 첫 주 → 끝 주');
+  assert.equal(flowSentence(down), '주별로 보면 낮아지는 흐름이에요 (30.0% → 15.0%)');
+  assert.equal(dateKey(down.hi.start), '2026-09-28');
+  assert.equal(dateKey(down.lo.start), '2026-10-19');
+  assert.equal(weeklyFlow(weekRows([3, 4, 5, 6])).verdict.kind, 'up');
+  const flat = weeklyFlow(weekRows([4, 4, 4, 4]));
+  assert.equal(flat.verdict.kind, 'flat');
+  assert.equal(flowSentence(flat), '주별로 보면 비슷하게 이어지고 있어요 (약 20.0%)');
+});
+
+test('🔴 주별 흐름 — 글이 30건 안 되는 주는 빼고, 쓸 주가 3개 미만이면 말하지 않는다', () => {
+  const thin = weeklyFlow(weekRows([1, 1, 1, 1], 4)); // 주 28건
+  assert.equal(thin.used, 0);
+  assert.equal(thin.verdict.kind, 'thin');
+  assert.equal(thin.hi, null);
+  assert.equal(flowSentence(thin), '글이 적은 주가 많아 아직 흐름을 말하기엔 일러요');
+  const two = weeklyFlow(weekRows([6, 3])); // 14일 = 2주
+  assert.equal(two.used, 2);
+  assert.equal(two.verdict.kind, 'thin', '14일은 주가 둘뿐');
+  assert.equal(weeklyFlow([]).verdict.kind, 'thin');
 });
 
 /* ── ③ 지수 ── */
@@ -122,33 +160,35 @@ test('그날 가장 많은 마찰 원인 — 없으면 null', () => {
 
 /* ── 문장 ── */
 
-test('제목 — 앞 기간 없음 · 거의 같음 · 촘촘해짐 · 벌어짐 · 빈 팀', () => {
-  const cur = [row({ refined: 100, misread: 10 })];
-  assert.equal(headline(cur, [], 30, '팀과 동료들 사이').rest, '마찰 비율 10.0%');
-  assert.equal(headline(cur, [row({ refined: 100, misread: 10.2 })], 30, 'X').rest, '거의 같아요');
-  assert.equal(headline(cur, [row({ refined: 100, misread: 20 })], 30, 'X').rest, '더 촘촘해졌어요');
-  assert.equal(headline(cur, [row({ refined: 100, misread: 2 })], 30, 'X').rest, '조금 벌어졌어요');
-  assert.equal(headline([row({})], [], 30, 'X').lead, '아직 쌓인 신호가 없어요');
+test('제목 — 주별 흐름으로 말한다, 말할 수 없으면 비율만 · 빈 팀', () => {
+  assert.equal(headline([row({ refined: 100, misread: 10 })], 30, '팀과 동료들 사이').rest, '마찰 비율 10.0%');
+  assert.equal(headline(weekRows([6, 5, 4, 3]), 28, 'X').rest, '점점 촘촘해지고 있어요');
+  assert.equal(headline(weekRows([3, 4, 5, 6]), 28, 'X').rest, '조금씩 벌어지고 있어요');
+  assert.equal(headline(weekRows([4, 4, 4, 4]), 28, 'X').rest, '고르게 이어지고 있어요');
+  assert.equal(headline([row({})], 30, 'X').lead, '아직 쌓인 신호가 없어요');
 });
 
-test('변화 알약 — %p로 말한다', () => {
-  const d = deltaOf([row({ refined: 100, misread: 8 })], [row({ refined: 100, misread: 10 })], 14);
-  assert.deepEqual(d, { dir: 'down', text: '앞 14일보다 마찰 비율 2.0%p 줄었어요' });
+test('흐름 알약 — 오르거나 내릴 때만', () => {
+  assert.deepEqual(flowPill(weekRows([6, 5, 4, 3])), { dir: 'down', text: '주별 마찰 비율 30.0% → 15.0%' });
+  assert.equal(flowPill(weekRows([4, 4, 4, 4])), null);
+  assert.equal(flowPill([row({ refined: 100, misread: 10 })]), null);
 });
 
 test('이야기 — 가장 큰 원인과 오프타임 요일', () => {
   const cur = [row({ refined: 10, misread: 6, venting: 2, clear: 3 }, 1), row({ refined: 10, forceOffHours: 2 }, 5)];
-  const s = storyFacts(cur, []);
+  const s = storyFacts(cur);
   assert.equal(s.top.id, 'misread');
   assert.equal(s.topShare, 0.6);
   assert.deepEqual(s.offTop, { wd: 5, count: 2 });
-  assert.equal(s.b, null);
+  assert.equal(s.flow.verdict.kind, 'thin');
+  assert.equal('b' in s, false, '앞 기간 값이 없다');
 });
 
-test('회의용 한 장 — 화면과 복사 글이 같은 문장, 앞 기간이 없으면 그렇게 말한다', () => {
+test('회의용 한 장 — 화면과 복사 글이 같은 문장, 첫 줄은 이 기간 비율과 주별 흐름', () => {
   const cur = [row({ refined: 40, misread: 4, clear: 2, decoded: 10, decodeUrgencyGap: 3 })];
-  const lines = briefLines(cur, [], 30);
-  assert.equal(lines[0], '협업 건강도 90.0 — 비교할 앞 기간이 없어요.');
+  const lines = briefLines(cur, 30);
+  assert.equal(lines[0], '협업 건강도 90.0 — 지난 30일 마찰 비율 10.0%, 글이 적은 주가 많아 아직 흐름을 말하기엔 일러요.');
+  assert.equal(briefLines(weekRows([6, 5, 4, 3]), 28)[0], '협업 건강도 77.5 — 지난 28일 마찰 비율 22.5%, 주별로 보면 낮아지는 흐름이에요 (30.0% → 15.0%).');
   assert.match(lines[1], /마찰의 100%가 「오해 소지 표현」/);
   assert.equal(lines[2], '상대 쪽에서 온 글 10건 중 30%는 겉말과 실제 의도가 달랐어요.');
   const text = briefText({ pairLabel: '우리팀 ↔ 주고받은 동료들', days: 30, lines, next: { title: 'T', why: 'W' } });
@@ -158,35 +198,34 @@ test('회의용 한 장 — 화면과 복사 글이 같은 문장, 앞 기간이
 
 /* ── ⑤ 다음에 할 일 ── */
 
-test('할 일 판정표 — 비중 30% 이상 · 1.3배 증가 · 받은 글 · Critical · 용어집', () => {
+test('할 일 판정표 — 비중 30% 이상 · 받은 글 · Critical · 용어집 (앞 기간 비교 없음)', () => {
   const cur = [row({ refined: 100, misread: 10, venting: 5, decoded: 10, decodeUrgencyGap: 4, urgencyCritical: 20, urgencyNormal: 60, urgencyLow: 20, teamGlossaryApplied: 10 })];
-  const prev = [row({ refined: 100, misread: 10, venting: 2 })];
-  const ids = actions(cur, prev).map((a) => a.id);
+  const list = actions(cur);
+  const ids = list.map((a) => a.id);
   assert.ok(ids.includes('misread'), '마찰의 67%');
-  assert.ok(ids.includes('venting'), '2 → 5 (1.3배 이상, 3건 이상)');
+  assert.ok(ids.includes('venting'), '마찰의 33%');
   assert.ok(ids.includes('inbound'), '받은 글 40%');
   assert.ok(ids.includes('critical'), 'Critical 20%');
   assert.ok(ids.includes('glossary'), '용어집 10%');
-  const venting = actions(cur, prev).find((a) => a.id === 'venting');
-  assert.equal(venting.hot, true);
-  assert.equal(venting.why, '앞 기간 2건 → 5건');
-  assert.equal(ids[0], 'venting', '늘고 있는 것이 먼저(+0.5)');
+  assert.equal(list.find((a) => a.id === 'venting').why, '마찰의 33% · 5건');
+  assert.equal(ids[0], 'misread', '비중이 가장 큰 것이 먼저');
+  assert.ok(list.filter((a) => a.id !== 'inbound').every((a) => a.hot === false), '「늘고 있음」은 없다');
 });
 
 test('할 일은 최대 5개이고, 기준 밑이면 내지 않는다', () => {
   const quiet = [row({ refined: 100, misread: 1, missing: 1, venting: 1, urgencyGap: 1, forceOffHours: 1, decoded: 4, decodeUrgencyGap: 4, urgencyNormal: 100, teamGlossaryApplied: 50 })];
-  assert.deepEqual(actions(quiet, []), [], '각 20% · 받은 글 5건 미만 · Critical 0 · 용어집 50%');
+  assert.deepEqual(actions(quiet), [], '각 20% · 받은 글 5건 미만 · Critical 0 · 용어집 50%');
   const busy = [row({ refined: 10, misread: 9, venting: 9, decoded: 9, decodeUrgencyGap: 9, urgencyCritical: 9, urgencyNormal: 1 })];
-  assert.ok(actions(busy, []).length <= 5);
+  assert.ok(actions(busy).length <= 5);
 });
 
 test('🔴 빈 팀에는 할 일을 내지 않는다 — 근거 없는 「용어집을 채우세요」를 막는다', () => {
-  assert.deepEqual(actions([row({})], []), []);
+  assert.deepEqual(actions([row({})]), []);
 });
 
 test('오프타임 강행 할 일은 몰린 요일을 말한다', () => {
   const cur = [row({ refined: 10, forceOffHours: 4 }, 4), row({ refined: 10, forceOffHours: 1 }, 2)];
-  assert.match(actions(cur, []).find((a) => a.id === 'forceOffHours').body, /^목요일에 4건이 몰렸어요\./);
+  assert.match(actions(cur).find((a) => a.id === 'forceOffHours').body, /^목요일에 4건이 몰렸어요\./);
 });
 
 /* ── ⑥ NaN 방어 ── */
@@ -201,7 +240,7 @@ test('🔴 막대 분모는 1 아래로 내려가지 않는다 — 빈 배열·0
   const fold = weekdayFold([row({})]);
   assert.equal(fold.maxR, 1);
   assert.equal(fold.peak, -1);
-  for (const t of signalMap([row({}), row({})], [], []).groups.flatMap((g) => g.rows)) assert.ok(Number.isFinite(t.max) && t.max >= 1);
+  for (const t of signalMap([row({}), row({})], []).groups.flatMap((g) => g.rows)) assert.ok(Number.isFinite(t.max) && t.max >= 1);
 });
 
 test('요일의 결 — 다듬은 글이 있는 요일 중 마찰 비율이 가장 높은 요일', () => {
