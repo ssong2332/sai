@@ -4,7 +4,13 @@ import VentingPrompt from './VentingPrompt.jsx';
 import TicketPopup, { formatTicketText } from './TicketPopup.jsx';
 import SensitiveWarning from './SensitiveWarning.jsx';
 import DecodePopup, { ReplyPanel } from './DecodePopup.jsx';
-import { buildAnswerList, answersToText } from '../core/reply/questions.js';
+import {
+  buildPlaceholderQuestions,
+  buildAnswerList,
+  answersToText,
+  fillPlaceholders,
+} from '../core/reply/questions.js';
+import { collectPlaceholders } from '../core/reply/verify.js';
 import SaiMark from '../assets/SaiMark.jsx';
 import { SnippetIcon, DecisionIcon } from '../assets/SaiIcons.jsx';
 import { requestRefine, requestDecode, requestDecisions, requestReply } from './refineClient.js';
@@ -167,7 +173,11 @@ export default function SaiOverlay({ autoButton = true }) {
    * 컴포넌트로 갈라졌다 — 공통 조상이 여기뿐이다.
    */
   const [replyAuto, setReplyAuto] = useState(false);
-  const [replyAsk, setReplyAsk] = useState(null);
+  /**
+   * 🔴 L29 — 질문 카드가 열려 있는가(불리언). 예전엔 「질문 중인 의도」였는데, 이제 질문은 초안이
+   *    나온 **뒤** 그 초안의 자리표시자로 만든다 — 의도는 `replyIntent` 하나로 충분하다.
+   */
+  const [replyAsk, setReplyAsk] = useState(false);
   const [replyAnswers, setReplyAnswers] = useState({});
   const [replySentAnswers, setReplySentAnswers] = useState('');
   /**
@@ -668,7 +678,7 @@ export default function SaiOverlay({ autoButton = true }) {
     setReplyIntent(null);
     setReplyResult(null);
     setReplyError('');
-    setReplyAsk(null);
+    setReplyAsk(false);
     setReplyAnswers({});
     setReplySentAnswers('');
     try {
@@ -690,18 +700,27 @@ export default function SaiOverlay({ autoButton = true }) {
    * 🔴 원문은 `sendTextRef`에서 읽는다(마스킹된 문장). 해독이 본 것과 **같은 문장**에 대한
    *    회신이어야 하고, 마스킹을 우회하는 두 번째 전송 경로를 만들지 않기 위해서다.
    */
-  const runReply = useCallback(async (intent, answers = []) => {
+  /**
+   * 🔴 L29 — `ask`가 참이면(질문 모드) 초안이 남긴 자리표시자가 있을 때만 질문 카드를 연다.
+   *    질문 모드도 **요청은 자동 모드와 똑같다**(answers 없음, 호출 1회) — 질문은 응답에서 나온다.
+   */
+  const runReply = useCallback(async (intent, { ask = false } = {}) => {
     const text = sendTextRef.current;
     if (!text) return;
     setReplyIntent(intent);
     setReplyLoading(true);
     setReplyError('');
     setReplyResult(null);
+    setReplyAsk(false);
+    setReplyAnswers({});
+    setReplySentAnswers('');
     try {
-      const response = await requestReply({ text, intent, answers });
+      const response = await requestReply({ text, intent, answers: [] });
       setReplyResult(response);
       // 새 초안이 오면 편집본을 그것으로 초기화한다 — 이전 초안을 고치던 내용이 남으면 안 된다.
-      setReplyDraftText(typeof response?.draft === 'string' ? response.draft : '');
+      const draft = typeof response?.draft === 'string' ? response.draft : '';
+      setReplyDraftText(draft);
+      if (ask && !response?.fallback && collectPlaceholders(draft).length > 0) setReplyAsk(true);
     } catch {
       // 🔴 예외 메시지에 원문이 섞이지 않게 우리 문구로 덮는다.
       setReplyError(failureMessage('회신 초안'));
@@ -733,34 +752,35 @@ export default function SaiOverlay({ autoButton = true }) {
     setReplyAuto((prev) => {
       const next = !prev;
       setLocal(STORAGE_KEYS.REPLY_AUTO, next);
-      if (next) setReplyAsk(null); // 자동으로 바꾸면 열려 있던 질문 카드는 의미가 없다
+      if (next) setReplyAsk(false); // 자동으로 바꾸면 열려 있던 질문 카드는 의미가 없다
       return next;
     });
   }, []);
 
   const pickReplyIntent = useCallback(
     (key) => {
-      if (replyAuto) {
-        setReplySentAnswers('');
-        runReply(key, []);
-        return;
-      }
-      // 같은 방향을 다시 누르면 질문 카드를 닫는다(답을 고치려고 여는 경로이기도 하다).
-      setReplyAsk((prev) => (prev === key ? null : key));
-      setReplyAnswers({});
+      // 🔴 L29 — 두 모드 모두 바로 초안을 만든다. 질문 모드는 그 초안의 빈칸만 묻는다.
+      runReply(key, { ask: !replyAuto });
     },
     [replyAuto, runReply],
   );
 
+  /**
+   * 🔴 L29 — 답을 **지금 편집 중인 초안**의 자리표시자에 대입한다. LLM을 다시 부르지 않는다.
+   *    건너뛰면(`withAnswers=false`) 카드만 닫고 자리표시자는 그대로 둔다.
+   */
   const submitReply = useCallback(
     (withAnswers) => {
       if (!replyAsk) return;
-      const list = withAnswers ? buildAnswerList(replyAsk, replyAnswers) : [];
-      setReplySentAnswers(answersToText(list));
-      runReply(replyAsk, list);
-      setReplyAsk(null);
+      if (withAnswers) {
+        const questions = buildPlaceholderQuestions(collectPlaceholders(replyResult?.draft ?? ''));
+        const list = buildAnswerList(questions, replyAnswers);
+        setReplyDraftText((prev) => fillPlaceholders(prev, list));
+        setReplySentAnswers(answersToText(list));
+      }
+      setReplyAsk(false);
     },
-    [replyAsk, replyAnswers, runReply],
+    [replyAsk, replyAnswers, replyResult],
   );
 
   /**
@@ -768,7 +788,7 @@ export default function SaiOverlay({ autoButton = true }) {
    *    절반이 아무것도 없는 상자로 덮인다.
    */
   const replyPanelOpen =
-    replyAsk !== null || replyLoading || replyError !== '' || replyResult !== null;
+    replyAsk || replyLoading || replyError !== '' || replyResult !== null;
   const replySideBySide = viewportWidth >= SIDE_BY_SIDE_MIN_WIDTH && replyPanelOpen;
 
 
@@ -966,7 +986,7 @@ export default function SaiOverlay({ autoButton = true }) {
     const trimmed = String(text ?? '').trim();
     if (trimmed === '') return;
     modeRef.current = 'compose';
-    setReplyAsk(null);
+    setReplyAsk(false);
     beginSend(trimmed);
   };
 
@@ -1835,11 +1855,11 @@ export default function SaiOverlay({ autoButton = true }) {
             <ReplyPanel
               standalone
               onClose={() => {
-                setReplyAsk(null);
+                setReplyAsk(false);
                 setReplyResult(null);
                 setReplyError('');
               }}
-              askIntent={replyAsk}
+              askOpen={replyAsk}
               answers={replyAnswers}
               onAnswersChange={setReplyAnswers}
               onSubmit={() => submitReply(true)}

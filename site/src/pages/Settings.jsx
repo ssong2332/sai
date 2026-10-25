@@ -582,6 +582,13 @@ function GlossaryPanel({ s, saves, actions }) {
   );
 }
 
+/** 사이드패널 삭제 안내와 같은 뜻 — 서버 기록을 바로 지웠는지 알린다. */
+const LEARNED_SERVER_NOTE = {
+  deleted: '지웠어요. 서버에 동기화한 기록도 함께 지웠어요.',
+  local: '지웠어요. 로그인하지 않아 서버에는 지울 기록이 없어요.',
+  later: '지웠어요. 서버 기록은 연결이 되면 다음 동기화 때 지워요.',
+};
+
 function LearnedPanel({ s, saves, actions }) {
   const [confirmAll, setConfirmAll] = useState(false);
   const counts = s.learned?.counts ?? {};
@@ -595,6 +602,11 @@ function LearnedPanel({ s, saves, actions }) {
         다듬은 문장을 내가 다시 고쳐 쓰면, 어떤 종류의 수정이었는지 <b>횟수만</b> 셉니다. 문장은 저장하지 않아요. 같은
         종류가 {LEARNING_THRESHOLD}번 이상 쌓이면 다음 교정에 반영돼요.
       </p>
+      {s.learnedServer && (
+        <p className="learned-server" role="status">
+          {LEARNED_SERVER_NOTE[s.learnedServer]}
+        </p>
+      )}
       {rows.length === 0 ? (
         <p className="empty">아직 쌓인 학습 내역이 없어요.</p>
       ) : (
@@ -629,8 +641,7 @@ function LearnedPanel({ s, saves, actions }) {
             {confirmAll ? (
               <div className="confirm-box" role="group" aria-label="학습 내역 전체 삭제 확인">
                 <p>
-                  학습 내역 {rows.length}가지를 모두 지워요. 서버에 동기화한 적이 있다면 그 기록도 확장이 다음 동기화 때
-                  함께 지웁니다. 되돌릴 수 없어요.
+                  학습 내역 {rows.length}가지를 모두 지워요. 서버에 동기화한 기록도 바로 함께 지웁니다. 되돌릴 수 없어요.
                 </p>
                 <div className="confirm-actions">
                   <button
