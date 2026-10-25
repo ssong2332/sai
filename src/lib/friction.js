@@ -143,6 +143,29 @@ export function decodeEvents(response) {
   return events;
 }
 
+/** 긴급도 높은 순 — 앞일수록 급하다(`core/refine/prompt.js` `URGENCY_LEVELS`와 같은 순서). */
+const URGENCY_RANK = ['CRITICAL', 'NORMAL', 'LOW'];
+
+/**
+ * 다듬기 쪽 `urgencyGap` 판정 — **「완곡한 표현이 실제 긴급도를 가렸다」**.
+ *
+ * | 조건 | 결과 |
+ * |---|---|
+ * | 폴백 · 사용자가 긴급도를 고르지 않음(AI·폴백 출처) | false |
+ * | 사용자가 고른 긴급도가 글에서 읽히는 긴급도(AI 판정)보다 **높다** | true — 급한데 글은 급해 보이지 않는다 |
+ * | 같거나 낮다 · AI 판정 없음 | false |
+ *
+ * 🔴 2026-10-25 — 옛 조건(`urgency !== aiUrgency && 출처 === 'ai'`)은 출처가 ai이면 schema가
+ *    `urgency = aiUrgency`로 넣어 **항상 거짓**이었다(이 지표는 그동안 0건). 사용자 결정으로 이 표로 바꿨다.
+ * @param {object} response `requestRefine` 응답.
+ */
+export function isUrgencyMasked(response) {
+  if (!response || response.fallback || response.urgencySource !== 'user') return false;
+  const picked = URGENCY_RANK.indexOf(response.urgency);
+  const read = URGENCY_RANK.indexOf(response.aiUrgency);
+  return picked !== -1 && read !== -1 && picked < read;
+}
+
 /** 극성 — 대시보드가 신호 막대와 분모를 가르는 데 쓴다. */
 export const EVENT_POLARITY = {
   misread: 'friction',

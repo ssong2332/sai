@@ -35,6 +35,7 @@ import {
   NO_TEAM_BUCKET,
   refineContextEvents,
   decodeEvents,
+  isUrgencyMasked,
 } from '../lib/friction.js';
 // 🔴 대화 상대 **후보만** 뽑는다 — 등록은 사용자가 누를 때만(`detectPeople.js` 헤더).
 import { detectSpeakerNames, matchRecipient } from './detectPeople.js';
@@ -651,7 +652,8 @@ export default function SaiOverlay({ autoButton = true }) {
            * 🔴 `urgencyGap`은 「완곡한 표현이 실제 긴급도를 가렸다」는 뜻이다 — 이 제품이
            *    잡으려는 대표 실패(F-11)와 같은 축이라 팀 지표로서 의미가 크다.
            */
-          if (response.urgency !== response.aiUrgency && response.urgencySource === 'ai') {
+          // 🔴 판정은 `friction.js` `isUrgencyMasked` 한 곳(2026-10-25 — 옛 조건은 항상 거짓이라 0건이었다).
+          if (isUrgencyMasked(response)) {
             recordFrictionEvent(FRICTION_EVENTS.URGENCY_GAP, { teamId: frictionTeamId() });
           }
           if ((response.missingElements ?? []).length > 0) {
