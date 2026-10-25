@@ -40,7 +40,7 @@
 | 배포 확인 | `curl https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/health` | 2026-08-13 |
 | 수신 해독 실측(운영) | `curl -X POST .../refineV1 -d '{"mode":"decode","text":"...","sourceLanguage":"en","targetLanguage":"ko"}'` | 2026-08-13 |
 | Functions 의존성 설치 (worktree에 `functions/node_modules`가 없을 때) | `functions/` 안에서 `npm ci` — 🔴 `npm --prefix functions install`은 쓰지 않는다: `functions/package.json`에 `"sai": "file:.."` 의존성을 몰래 추가한다(2026-10-23 실측) | 2026-10-23 |
-| 대시보드 설치 | `npm --prefix dashboard install` | 2026-08-13 |
+| 대시보드 설치 | `dashboard/` 안에서 `npm ci` — 🔴 `npm --prefix dashboard install`은 쓰지 않는다: `dashboard/package.json`에 `"sai": "file:.."`를 몰래 넣는다(2026-10-25 실측) | 2026-10-25 |
 | 대시보드 빌드 | `npm --prefix dashboard run build` | 2026-08-13 |
 | 대시보드 배포 | `firebase deploy --only hosting` | 2026-08-13 |
 | 대시보드 배포 확인 | `curl https://sai-global-msg-2026.web.app/` | 2026-08-13 |

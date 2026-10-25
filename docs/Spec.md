@@ -6,7 +6,7 @@
 
 ## 🔴 0. 출시 전환 (2026-09-30 사용자 결정) — 이 절이 아래 해커톤 시점 서술보다 우선한다
 
-**해커톤(2026-08-12 ~ 08-21)은 끝났다. 이후 사이는 실제 서비스 출시를 목표로 계속 개발한다.** 아래 표와 충돌하는 해커톤 시점 서술(§1 수익화, §6-3 Main LLM, §7 역할, §8 타임라인, 권장 12 캘린더)은 기록으로만 남기고 이 표를 따른다. 출시 단계·태스크는 `docs/Tasks.md` 「출시 v1.0」 절.
+**해커톤(2026-08-12 ~ 08-21)은 끝났다. 이후 사이는 실제 서비스 출시를 목표로 계속 개발한다.** 아래 표와 충돌하는 해커톤 시점 서술(§1 수익화, §6-2 서버, §6-3 Main LLM, §7 역할, §8 타임라인, 권장 12 캘린더)은 기록으로만 남기고 이 표를 따른다. 출시 단계·태스크는 `docs/Tasks.md` 「출시 v1.0」 절.
 
 | 항목 | 해커톤 시점 | 출시 기준 (2026-09-30~) |
 |---|---|---|
@@ -14,12 +14,13 @@
 | 인원 | 4인 (§7) | **1인 개발** |
 | 기간 | 10일 | 기한 없음 — 단계별 진입·졸업 조건으로 관리 |
 | Main LLM (§6-3) | OpenAI | **Anthropic Claude (`claude-haiku-5-5`, 사고 끔)** — 폴오버 예비 **Groq** (`openai/gpt-oss-120b`). 2026-10-23 사용자 결정(이전: 2026-09-30 Gemini). 근거: Tasks L30 실측(건당 $0.00070·중앙값 2.4~2.5초) + 데이터 정책(Anthropic API 입력은 기본적으로 학습에 쓰지 않음 · Groq는 계약상 학습 금지 + 무보존(ZDR) 가능 · **Gemini 무료 티어는 입력을 학습에 씀** — 그래서 Gemini는 예비로도 두지 않는다, 결정 (b)). Gemini·OpenAI는 명시 요청으로만 남는다. 🔴 운영 Functions는 ANTHROPIC·GROQ 시크릿 등록·배포 전까지 Gemini(임시 기본)로 돈다 — `functions/index.js` `INTERIM_DEFAULT_PROVIDER` |
+| 서버 (§6-2) | Firebase Cloud Functions(서울) | **Cloudflare Workers** (`sai-refine.aiisgod.workers.dev`) — 2026-10-23~24 사용자 결정. **로그인(Firebase Auth)·저장(Firestore)은 Firebase 유지**, Worker는 Firebase ID 토큰만 검증한다. GCP 업그레이드는 보류 — 2026-10-28 체험 종료로 Functions가 멈추는 것을 감수한다(Tasks L27). 비공개 베타는 **확장이 Worker를 쓰는 버전으로만** 시작한다(Tasks L02) |
 | 수익화 (§1) | 개인 무료 · 팀 구독 · 인앱 포인트 | **유료화는 나중.** 팀 기능은 **당분간 무료 공개**. 포인트는 적립만 있고 사용처는 유료화와 함께 |
 | 권장 12 회의 시간 추천의 캘린더 빈 시간 | 포함 (`calendar.readonly`) | **첫 출시에서 제외** — 민감 범위의 구글 OAuth 검증 대기를 피한다 |
 | 타깃 | 기획안 | 그대로 — **한국 개발 조직의 개인 사용자** |
 
 * 🔴 **Zero Retention(필수 5)은 출시 기준에서도 불변이다.** 베타 지표·모니터링도 카운트·메타데이터만 쓴다.
-* 🔴 **Gemini는 유료 티어로만 공개한다** — 2026-10-23부터 기본·예비가 아니므로, 실제 사용자 텍스트가 Gemini로 가는 경로는 **Functions 임시 기본**(사슬 시크릿 등록 전)과 **명시 요청**뿐이다 (2026-10-01 약관 원문 확인 — Gemini API Additional Terms, 최종 수정 2026-04-28, `https://ai.google.dev/gemini-api/terms`).
+* 🔴 **Gemini는 유료 티어로만 공개한다** — 2026-10-23부터 기본·예비가 아니므로, 실제 사용자 텍스트가 Gemini로 가는 경로는 **Functions 임시 기본**(사슬 시크릿 등록 전)과 **명시 요청**뿐이다. 2026-10-25 결정(Tasks L02): 결제 연결 없이 **Worker 전환으로 해소** — 앞의 경로는 Functions 중단과 함께 사라지고, 확장은 provider를 싣지 않는다. 그래서 개인정보처리방침의 위탁사에서 Gemini를 뺐다(Anthropic·Groq·Cloudflare) (2026-10-01 약관 원문 확인 — Gemini API Additional Terms, 최종 수정 2026-04-28, `https://ai.google.dev/gemini-api/terms`).
   | 구분 | 약관 내용 | 우리에게 뜻하는 것 |
   |---|---|---|
   | 무료(Unpaid) | 입력·출력을 Google 제품 개선에 쓰고 사람 검토자가 볼 수 있다. **「민감·기밀·개인 정보를 보내지 말라」**고 명시 | 업무 메시지를 보내는 이 제품은 **무료 티어로 공개할 수 없다** |
@@ -143,7 +144,7 @@
 * **Chrome Extension Core APIs**: `chrome.sidePanel`, `chrome.runtime`, `chrome.storage.local`, `Selection API`
 
 ### 2) 백엔드 & 데이터베이스 (Backend & DB)
-* **Serverless Runtime**: `Node.js 22` + `Firebase Cloud Functions`
+* **Serverless Runtime**: `Node.js 22` + `Firebase Cloud Functions` (해커톤 기준 — 출시 기준은 §0 「서버」 행: Cloudflare Workers)
 * **Authentication**: `Firebase Auth` (구글 소셜 로그인 및 B2B 팀 역할 권한 제어)
 * **Database**: `Firebase Firestore` (NoSQL - 개인 선호도, B2B 용어집, 팀 협업 지수, 재화 토큰 내역 저장)
 * **Data Scraper (Cron Job)**: `Node.js` + `Cheerio` (주기적으로 각국 최신 밈 및 공휴일 데이터 정기 크롤링)
