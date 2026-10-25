@@ -4,6 +4,9 @@
 #      npx wrangler secret put ANTHROPIC_API_KEY      (1번 — 기본)
 #      npx wrangler secret put GROQ_API_KEY           (2번 — 폴오버. 없으면 그 단계는 건너뛴다)
 #    (사용자가 직접 입력 — 대화·로그에 남기지 않는다. Gemini는 사슬 밖이라 안내하지 않는다 — 사용자 결정 (b))
+#    🔴 2026-10-26 — 일일 상한·베타 지표·팀 API(/v1/team)는 서비스 계정이 있어야 돈다(`src/google/clients.js`):
+#      PowerShell:  Get-Content <서비스계정.json> -Raw | npx wrangler secret put GOOGLE_SERVICE_ACCOUNT
+#    서비스 계정 역할: Cloud Datastore 사용자 + Firebase 인증 관리자(계정 삭제). 없으면 /health usageStore=noop·team=unavailable.
 #    CLAUDE.md의 Firebase 함정(숨김 프롬프트 붙여넣기 실패·끝 개행 → 401 오진)이 여기서도 생길 수 있다 —
 #    401이 나면 코드보다 먼저 시크릿 값을 의심한다(🔴 추정, 미실측).
 #
@@ -27,6 +30,10 @@ compatibility_flags = ["nodejs_compat"]
 #    🔴 이 줄을 지우면 SDK가 다시 번들된다 — `npm run check:bundle`이 잡는다. `wrangler.dev.toml`에도 같은 줄이 있다.
 [alias]
 "@anthropic-ai/sdk" = "./src/anthropicFetch.js"
+# 🔴 2026-10-26 — functions/*.js 판정 코드를 Worker에서 그대로 부른다. firebase-admin 대신 REST 어댑터의 FieldValue를 받게 한다
+#    (src/shims/*.js 헤더). test/sdkAlias.mjs에도 같은 표가 있다 — 하나만 바꾸면 테스트와 배포본이 갈린다.
+"firebase-admin/firestore" = "./src/shims/firebaseAdminFirestore.js"
+"firebase-admin/auth" = "./src/shims/firebaseAdminAuth.js"
 
 # 🔴 공개 설정값만(비밀 아님). 로직에 하드코딩하지 않고 여기서 읽는다(`src/config.js`).
 [vars]

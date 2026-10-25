@@ -20,7 +20,7 @@
  *
  * 요청 처리 순서 (기존 refineV1과 같은 순서 — 🔴 차이는 ①만)
  * ① Origin 판정(다른 오리진 403) → 설정 누락 500 → 토큰 401 `{error:'unauthorized', reason}` → 본문 JSON(깨지면 400)
- * → 일일 상한 429 — 🔴 1단계는 스텁(`usageStore.js`)이라 항상 통과
+ * → 일일 상한 429 — `usageStore.js` 표(시크릿 없으면 스텁 — 항상 통과)
  * → provider 판정(아래 표) → mode 코어(위 표) + 폴오버 → 던지면 400 `{error: message}` → 지표 기록(mode별) → 200
  *
  * provider 판정표 (2026-10-23 — `functions/index.js` `resolveProviderAndKey`와 같은 규칙, 임시 기본만 없다)
@@ -57,6 +57,8 @@ import { readConfig } from './config.js';
 import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
+import { handleTeam } from './teamRoute.js';
+import { googleClientsFromEnv } from './google/clients.js';
 
 /**
  * 🔴 `mode` 라우팅 표 — `functions/index.js` `MODES`와 **같은 코어·같은 로그 필드**다(2026-10-24 이식).
@@ -123,10 +125,12 @@ export function resolveProvider(requested, keys) {
 /**
  * @param {object} [deps] 전부 테스트 주입용. 운영 기본값은 `index.js`.
  * @param {Function} [deps.jwks] jose 키 묶음(테스트는 `createLocalJWKSet`).
- * @param {object} [deps.usageStore] `usageStore.js` 인터페이스.
+ * @param {object|((env: object) => object)} [deps.usageStore] `usageStore.js` 인터페이스, 또는 env를 받아 그것을 돌려주는 함수
+ *   (운영 `index.js` = `usageStoreFromEnv` — 시크릿은 요청의 env로만 온다).
  * @param {typeof fetch} [deps.fetchImpl] provider 호출에 넘길 fetch(테스트는 가짜 응답 — 모든 provider 공용).
  * @param {object} [deps.cache] refine 코어 캐시 스토어.
  * @param {{decode?: object, decisions?: object, reply?: object}} [deps.caches] 나머지 mode의 캐시 스토어.
+ * @param {(env: object) => object|null} [deps.google] env → Google 클라이언트(`google/clients.js`). 테스트는 가짜 Firestore를 넘긴다.
  * @param {() => number} [deps.now]
  * @param {{log: Function, warn: Function, error: Function}} [deps.logger] 기본 console.
  */
@@ -140,6 +144,7 @@ export function createHandler(deps = {}) {
     caches = {},
     now = () => Date.now(),
     logger = console,
+    google = (env) => googleClientsFromEnv(env),
   } = deps;
   // mode마다 스토어 하나 — Functions(`refineCache`·`decodeCache`·…)와 같다. 같은 isolate 메모리 전용 클래스다.
   const modeCaches = {
@@ -148,6 +153,8 @@ export function createHandler(deps = {}) {
     decisions: caches.decisions ?? new MemoryCacheStore(),
     reply: caches.reply ?? new MemoryCacheStore(),
   };
+
+  const storeFor = typeof usageStore === 'function' ? usageStore : () => usageStore;
 
   return async function handle(request, env = {}) {
     const config = readConfig(env);
@@ -195,8 +202,19 @@ export function createHandler(deps = {}) {
         model: config.anthropicModel ?? null,
         // 코어 판정표와 같게 — `adaptive`만 켬, 나머지(없음 포함)는 끔.
         thinking: thinkingSwitch(config.thinking),
-        usageStore: usageStore.kind ?? 'custom',
+        usageStore: safeStoreKind(storeFor, env, logger),
+        // 팀 API(/v1/team) — 서비스 계정 시크릿이 있어야 ready.
+        team: safeGoogle(google, env, logger) ? 'ready' : 'unavailable',
       });
+    }
+
+    // 팀 API — 판정은 functions/*.js 그대로(teamRoute.js 헤더). 설정 누락은 교정과 같게 500.
+    if (url.pathname === '/v1/team') {
+      if (config.missing.length > 0) {
+        logger.error(`[team] 설정 누락: ${config.missing.join(',')}`);
+        return json(500, { error: 'server misconfigured' });
+      }
+      return handleTeam(request, { config, google: safeGoogle(google, env, logger), json, logger, jwks, now });
     }
 
     if (url.pathname !== '/v1/refine') return json(404, { error: 'not found' });
@@ -237,14 +255,15 @@ export function createHandler(deps = {}) {
     const modeName = resolveMode(body.mode);
     const mode = MODES[modeName];
 
-    // ⑥ 일일 상한 — 🔴 1단계 스텁. 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**.
+    // ⑥ 일일 상한 — 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**(저장소를 못 만들어도 noop으로 통과).
+    const store = resolveStore(storeFor, env, logger);
     try {
-      const quota = await usageStore.consumeDailyQuota(uid);
+      const quota = await store.consumeDailyQuota(uid);
       if (!quota.ok) {
         logger.warn(`[refine] 일일 상한 초과 used=${quota.used} limit=${quota.limit}`);
         return json(429, { error: 'daily-limit', limit: quota.limit });
       }
-      if (quota.used === 1) await safeMetric(logger, () => usageStore.recordDailyUser(uid));
+      if (quota.used === 1) await safeMetric(logger, () => store.recordDailyUser(uid));
     } catch (error) {
       logger.error(`[refine] 상한 확인 실패 — 통과시킴: ${error?.code ?? error?.name ?? 'unknown'}`);
     }
@@ -311,14 +330,14 @@ export function createHandler(deps = {}) {
       // 🔴 코어의 *RequestError 문구는 우리 문구다(본문 없음). 그 밖 오류는 이름만 로그에.
       logger.error(`[${modeName}] 요청 거절: ${error?.name ?? 'error'}`);
       await safeMetric(logger, () =>
-        usageStore.recordRequest({ mode: modeName, rejected: true, latencyMs: now() - receivedAt }),
+        store.recordRequest({ mode: modeName, rejected: true, latencyMs: now() - receivedAt }),
       );
       return json(400, { error: error?.message ?? 'bad request' });
     }
 
     // ⑨ 지표 — 모드·성공 여부·사유 코드·시간뿐.
     await safeMetric(logger, () =>
-      usageStore.recordRequest({
+      store.recordRequest({
         mode: modeName,
         fallback: result?.fallback === true,
         fallbackReason: result?.fallbackReason,
@@ -327,6 +346,30 @@ export function createHandler(deps = {}) {
     );
     return json(200, result);
   };
+}
+
+/** env → 저장소. 만들다 실패하면(시크릿 형식·프로젝트 불일치) noop — 로그에는 사유 코드만. */
+function resolveStore(storeFor, env, logger) {
+  try {
+    return storeFor(env);
+  } catch (error) {
+    logger.error(`[usage] 저장소 준비 실패 — 상한 없이 통과: ${error?.code ?? error?.name ?? 'unknown'}`);
+    return createNoopUsageStore();
+  }
+}
+
+/** env → Google 클라이언트. 못 만들면 null(사유 코드만 로그) — 팀 API는 503으로 드러난다. */
+function safeGoogle(google, env, logger) {
+  try {
+    return google(env);
+  } catch (error) {
+    logger.error(`[google] 준비 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+    return null;
+  }
+}
+
+function safeStoreKind(storeFor, env, logger) {
+  return resolveStore(storeFor, env, logger).kind ?? 'custom';
 }
 
 /** 지표 실패가 교정을 막지 않는다(L20). 로그에는 오류 코드만. */

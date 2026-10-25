@@ -8,6 +8,10 @@ compatibility_flags = ["nodejs_compat"]
 # 🔴 운영(`wrangler.toml`)과 같은 SDK 대역 — 로컬 workerd에서도 배포본과 같은 코드가 돈다(2026-10-23 L33).
 [alias]
 "@anthropic-ai/sdk" = "./src/anthropicFetch.js"
+# 🔴 2026-10-26 — functions/*.js 판정 코드를 Worker에서 그대로 부른다. firebase-admin 대신 REST 어댑터의 FieldValue를 받게 한다
+#    (src/shims/*.js 헤더). test/sdkAlias.mjs에도 같은 표가 있다 — 하나만 바꾸면 테스트와 배포본이 갈린다.
+"firebase-admin/firestore" = "./src/shims/firebaseAdminFirestore.js"
+"firebase-admin/auth" = "./src/shims/firebaseAdminAuth.js"
 
 [vars]
 FIREBASE_PROJECT_ID = "sai-global-msg-2026"
