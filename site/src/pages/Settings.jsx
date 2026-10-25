@@ -1,7 +1,8 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from '../router.jsx';
 import { BRIDGE_ERRORS, describeError } from '../bridge.js';
 import { useExtension } from './useExtension.js';
+import Segmented from '../components/Segmented.jsx';
 
 /**
  * /settings — 「관리하는 자리」. 확장에 저장된 값을 확장을 통해 읽고 바꾼다.
@@ -32,17 +33,22 @@ function SaveNote({ save }) {
   if (save.state === 'saving')
     return (
       <span className="save-note save-saving" aria-live="polite">
+        <span className="save-spin" aria-hidden="true" />
         저장 중…
       </span>
     );
   if (save.state === 'saved')
     return (
       <span className="save-note save-saved" aria-live="polite">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          <path d="M3 7.3l2.6 2.6L11 4.3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
         저장됨
       </span>
     );
   return (
     <span className="save-note save-error" role="alert">
+      <span className="save-bang" aria-hidden="true">!</span>
       {save.message}
     </span>
   );
@@ -74,7 +80,7 @@ function ToggleRow({ label, hint, checked, onChange, save }) {
       <button
         type="button"
         role="switch"
-        className="switch"
+        className="sw"
         aria-checked={shown}
         aria-labelledby={`${id}-l`}
         aria-describedby={hint ? `${id}-h` : undefined}
@@ -105,20 +111,14 @@ function ChoiceRow({ label, hint, options, value, onChange, save, allowNone = fa
         {hint && <span className="row-hint">{hint}</span>}
         <SaveNote save={save} />
       </div>
-      <div className="segmented" role="radiogroup" aria-labelledby={`${id}-l`}>
-        {list.map((opt) => (
-          <button
-            key={String(opt.id)}
-            type="button"
-            role="radio"
-            aria-checked={shown === opt.id}
-            disabled={save?.state === 'saving'}
-            onClick={() => pick(opt.id)}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        options={list}
+        value={shown}
+        onChange={pick}
+        labelledBy={`${id}-l`}
+        disabled={save?.state === 'saving'}
+        wrap
+      />
     </div>
   );
 }
@@ -436,18 +436,18 @@ function GlossaryEditor({ initial, languages, onSubmit, onCancel, submitLabel, b
         <button
           type="button"
           role="switch"
-          className="switch"
+          className="sw"
           aria-checked={keepSource}
           aria-labelledby={ids.k}
           onClick={() => setKeep((v) => !v)}
         />
       </div>
       <div className="gl-actions">
-        <button type="submit" className="btn btn-small btn-action" disabled={!canSubmit || busy}>
+        <button type="submit" className="btn sm primary press" disabled={!canSubmit || busy}>
           {submitLabel}
         </button>
         {onCancel && (
-          <button type="button" className="btn btn-small" onClick={onCancel}>
+          <button type="button" className="btn sm press" onClick={onCancel}>
             취소
           </button>
         )}
@@ -479,7 +479,7 @@ function GlossaryPanel({ s, saves, actions }) {
 
       <section className="group">
         <h3 className="group-title">
-          등록한 용어 <span className="count mono">{list.length}</span>
+          등록한 용어 <span className="count num">{list.length}</span>
         </h3>
         {list.length === 0 ? (
           <p className="empty">아직 등록한 용어가 없어요. 위에서 자주 쓰는 말을 하나 추가해 보세요.</p>
@@ -529,7 +529,7 @@ function GlossaryPanel({ s, saves, actions }) {
                       <button
                         type="button"
                         role="switch"
-                        className="switch"
+                        className="sw"
                         aria-checked={!!item.keepSource}
                         aria-label={`${item.sourceText} 원문 유지`}
                         disabled={saves[`glossary.${item.id}`]?.state === 'saving'}
@@ -547,7 +547,7 @@ function GlossaryPanel({ s, saves, actions }) {
                           <span>삭제할까요?</span>
                           <button
                             type="button"
-                            className="btn btn-small btn-danger"
+                            className="btn sm danger press"
                             onClick={async () => {
                               await actions.removeGlossary(item.id);
                               setConfirming(null);
@@ -555,7 +555,7 @@ function GlossaryPanel({ s, saves, actions }) {
                           >
                             삭제
                           </button>
-                          <button type="button" className="btn btn-small" onClick={() => setConfirming(null)}>
+                          <button type="button" className="btn sm press" onClick={() => setConfirming(null)}>
                             취소
                           </button>
                         </span>
@@ -607,14 +607,14 @@ function LearnedPanel({ s, saves, actions }) {
                 <li key={c.id} className="learned-row">
                   <div className="learned-text">
                     <span className="row-label">{c.label}</span>
-                    <span className="row-hint mono">
+                    <span className="row-hint num">
                       {n}회 · {n >= LEARNING_THRESHOLD ? '교정에 반영 중' : `${LEARNING_THRESHOLD}회부터 반영`}
                     </span>
                     <SaveNote save={save} />
                   </div>
                   <button
                     type="button"
-                    className="btn btn-small"
+                    className="btn sm press"
                     disabled={save?.state === 'saving'}
                     onClick={() => actions.removeLearned(c.id)}
                     aria-label={`${c.label} 학습 내역 삭제`}
@@ -635,7 +635,7 @@ function LearnedPanel({ s, saves, actions }) {
                 <div className="confirm-actions">
                   <button
                     type="button"
-                    className="btn btn-small btn-danger"
+                    className="btn sm danger press"
                     onClick={async () => {
                       const ok = await actions.clearLearned();
                       if (ok) setConfirmAll(false);
@@ -643,7 +643,7 @@ function LearnedPanel({ s, saves, actions }) {
                   >
                     전체 삭제
                   </button>
-                  <button type="button" className="btn btn-small" onClick={() => setConfirmAll(false)}>
+                  <button type="button" className="btn sm press" onClick={() => setConfirmAll(false)}>
                     취소
                   </button>
                 </div>
@@ -679,7 +679,7 @@ function DataPanel({ status, demo }) {
           </div>
           <div>
             <dt>확장 버전</dt>
-            <dd className="mono">{status.version ?? '알 수 없음'}</dd>
+            <dd className="num">{status.version ?? '알 수 없음'}</dd>
           </div>
           <div>
             <dt>로그인</dt>
@@ -748,10 +748,10 @@ function NotConnected({ status, onRetry }) {
         </li>
       </ol>
       <div className="nc-actions">
-        <button type="button" className="btn btn-action" onClick={onRetry}>
+        <button type="button" className="btn primary press" onClick={onRetry}>
           다시 확인
         </button>
-        <Link to="/settings?demo=1" className="btn">
+        <Link to="/settings?demo=1" className="btn on-surface press">
           예시 데이터로 둘러보기
         </Link>
       </div>
@@ -788,7 +788,7 @@ function StatusStrip({ status, demo }) {
         <span className="strip-dot" aria-hidden="true" />
         <span>
           <b>확장과 연결됨</b>
-          <span className="mono strip-meta">
+          <span className="num strip-meta">
             {status.version ? ` v${status.version}` : ''} · {status.signedIn ? '로그인함' : '로그인 안 함'}
           </span>{' '}
           — 바꾸면 바로 확장에 저장돼요.
@@ -808,10 +808,35 @@ function StatusStrip({ status, demo }) {
 
 /* ── 페이지 ────────────────────────────────────────────── */
 
+/** 설정 메뉴의 선택 표시 — 고른 항목으로 미끄러진다(transform만). 위치는 링크의 offset을 잰다. */
+function useNavKnob(listRef, panel) {
+  const [box, setBox] = useState(null);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return undefined;
+    const measure = () => {
+      const on = list.querySelector('[aria-current="page"]');
+      if (!on) return;
+      setBox({ x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight });
+    };
+    measure();
+    let ro;
+    if (typeof window.ResizeObserver !== 'undefined') {
+      ro = new window.ResizeObserver(measure);
+      ro.observe(list);
+    }
+    document.fonts?.ready.then(measure).catch(() => {});
+    return () => ro?.disconnect();
+  }, [listRef, panel]);
+  return box;
+}
+
 export default function Settings({ search }) {
   const demo = new URLSearchParams(search).get('demo') === '1';
   const { status, settings, loadError, saves, actions, retry } = useExtension({ demo });
   const [panel, setPanel] = useState(readPanel);
+  const navList = useRef(null);
+  const knob = useNavKnob(navList, panel);
 
   useEffect(() => {
     const onHash = () => setPanel(readPanel());
@@ -831,9 +856,10 @@ export default function Settings({ search }) {
   const panelProps = { s: settings, saves, set: actions.set, actions };
 
   return (
-    <main id="main" className="settings">
-      <div className="container">
+    <main id="main" className="settings page-pad">
+      <div className="wrap">
         <div className="settings-head">
+          <p className="kick ink">사이 확장</p>
           <h1 className="settings-title">설정</h1>
           <p className="settings-sub">확장의 설정을 큰 화면에서 정리하는 곳이에요.</p>
         </div>
@@ -849,7 +875,7 @@ export default function Settings({ search }) {
               <h2 className="nc-title">설정을 불러오지 못했어요</h2>
               <p className="nc-lead">{loadError}</p>
               <div className="nc-actions">
-                <button type="button" className="btn btn-action" onClick={retry}>
+                <button type="button" className="btn primary press" onClick={retry}>
                   다시 불러오기
                 </button>
               </div>
@@ -860,7 +886,15 @@ export default function Settings({ search }) {
         ) : (
           <div className="console">
             <nav className="console-nav" aria-label="설정 메뉴">
-              <ul>
+              <span
+                className="nav-knob"
+                aria-hidden="true"
+                data-ready={knob ? 'true' : 'false'}
+                style={
+                  knob ? { width: knob.w, height: knob.h, transform: `translate(${knob.x}px, ${knob.y}px)` } : undefined
+                }
+              />
+              <ul ref={navList}>
                 {PANELS.map((p) => (
                   <li key={p.id}>
                     <a
@@ -883,12 +917,14 @@ export default function Settings({ search }) {
               <h2 className="panel-title" id="panel-title" tabIndex={-1}>
                 {current.label}
               </h2>
+              <div className="panel-body" key={panel}>
               {panel === 'general' && <GeneralPanel {...panelProps} />}
               {panel === 'language' && <LanguagePanel {...panelProps} />}
               {panel === 'me' && <MePanel {...panelProps} />}
               {panel === 'glossary' && <GlossaryPanel {...panelProps} />}
               {panel === 'learned' && <LearnedPanel {...panelProps} />}
               {panel === 'data' && <DataPanel status={status} demo={demo} />}
+              </div>
             </div>
           </div>
         )}

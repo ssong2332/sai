@@ -1,96 +1,131 @@
-/* 사이 웹사이트 토큰 — 색은 「뜻」이다(확장과 같은 규칙).
+/* 사이 웹사이트 토큰 — 시안 A2(docs/design/reference-a2.html) 값. 🔴 색은 「뜻」이다(확장과 같은 규칙).
    | 토큰 | 뜻 | 쓰는 곳 |
    |---|---|---|
-   | --ground / --surface / --sunken | 바닥 · 카드 · 눌린 영역 | 배경 |
+   | --bg / --surface / --sunken | 바닥 · 카드 · 눌린 영역 | 배경 |
    | --ink / --sub / --mut | 본문 · 보조 · 라벨 | 글자 |
-   | --bar | 로고 바(그라파이트) · 트랙 | 로고·바 |
-   | --action | 누르는 것 | 주요 버튼·선택된 컨트롤 |
-   | --fact | 바뀌지 않는 것(원문의 숫자·날짜·이름, 내 기기에 남는 데이터) | 레드 바·표시 |
-   | --term | 용어집이 지킨 말 | 초록 표시 |
-   🔴 이 뜻 밖에서 색을 장식으로 쓰지 않는다. 글자에는 `-ink` 변형을 쓴다(AA). */
+   | --seam | 바뀌지 않는 것(숫자·날짜·이름) · 지우기 · 올라가지 않는 것 | 로고 이음선·사실 표시 |
+   | --kept | 용어집이 지킨 말 · 연결됨 · 계정에 올라가는 것 | 초록 표시 |
+   | --dusk | 받은 글(해석) · 상대 · 포커스 | 파랑 표시 |
+   | --check | 확인이 필요한 것 | 노랑 표시 |
+   | --night | 「보낼 때」 밤 장면 하나뿐 | 배경 |
+   | --act / --on-act | 누르는 것 | 주요 버튼·켜진 스위치 |
+   🔴 이 뜻 밖에서 색을 장식으로 쓰지 않는다. 작은 글자에는 `-ink` 변형을 쓴다(AA 4.5:1).
+   A2와 다른 값: --mut(#6B7684 → #5F6B78, 회색 바닥 위 작은 글자 AA) · `-ink` 네 개(추가). */
 :root {
   color-scheme: light;
-  --ground: #eef0f3;
+  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic',
+    system-ui, sans-serif;
+
+  --bg: #f2f4f6;
   --surface: #ffffff;
   --sunken: #f2f4f6;
   --ink: #191f28;
   --sub: #4e5968;
-  --mut: #565f6d;
-  --line: rgba(25, 31, 40, 0.12);
-  --line-strong: rgba(25, 31, 40, 0.24);
+  --mut: #5f6b78;
+  --faint: #d1d6db;
 
+  --seam: #f04419;
+  --seam-ink: #c2360f;
+  --seam-tint: #ffeee8;
+  --kept: #0e9f6e;
+  --kept-ink: #067a54;
+  --kept-tint: #e6f7f0;
+  --dusk: #3d5afe;
+  --dusk-ink: #2e47e0;
+  --dusk-tint: #eceffe;
+  --check: #e59500;
+  --check-ink: #8f5c00;
+  --check-tint: #fff6e0;
+  --night: #0b1026;
+  /* 로고 전용 — 확장 SaiMark와 같은 색(바 그라파이트/크림 · 액센트 레드 두 테마 고정) */
   --bar: #201e1d;
-  --action: #ff6100;
-  --action-ink: #bf4900; /* 흰 바탕 5.04:1 */
-  --on-action: #191f28; /* 주황 위 글자 — 5.5:1 (흰 글자는 3.0:1이라 쓰지 않는다) */
-  --fact: #ec3013; /* 로고 액센트 — 두 테마 고정 */
-  --fact-ink: #c22a10; /* 흰 바탕 5.8:1 */
-  --term: #009b64;
-  --term-ink: #007c50;
-  --fact-tint: color-mix(in oklab, var(--fact) 9%, var(--surface));
-  --term-tint: color-mix(in oklab, var(--term) 11%, var(--surface));
-  --action-tint: color-mix(in oklab, var(--action) 10%, var(--surface));
+  --fact: #ec3013;
 
-  --focus: #191f28;
-  --shadow: 0 1px 2px rgba(25, 31, 40, 0.06), 0 12px 32px rgba(25, 31, 40, 0.08);
+  --act: #191f28;
+  --on-act: #ffffff;
+  --line: rgba(25, 31, 40, 0.08);
+  --line-strong: rgba(25, 31, 40, 0.16);
+  --e1: 0 1px 3px rgba(25, 31, 40, 0.06);
+  --e3: 0 2px 6px rgba(25, 31, 40, 0.04), 0 24px 48px -16px rgba(25, 31, 40, 0.22);
+  --knob-shadow: 0 2px 6px rgba(25, 31, 40, 0.12);
 
-  --font-display: 'Hahmlet', 'Pretendard Variable', serif;
-  --font-body: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    'Malgun Gothic', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'Pretendard Variable', Pretendard, monospace;
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --out: cubic-bezier(0.16, 1, 0.3, 1);
+  --r-lg: 28px;
+  --r: 20px;
+  --r-sm: 14px;
 
-  /* 글자 크기 단계 — 13 · 15 · 17 · 20 · 26 · 36 · 56 */
-  --t-xs: 0.8125rem;
-  --t-sm: 0.9375rem;
-  --t-md: 1.0625rem;
-  --t-lg: 1.25rem;
-  --t-xl: clamp(1.375rem, 1.1rem + 1vw, 1.625rem);
-  --t-2xl: clamp(1.75rem, 1.3rem + 1.8vw, 2.25rem);
-  --t-3xl: clamp(2.25rem, 1.4rem + 3.6vw, 3.5rem);
+  --wrap: 1180px;
+  --gutter: 24px;
+  --nav-h: 64px;
+}
 
-  --radius: 10px;
-  --radius-lg: 16px;
-  --gutter: clamp(16px, 4vw, 40px);
-  --maxw: 1160px;
-
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+@media (max-width: 480px) {
+  :root {
+    --gutter: 16px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --ground: #0e1116;
-    --surface: #1a1f27;
-    --sunken: #242b35;
+    --bg: #101318;
+    --surface: #1b1f27;
+    --sunken: #242a33;
     --ink: #f2f4f6;
-    --sub: #c4cad3;
-    --mut: #9aa3ae;
-    --line: rgba(255, 255, 255, 0.1);
-    --line-strong: rgba(255, 255, 255, 0.22);
+    --sub: #b0b8c1;
+    --mut: #8b95a1;
+    --faint: #3a434f;
+    --seam: #ff6a45;
+    --seam-ink: #ff7c5c;
+    --seam-tint: #3a211b;
+    --kept: #33c38e;
+    --kept-ink: #3fd09a;
+    --kept-tint: #15302a;
+    --dusk: #8c9eff;
+    --dusk-ink: #9dadff;
+    --dusk-tint: #1e2440;
+    --check: #ffb938;
+    --check-ink: #ffc35a;
+    --check-tint: #3a2e14;
     --bar: #f8f4f4;
-    --action-ink: #ff7a2e;
-    --fact-ink: #ff7a63;
-    --term-ink: #2bbf86;
-    --focus: #f2f4f6;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
+    --act: #f2f4f6;
+    --on-act: #101318;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.18);
+    --e1: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --e3: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+    --knob-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --ground: #0e1116;
-  --surface: #1a1f27;
-  --sunken: #242b35;
+  --bg: #101318;
+  --surface: #1b1f27;
+  --sunken: #242a33;
   --ink: #f2f4f6;
-  --sub: #c4cad3;
-  --mut: #9aa3ae;
-  --line: rgba(255, 255, 255, 0.1);
-  --line-strong: rgba(255, 255, 255, 0.22);
+  --sub: #b0b8c1;
+  --mut: #8b95a1;
+  --faint: #3a434f;
+  --seam: #ff6a45;
+  --seam-ink: #ff7c5c;
+  --seam-tint: #3a211b;
+  --kept: #33c38e;
+  --kept-ink: #3fd09a;
+  --kept-tint: #15302a;
+  --dusk: #8c9eff;
+  --dusk-ink: #9dadff;
+  --dusk-tint: #1e2440;
+  --check: #ffb938;
+  --check-ink: #ffc35a;
+  --check-tint: #3a2e14;
   --bar: #f8f4f4;
-  --action-ink: #ff7a2e;
-  --fact-ink: #ff7a63;
-  --term-ink: #2bbf86;
-  --focus: #f2f4f6;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --act: #f2f4f6;
+  --on-act: #101318;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --e1: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --e3: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+  --knob-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }

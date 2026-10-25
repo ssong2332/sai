@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 
 export function useReducedMotion() {
@@ -17,58 +17,57 @@ export function useReducedMotion() {
 }
 
 /**
- * 스크롤 연동 트랙 — 등록된 요소에 `--p`(0~1)를 직접 쓴다. React 상태를 거치지 않는다
- * (스크롤마다 다시 그리면 60fps를 못 지킨다). CSS는 `--p`로 transform만 바꾼다.
- * 🔴 모션 줄이기면 `--p: 1`로 고정 — 처음부터 다 펼친 상태로 읽힌다.
+ * 스크롤 구독 — 스크롤·리사이즈 이벤트를 한 프레임에 한 번(rAF)으로 묶는다.
+ * 🔴 구독 함수는 React 상태를 매 프레임 바꾸지 않는다. DOM 스타일(`--p`)을 직접 쓰거나,
+ *    값이 바뀔 때만 setState 한다(60fps).
  */
-const tracked = new Set();
-let ticking = false;
+const subscribers = new Set();
+let frame = 0;
 
-function update() {
-  ticking = false;
-  const vh = window.innerHeight || 800;
-  for (const el of tracked) {
-    const top = el.getBoundingClientRect().top;
-    const start = vh * 0.95;
-    const end = vh * 0.5;
-    const p = Math.min(1, Math.max(0, (start - top) / (start - end)));
-    el.style.setProperty('--p', p.toFixed(3));
-  }
+function flush() {
+  frame = 0;
+  for (const fn of subscribers) fn();
 }
 
-function onScroll() {
-  if (!ticking) {
-    ticking = true;
-    requestAnimationFrame(update);
-  }
+function schedule() {
+  if (!frame) frame = requestAnimationFrame(flush);
 }
 
-export function useScrollTrack(ref) {
+export function onScrollFrame(fn) {
+  subscribers.add(fn);
+  if (subscribers.size === 1) {
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+  }
+  fn();
+  return () => {
+    subscribers.delete(fn);
+    if (subscribers.size === 0) {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+    }
+  };
+}
+
+/** 최신 콜백을 담아 두는 ref — 구독을 다시 걸지 않고 콜백만 바꾼다. */
+function useLatest(value) {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
+export function useScrollFrame(fn, enabled = true) {
+  const latest = useLatest(fn);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
-    if (prefersReducedMotion()) {
-      el.style.setProperty('--p', '1');
-      return undefined;
-    }
-    tracked.add(el);
-    if (tracked.size === 1) {
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll);
-    }
-    update();
-    return () => {
-      tracked.delete(el);
-      if (tracked.size === 0) {
-        window.removeEventListener('scroll', onScroll);
-        window.removeEventListener('resize', onScroll);
-      }
-    };
-  }, [ref]);
+    if (!enabled) return undefined;
+    return onScrollFrame(() => latest.current());
+  }, [enabled, latest]);
 }
 
-/** 한 번 보이면 true — 게이지 같은 1회성 모션용. */
-export function useInView(ref, { threshold = 0.4 } = {}) {
+/** 한 번 보이면 true — 등장·게이지 같은 1회성 모션용. 모션 줄이기면 처음부터 true. */
+export function useInView(ref, { threshold = 0.25, rootMargin = '0px' } = {}) {
   const [seen, setSeen] = useState(prefersReducedMotion);
   useEffect(() => {
     const el = ref.current;
@@ -84,10 +83,36 @@ export function useInView(ref, { threshold = 0.4 } = {}) {
           io.disconnect();
         }
       },
-      { threshold },
+      { threshold, rootMargin },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [ref, seen, threshold]);
+  }, [ref, seen, threshold, rootMargin]);
   return seen;
+}
+
+/**
+ * 숫자 굴리기 — `run`이 true가 되면 0 → target으로 감속하며 올라간다(ease-out quart).
+ * 모션 줄이기면 바로 target. 반환값은 지금 보여 줄 숫자.
+ */
+export function useCountUp(target, run, duration = 1400) {
+  const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
+  useEffect(() => {
+    if (!run) return undefined;
+    if (prefersReducedMotion() || !duration) {
+      setValue(target);
+      return undefined;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (now) => {
+      const k = Math.min(1, (now - t0) / duration);
+      const eased = 1 - Math.pow(1 - k, 4);
+      setValue(Math.round(target * eased));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, run, duration]);
+  return value;
 }
