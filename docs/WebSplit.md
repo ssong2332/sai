@@ -3,6 +3,12 @@
 > 2026-08-14 사용자 결정. **지금은 A(사이드패널 유지·정리), 나중에 B(대부분 웹 이전).**
 > Spec과 충돌하면 `docs/Spec.md`가 이긴다 (CLAUDE.md 문서 위계).
 
+> 🔴 **2026-10-25 사용자 결정 — 설정 콘솔은 확장 안 페이지로 옮겼다.** 자세한 설정은 이제
+> `chrome-extension://<id>/src/settings/index.html`(manifest `options_ui`, `src/settings/`)에서 `src/lib/*`를 직접
+> 부른다. 웹사이트의 `site/src/pages/Settings.jsx`와 로컬 브리지(`src/background/siteBridge.js`, `site/src/bridge.js`,
+> `test/siteBridge.unit.test.js`)는 **이 PR에서 지우지 않았다** — 쓰는 화면이 없어져 **제거 후보**이며, 지우는 것은
+> 사용자 승인 뒤 별도 PR이다. 그전까지 두 화면의 표시 설정 기본값 표는 `src/lib/displaySettings.js`가 기준이다.
+
 ## 금지 — 어떤 단계에서도 웹으로 옮기지 않는다
 
 | 데이터 | 저장 키 | 왜 못 옮기나 |

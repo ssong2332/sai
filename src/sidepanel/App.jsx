@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
-import { DASHBOARD_URL, FEATURES, SITE_URL } from '../config.js';
-import { getLocal, setLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
+import { DASHBOARD_URL, FEATURES } from '../config.js';
+import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
 import {
   listPersonalGlossary,
   addPersonalGlossaryEntry,
@@ -18,7 +18,6 @@ import {
   removeLearnedPattern,
   clearLearnedPatterns,
   SITUATION_TEMPLATES,
-  COLLAB_STYLES,
 } from '../lib/profile.js';
 import { categoryLabel, LEARNING_THRESHOLD } from '../core/profile/diff.js';
 // S23 / Spec 권장 12 · §1 Token Economy
@@ -79,6 +78,7 @@ import {
   saveOnboarding,
   setProfileSyncingTone,
   setMyLanguage,
+  setOnboardingFields,
   resetOnboarding,
   onboardingLabels,
   MY_LANGUAGES,
@@ -189,63 +189,11 @@ export default function App() {
   const [reservations, setReservations] = useState([]);
 
   /**
-   * 설정 탭 (2026-08-13 사용자 요청) — 개인 설정을 한자리에 모은다.
-   * 🔴 팝업에도 같은 토글이 있다. **저장소가 단일 출처**라 어느 쪽에서 바꾸든 즉시 반영된다
-   *    (팝업은 `chrome.storage.onChanged`를 구독한다) — 두 화면이 서로 다른 값을 말하지 않는다.
+   * 설정 시트 (톱니) — 2026-10-25 사용자 결정으로 **필수 항목만** 남겼다(내 언어·상대 지역·기본 톤·다크 모드·계정).
+   * 🔴 나머지 토글(역번역·변경 이유·색 표시 설명·직전 대화 참고·저장 문구 이어 붙이기)과 단축키 카드는 확장 설정 페이지
+   *    (`src/settings/`, 「자세한 설정」)로 옮겼다. 저장 키·기본값은 그대로다 — 팝업은 전과 똑같이 읽는다.
    */
-  const [backOn, setBackOn] = useState(true);
-  const [hintsOn, setHintsOn] = useState(true);
-  const [snippetMode, setSnippetMode] = useState('replace');
-  /** S21 / Spec 권장 8 — 직전 대화 맥락 참고. 기본 꺼짐(2026-09-30, `THREAD_CONTEXT_DEFAULT`). */
-  const [threadOn, setThreadOn] = useState(THREAD_CONTEXT_DEFAULT);
-  /** 설정은 탭이 아니라 헤더 톱니로 여는 오버레이다. */
-  const [reasonOn, setReasonOn] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  useEffect(() => {
-    if (!settingsOpen) return;
-    getLocal(STORAGE_KEYS.BACK_TRANSLATION, true).then(setBackOn);
-    getLocal(STORAGE_KEYS.HIGHLIGHT_HINTS, true).then(setHintsOn);
-    getLocal(STORAGE_KEYS.SNIPPET_INSERT_MODE, 'replace').then(setSnippetMode);
-    getLocal(STORAGE_KEYS.THREAD_CONTEXT, THREAD_CONTEXT_DEFAULT).then(setThreadOn);
-    /**
-     * 🔴 **「변경 이유」가 설정에서 빠져 있었다** (2026-08-16 사용자 지적 ①).
-     *    팝업의 다른 스위치들과 **똑같이 `chrome.storage`에 저장되는데**(`sai.refineReasoning`)
-     *    설정 화면에만 없었다 — 즉 기능은 기억되는데 **바꿀 자리가 팝업 한 곳뿐**이었다.
-     *    빠뜨린 것이지 의도가 아니다.
-     */
-    getLocal(STORAGE_KEYS.REFINE_REASONING, false).then(setReasonOn);
-  }, [settingsOpen]);
-
-  const toggleBackTranslation = async () => {
-    const next = !backOn;
-    setBackOn(next);
-    await setLocal(STORAGE_KEYS.BACK_TRANSLATION, next);
-  };
-
-  const toggleHints = async () => {
-    const next = !hintsOn;
-    setHintsOn(next);
-    await setLocal(STORAGE_KEYS.HIGHLIGHT_HINTS, next);
-  };
-
-  const toggleReason = async () => {
-    const next = !reasonOn;
-    setReasonOn(next);
-    await setLocal(STORAGE_KEYS.REFINE_REASONING, next);
-  };
-
-  const toggleThread = async () => {
-    const next = !threadOn;
-    setThreadOn(next);
-    await setLocal(STORAGE_KEYS.THREAD_CONTEXT, next);
-  };
-
-  const toggleSnippetMode = async () => {
-    const next = snippetMode === 'replace' ? 'append' : 'replace';
-    setSnippetMode(next);
-    await setLocal(STORAGE_KEYS.SNIPPET_INSERT_MODE, next);
-  };
   const [toast, setToast] = useState('');
 
   /**
@@ -270,6 +218,21 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  /**
+   * 🔴 **설정 페이지에서 바꾼 값을 따라간다** (2026-10-25). 테마·언어와 톤은 이제 설정 페이지에서도 바꾼다 —
+   *    사이드패널을 열어 둔 채 거기서 바꾸면 이 화면만 옛 값을 말하게 된다. 두 키만 구독한다.
+   */
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome?.storage?.onChanged) return undefined;
+    const onChanged = (changes, area) => {
+      if (area !== 'local') return;
+      if (changes[STORAGE_KEYS.THEME]) setTheme(changes[STORAGE_KEYS.THEME].newValue ?? 'light');
+      if (changes[STORAGE_KEYS.ONBOARDING]) getOnboarding().then(setOnboarding);
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, []);
 
   // S11 — 저장된 온보딩을 복원한다. 없으면 `completedAt`이 비어 질문 화면이 뜬다.
   useEffect(() => {
@@ -342,6 +305,15 @@ export default function App() {
   const changeMyLanguage = async (language) => {
     setOnboarding(await setMyLanguage(language));
     setToast('내 언어를 바꿨어요');
+  };
+
+  /**
+   * 설정 시트의 언어·지역·톤 (2026-10-25). 🔴 `setOnboardingFields` — `completedAt`을 찍지 않고 넘긴 필드만 바꾼다.
+   *    톤을 바꾸면 프로필 협업 성향도 같은 값이 된다(그 함수의 규칙, 설정 페이지와 같다).
+   */
+  const changeOnboardingField = async (patch) => {
+    setOnboarding(await setOnboardingFields(patch));
+    setToast('저장했어요');
   };
 
   // 토스트는 2.2초 뒤 사라진다 (프로토타입 showToast와 같은 시간).
@@ -560,16 +532,8 @@ export default function App() {
             onClose={() => setSettingsOpen(false)}
             theme={theme}
             onToggleTheme={toggleTheme}
-            backOn={backOn}
-            onToggleBack={toggleBackTranslation}
-            hintsOn={hintsOn}
-            onToggleHints={toggleHints}
-            reasonOn={reasonOn}
-            onToggleReason={toggleReason}
-            snippetMode={snippetMode}
-            onToggleSnippetMode={toggleSnippetMode}
-            threadOn={threadOn}
-            onToggleThread={toggleThread}
+            onboarding={onboarding}
+            onChangeOnboarding={changeOnboardingField}
             onNotice={setToast}
           />
         )}
@@ -1030,104 +994,62 @@ function SettingRow({ row }) {
   );
 }
 
-function SettingsTab({
-  onClose,
-  theme,
-  onToggleTheme,
-  backOn,
-  onToggleBack,
-  hintsOn,
-  onToggleHints,
-  reasonOn,
-  onToggleReason,
-  snippetMode,
-  onToggleSnippetMode,
-  threadOn,
-  onToggleThread,
-  onNotice,
-}) {
-  /**
-   * 🔴 **기준을 「메시지가 바뀌는가」로 바꿨다** (2026-08-16 사용자 질문 ①②).
-   *    ① 「색 표시 설명」이 「보기」에 있는 게 맞냐 — **맞지 않았다.** 그 토글은 앱 외관이 아니라
-   *       **교정 결과를 어떻게 읽을지**를 정한다. 같은 이유로 「역번역 보기」도 「교정 결과」에
-   *       있으면 안 됐다 — 그것도 나가는 문장을 바꾸지 않는다.
-   *    ② 「교정 결과를 설정에서 정하는 게 맞냐」 — **여기 있는 건 기본값이고, 이번 한 번은
-   *       팝업에서 바꾼다.** 그 사실을 화면이 말하지 않아서 같은 스위치가 두 곳에 있는 것처럼
-   *       보였다. 그룹 이름과 설명에 명시한다.
-   *    그래서 세 갈래가 된다: **메시지가 바뀜 / 교정을 보는 방법 / 앱 자체**.
-   * 🔴 **성격별로 묶는다** (2026-08-16 사용자 지적 ⑩: "정리정돈이 안되어 있는데").
-   *    토글 6개가 평평하게 나열돼 **어느 것이 교정 결과를 바꾸고 어느 것이 화면만 바꾸는지**
-   *    구분되지 않았다. 「캐주얼 톤」(문장이 바뀐다)과 「다크 모드」(보기만 바뀐다)가 같은
-   *    무게로 보이는 것이 문제였다.
-   * 🔴 순서도 그 기준이다 — **결과를 바꾸는 것이 위**다. 무엇을 켜고 끄는지 잘못 알면
-   *    손해가 큰 쪽을 먼저 읽게 한다.
-   * 🔴 토글을 지우거나 기본값을 바꾸지 않았다 — 묶음과 순서만 바꿨다.
-   */
-  const rows = [
-    {
-      id: 'theme',
-      group: '앱',
-      label: '다크 모드',
-      hint: '사이드패널과 페이지 팝업에 함께 적용돼요.',
-      on: theme === 'dark',
-      onToggle: onToggleTheme,
-    },
-    {
-      id: 'back',
-      group: '교정을 보는 방법',
-      label: '역번역 보기',
-      hint: '상대에게 어떻게 읽히는지 되돌려 보여줘요.',
-      on: backOn,
-      onToggle: onToggleBack,
-    },
-    /**
-     * 🔴 **「캐주얼 톤」 스위치를 여기서 없앴다** (2026-08-18). 문체가 3단 하나의 눈금이 되면서
-     *    이 스위치는 **같은 축의 세 번째 자리**가 됐다 — 팝업(이 메시지) · 수신자(기본 위치) ·
-     *    설정(전역)이 서로 다른 값을 가리키면 어느 것이 이기는지 화면에 드러나지 않는다.
-     *    그 상태를 없애려고 3단으로 합친 것이므로, 여기 남겨 두면 합친 의미가 사라진다.
-     */
-    {
-      id: 'reason',
-      group: '교정을 보는 방법',
-      label: '변경 이유 보기',
-      hint: '무엇을 왜 바꿨는지, 원문의 기한·숫자가 그대로 남았는지 대조해서 보여줘요.',
-      on: reasonOn,
-      onToggle: onToggleReason,
-    },
-    {
-      id: 'hints',
-      group: '교정을 보는 방법',
-      label: '색 표시 설명',
-      hint: '초록·노란 표시가 무슨 뜻인지 알려줘요. 표시 자체는 항상 켜져 있어요.',
-      on: hintsOn,
-      onToggle: onToggleHints,
-    },
-    {
-      id: 'thread',
-      group: '메시지가 바뀌는 설정',
-      label: '직전 대화 참고',
-      // 🔴 "무엇이 나가는지"를 분명히 쓴다 — 남이 쓴 메시지가 함께 전송되는 설정이라
-      //    사용자가 모르고 켜둔 채로 두면 안 된다. 저장하지 않는다는 것도 같이 말한다.
-      hint: '같은 화면의 직전 메시지 최대 5개를 함께 보내 문맥에 맞게 다듬어요. 팝업에서 무엇을 참고했는지 볼 수 있고, 그 내용은 저장하지 않아요.',
-      on: threadOn,
-      onToggle: onToggleThread,
-    },
-    /**
-     * 🔴 **「앱」에서 빼냈다** (2026-08-19 사용자 요청 ⑤ — "연관되지 않은 것끼리 묶여 있으면 수정").
-     *    이 스위치는 **입력창에 문장을 어떻게 넣을지**를 정한다. 같은 그룹에 있던 「다크 모드」는
-     *    앱의 겉모습이라, 「무엇이 화면에 그려지는가」와 「무엇이 입력창에 써지는가」가 한
-     *    묶음에 있었다. 삽입 방식을 찾는 사람이 「앱」을 열어 볼 이유가 없다.
-     */
-    {
-      id: 'snippet',
-      group: '문장을 넣을 때',
-      label: '저장 문구를 뒤에 이어 붙이기',
-      hint: '끄면 입력창의 기존 내용을 지우고 넣어요.',
-      on: snippetMode === 'append',
-      onToggle: onToggleSnippetMode,
-    },
-  ];
+/**
+ * 확장 설정 페이지를 연다 (2026-10-25). manifest `options_ui`(`open_in_tab`)라 탭으로 열리고, 이미 열려 있으면 그 탭으로 간다.
+ * 🔴 `openOptionsPage`가 없거나 실패하면 같은 페이지를 `tabs.create`로 연다.
+ */
+async function openSettingsPage() {
+  try {
+    await chrome.runtime.openOptionsPage();
+  } catch {
+    await chrome.tabs?.create({ url: chrome.runtime.getURL('src/settings/index.html') });
+  }
+}
 
+/** 칩 한 줄 — 고른 값 = 잉크(A2). `allowNone`이면 「선택 안 함」이 붙는다. */
+function SheetChoice({ label, options, value, onPick, allowNone = false }) {
+  const list = allowNone ? [...options, { id: null, label: '선택 안 함' }] : options;
+  return (
+    <>
+      <p className="field-label">{label}</p>
+      <div className="tag-row">
+        {list.map((item) => {
+          const on = (value ?? null) === item.id;
+          return (
+            <button
+              key={String(item.id)}
+              type="button"
+              className={on ? 'chip chip-on' : 'chip'}
+              aria-pressed={on}
+              onClick={() => !on && onPick(item.id)}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/**
+ * 설정 시트 — **필수만** (2026-10-25 사용자 결정, DeepL식: 사이드패널은 도구, 자세한 설정은 확장 설정 페이지).
+ *
+ * | 남긴 것 | 이유 |
+ * |---|---|
+ * | 계정(AccountCard) | 로그인은 팀·동기화의 전제 — 2026-08-15 「연결이 맨 위」 결정 그대로 |
+ * | 상대 지역 · 기본 톤(「보내는 글 기본값」) | 나가는 문장을 가장 크게 바꾸는 두 값 |
+ * | 다크 모드 | 지금 보고 있는 화면의 겉모습 |
+ * | 「자세한 설정」 | 나머지 전부 — 확장 설정 페이지(`src/settings/`) |
+ * 🔴 **내 언어는 시트에 두지 않는다** (2026-10-25 사용자 결정 — 「나에 대한 사실」과 「사이가 보내는 글을 어떻게 쓰나」를
+ *    나눈다. 한 화면에 같은 값을 두 번 두지 않는다). 내 언어는 프로필 › 내 정보(`IdentityCard`)에만 있다.
+ * 🔴 옮긴 것: 역번역 보기 · 변경 이유 보기 · 색 표시 설명 · 직전 대화 참고 · 저장 문구 이어 붙이기 · 단축키 카드.
+ *    저장 키·기본값은 바꾸지 않았다(`src/lib/displaySettings.js` 표).
+ * 🔴 「상대 지역」은 2026-08-16에 온보딩 질문에서 뺐던 값이다(값 하나로는 여러 나라와 일할 때 틀린다). 2026-10-25 사용자
+ *    결정으로 시트에 다시 두되, 「사람마다 다르면 수신자에서 정한다」를 함께 적는다 — 저장값은 `languagePairFrom`의 기본값으로만 쓰인다.
+ */
+function SettingsTab({ onClose, theme, onToggleTheme, onboarding, onChangeOnboarding, onNotice }) {
+  const pickList = (list) => list.map(({ id, label }) => ({ id, label }));
   return (
     <div className="settings-sheet" role="dialog" aria-label="설정">
       <div className="card-head card-head-bare">
@@ -1138,65 +1060,54 @@ function SettingsTab({
       </div>
       {/**
        * 🔴 **연결이 맨 위다** (2026-08-15 검토). 로그인 상태는 다른 설정의 **전제**다 —
-       *    팀·동기화가 되는지, 대시보드가 열리는지가 여기서 갈린다. 토글 6개 아래에 묻어 두면
-       *    "로그인이 필요해요"를 본 사용자가 어디로 가야 할지 모른다.
+       *    팀·동기화가 되는지, 대시보드가 열리는지가 여기서 갈린다.
        */}
       <AccountCard onNotice={onNotice} />
 
-      {/* 🔴 「여기서 바꾼 설정은 팝업에도 적용돼요」를 지웠다 (2026-08-19 ③) — 바로 아래
-          그룹 설명이 같은 말을 더 정확하게 한다("이번 한 번만 바꾸려면 교정 팝업에서…"). */}
-      {[
-        {
-          id: '메시지가 바뀌는 설정',
-          // 🔴 **여기는 기본값이라는 사실**을 쓴다(②) — 팝업에도 같은 스위치가 있어 혼란스러웠다.
-          note: '상대에게 나가는 문장이 달라져요. 이번 한 번만 바꾸려면 교정 팝업에서 끄고 켤 수 있어요.',
-        },
-        /**
-         * 🔴 **순서 기준은 「결과에 미치는 영향」이다** (2026-08-16 확정 · 2026-08-19 보강).
-         *    ① 나가는 문장이 달라짐 → ② 입력창에 들어가는 방식 → ③ 내가 보는 방식 → ④ 겉모습.
-         *    잘못 알았을 때 손해가 큰 순서다.
-         */
-        {
-          id: '문장을 넣을 때',
-          note: '다듬은 문장·저장 문구를 입력창에 넣는 방식이에요.',
-        },
-        { id: '교정을 보는 방법', note: '나가는 문장은 그대로예요. 내가 확인하는 방식만 달라져요.' },
-        { id: '앱', note: null },
-      ].map(({ id: group, note }) => (
-        <div key={group} className="settings-group">
-          <h3 className="group-title">{group}</h3>
-          {note && <p className="meta">{note}</p>}
-          {rows
-            .filter((row) => row.group === group)
-            .map((row) => (
-              <SettingRow key={row.id} row={row} />
-            ))}
+      <div className="settings-group">
+        <h3 className="group-title">보내는 글 기본값</h3>
+        <p className="meta">바꾸면 다음 교정부터 적용돼요. 내 언어는 프로필 › 내 정보에 있어요.</p>
+        <div className="card">
+          <SheetChoice
+            label="상대 지역"
+            options={pickList(PARTNER_REGIONS)}
+            value={onboarding?.partnerRegion}
+            allowNone
+            onPick={(partnerRegion) => onChangeOnboarding({ partnerRegion })}
+          />
+          <p className="meta">
+            상대에게 보낼 언어의 기본값이에요. 사람마다 다르면 프로필의 「내가 대화하는 사람들」에서 정해요.
+          </p>
+          <SheetChoice
+            label="기본 톤"
+            options={pickList(DEFAULT_TONES)}
+            value={onboarding?.tone}
+            onPick={(tone) => onChangeOnboarding({ tone })}
+          />
         </div>
-      ))}
+      </div>
+
+      <div className="settings-group">
+        <h3 className="group-title">앱</h3>
+        <SettingRow
+          row={{
+            id: 'theme',
+            label: '다크 모드',
+            hint: '사이드패널·페이지 팝업·설정 페이지에 함께 적용돼요.',
+            on: theme === 'dark',
+            onToggle: onToggleTheme,
+          }}
+        />
+      </div>
 
       {/**
-        * 🔴 **웹 설정으로 가는 입구 — 추가만 했다** (2026-10-24, `docs/WebSplit.md` 「C — 로컬 브리지」).
-        *    웹은 이 확장의 `chrome.storage.local`을 직접 메시지로 읽고 쓴다(서버 없음). 여기 있는 설정을
-        *    옮기거나 지우는 것은 **별도 승인 단계**다 — 지금은 같은 설정이 양쪽에 있다.
-        * 🔴 `SITE_URL`이 `null`이면(공개 빌드 — 사이트 미배포) 이 줄을 그리지 않는다. 열 곳이 없는
-        *    버튼을 두지 않는다.
-        */}
-      {SITE_URL && (
-        <div className="card">
-          <div className="card-head card-head-bare">
-            <h3 className="card-label">자세한 설정</h3>
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => chrome.tabs?.create({ url: `${SITE_URL}/settings` })}
-            >
-              자세한 설정 — 웹에서 열기 →
-            </button>
-          </div>
-        </div>
-      )}
-
-      <ShortcutCard />
+       * 🔴 **자세한 설정 = 확장 안 페이지** (2026-10-25). 예전 웹사이트 설정으로 가던 줄(사이트 개발 빌드에만 보였다)을 대신한다 —
+       *    공개 빌드에서도 언제나 보인다. 교정 보기 토글·단축키·사이트별 켜고 끄기·용어집·학습 내역·데이터 보기가 거기 있다.
+       */}
+      <button type="button" className="button button-primary settings-more" onClick={openSettingsPage}>
+        자세한 설정
+      </button>
+      <p className="meta">교정 보기 · 단축키 · 사이트별 켜고 끄기 · 용어집 · 학습 내역 · 저장된 데이터</p>
     </div>
   );
 }
@@ -1246,75 +1157,7 @@ function ScheduleTab({ items, onDelete }) {
   );
 }
 
-/* ── 단축키 (S26 / Spec 부가 9) ───────────────────────────────────────── */
-
-/**
- * 🔴 **확장은 자기 단축키를 바꿀 수 없다** — 크롬이 쓰기 API를 주지 않는다(다른 확장·브라우저
- *    단축키를 가로챌 수 있어서). `chrome.commands`는 읽기 전용(`getAll`)이고, 변경은 오직
- *    `chrome://extensions/shortcuts`에서 사용자가 직접 한다. 우리가 할 수 있는 건 ①실제 할당값을
- *    **정확히 보여주기** ②그 페이지를 열어주기까지다.
- * 🔴 매니페스트의 제안값(`Alt+S`/`Alt+D`)을 화면에 하드코딩하지 않는다(2026-08-13 사용자 지적):
- *    다른 프로그램과 충돌하면 크롬이 **조용히 미할당**으로 두는데, 그때 화면만 "Alt+D"라고
- *    말하면 "눌러도 안 되는데 왜 안 되지"가 된다. 실제 값을 읽어 미할당이면 그렇게 표시한다.
- * 🔴 `chrome://` 주소는 `<a href>`로 못 연다(차단됨) — `chrome.tabs.create`로 열어야 한다.
- */
-/**
- * 🔴 크롬이 **예약 명령(`_execute_action`)의 description을 돌려주지 않는다** — 매니페스트에
- *    「사이드 패널 열기」라고 적어 두었는데도 `getAll()` 결과는 빈 문자열이라, 폴백이 원시 ID인
- *    `_execute_action`을 그대로 화면에 뿌렸다(2026-08-15 실확장 스크린샷).
- *    사용자가 알 수 없는 내부 이름이므로 우리가 아는 명령은 우리 라벨로 덮는다.
- */
-const COMMAND_LABELS = {
-  _execute_action: '사이드 패널 열기',
-  'refine-selection': '선택한 문장 다듬기 / 뜻 풀기',
-};
-
-function ShortcutCard() {
-  const [commands, setCommands] = useState(null); // null = 조회 전/불가
-
-  useEffect(() => {
-    chrome.commands?.getAll?.().then(setCommands).catch(() => setCommands([]));
-  }, []);
-
-  return (
-    <div className="card">
-      <div className="card-head card-head-bare">
-        <h3 className="card-label">단축키</h3>
-        <button
-          type="button"
-          className="link-button"
-          onClick={() => chrome.tabs?.create({ url: 'chrome://extensions/shortcuts' })}
-        >
-          바꾸기 →
-        </button>
-      </div>
-      {commands === null ? (
-        <p className="meta">단축키를 불러오는 중…</p>
-      ) : (
-        <>
-          <div className="shortcut-list">
-            {commands.map((command) => (
-              <div key={command.name} className="shortcut-row">
-                <span className="shortcut-desc">
-                  {COMMAND_LABELS[command.name] || command.description || command.name}
-                </span>
-                {command.shortcut ? (
-                  <kbd className="shortcut-key">{command.shortcut}</kbd>
-                ) : (
-                  // 🔴 빈 값을 숨기지 않는다 — 미할당이라는 사실이 곧 사용자가 알아야 할 정보다.
-                  <span className="shortcut-none">지정 안 됨</span>
-                )}
-              </div>
-            ))}
-          </div>
-          <p className="meta">
-            다른 프로그램과 겹치면 크롬이 비워둬요. 「바꾸기」에서 직접 지정할 수 있어요.
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
+/* ── 단축키 (S26 / Spec 부가 9) — 2026-10-25 확장 설정 페이지 「켜는 방법·단축키」로 옮겼다(`src/settings/App.jsx`). ── */
 
 /* ── 회의 시간 추천 (S23 / Spec 권장 12) ──────────────────────────────── */
 
@@ -3796,7 +3639,13 @@ function ProfileTab({
   onUpdateRecipient,
   onNotice,
 }) {
-  const collabLabel = COLLAB_STYLES.find((item) => item.id === profile.collabStyleId)?.label ?? null;
+  /**
+   * 🔴 **말투는 「기본 톤」 하나다** (2026-10-25 사용자 결정 — 「협업 성향」을 「기본 톤」으로 합쳤다).
+   *    요약 줄의 말투는 `sai.onboarding.tone`에서 읽는다. 교정 요청이 읽는 `sai.profile.collabStyleId`는
+   *    톤을 바꿀 때 `setOnboardingFields`/`saveOnboarding`이 같은 값으로 맞춘다(키·동기화 규칙은 그대로).
+   *    톤을 바꾸는 자리: 설정 시트 「보내는 글 기본값」 · 홈 온보딩 · 설정 페이지 「보내는 글 기본값」.
+   */
+  const toneLabel = onboardingLabels(onboarding).tone;
 
   /**
    * 🔴 **접기를 「내 정보」 카드 하나로 올렸다** (2026-08-20 사용자 요청 ①③).
@@ -3821,7 +3670,7 @@ function ProfileTab({
   useEffect(() => {
     getIdentity().then(setIdentityState);
   }, []);
-  const meChosen = !!identity.displayName && !!collabLabel;
+  const meChosen = !!identity.displayName && !!toneLabel;
   const [meOpen, setMeOpen] = useState(false);
 
   return (
@@ -3857,7 +3706,7 @@ function ProfileTab({
         {meChosen && !meOpen && (
           <p className="card-text">
             <b>{identity.displayName}</b>
-            {identity.jobTitle ? ` · ${identity.jobTitle}` : ''} · <b>{collabLabel}</b>
+            {identity.jobTitle ? ` · ${identity.jobTitle}` : ''} · <b>{toneLabel}</b>
           </p>
         )}
         {(!meChosen || meOpen) && (
@@ -3884,7 +3733,7 @@ function ProfileTab({
         *    남기고 연결(ⓐ)하는 대신 **지운다.** 화면이 줄고 오해가 사라진다.
         */}
 
-      {/* Spec 필수 2 1순위 — 사용자가 직접 고른 상황 템플릿·협업 성향. 항상 100% 반영된다. */}
+      {/* Spec 필수 2 1순위 — 사용자가 직접 고른 상황 템플릿(+ 기본 톤). 항상 100% 반영된다. */}
       <div className="profile-block">
         {/**
           * 🔴 **정하고 나면 요약으로 접는다** (2026-08-16 사용자 요청 ③). 이 값은 **한 번 정하고
@@ -3892,7 +3741,7 @@ function ProfileTab({
           * 🔴 **정하지 않았으면 펼친 채로 둔다** — 접어 두면 설정해야 한다는 사실 자체가 숨는다.
           *    (교정에 항상 100% 반영되는 값이라 비워 두면 손해다 — Spec 필수 2 1순위)
           */}
-        <h3 className="card-label">1순위 — 내 상황 · 협업 성향</h3>
+        <h3 className="card-label">1순위 — 내 상황</h3>
         {/**
           * 🔴 **「주로 쓰는 상황」은 지우지 않는다** (2026-08-20 사용자 확인 ② — "필요 없으면 숨겨").
           *    확인해 보니 **교정에 실제로 실린다**: `buildProfileForRefine()`가 `situation.hint`를
@@ -3916,24 +3765,13 @@ function ProfileTab({
             </button>
           ))}
         </div>
-        <p className="field-label">선호하는 말투</p>
-        <div className="tag-row">
-          {COLLAB_STYLES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={profile.collabStyleId === item.id ? 'chip chip-on' : 'chip'}
-              aria-pressed={profile.collabStyleId === item.id}
-              onClick={() =>
-                onProfileChange({
-                  collabStyleId: profile.collabStyleId === item.id ? null : item.id,
-                })
-              }
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {/**
+          * 🔴 **「선호하는 말투」 칩을 뺐다** (2026-10-25 사용자 결정). 같은 축(`collabStyleId` = 온보딩 `tone`)이
+          *    설정 시트 「기본 톤」에도 있어 두 자리에서 바꿀 수 있었다. 이제 말투는 「기본 톤」 하나로 정한다.
+          */}
+        <p className="meta">
+          말투는 설정(톱니) › 보내는 글 기본값의 「기본 톤」에서 정해요{toneLabel ? ` — 지금: ${toneLabel}` : ''}.
+        </p>
       </div>
 
       {/**
@@ -3989,7 +3827,7 @@ function ProfileTab({
       {/* Spec 필수 2 과도기 규칙 — 3회 미만이면 1순위만 100% 반영. */}
       <p className="meta">
         {LEARNING_THRESHOLD}회 이상 축적된 패턴만 교정에 반영돼요 (2순위). 1순위는 항상 내 상황
-        템플릿 · 협업 성향이에요. 국가·문화권 특성은 교정에 쓰지 않아요.
+        템플릿 · 기본 톤이에요. 국가·문화권 특성은 교정에 쓰지 않아요.
       </p>
       </div>
       )}

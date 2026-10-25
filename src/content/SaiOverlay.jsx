@@ -129,7 +129,13 @@ function failureMessage(action) {
     : `${action}에 실패했어요. 잠시 후 다시 시도해 주세요.`;
 }
 
-export default function SaiOverlay() {
+/**
+ * @param {{autoButton?: boolean}} props
+ *   `autoButton` — 선택하면 저절로 뜨는 사이 버튼을 그릴지(2026-10-25). 「통합」에서 끈 사이트·「표시 안 할 사이트」에서는
+ *   `SiteGate`가 false로 내린다. 🔴 **단축키는 그대로 산다** — Alt+D(`refine-selection`)·Alt+X(`open-snippets`)는
+ *   사용자가 직접 부른 것이라 이 값과 무관하게 팝업·저장 문구를 연다(DeepL과 같은 규칙, 사용자 결정).
+ */
+export default function SaiOverlay({ autoButton = true }) {
   const [anchor, setAnchor] = useState(null); // 선택 영역의 뷰포트 사각형(DOMRect 형태)
   const [selectedText, setSelectedText] = useState('');
   /**
@@ -1570,9 +1576,15 @@ export default function SaiOverlay() {
         top: `${clamp(clamp(topBase, EDGE_GAP, maxTop) + dragOffset.y, EDGE_GAP, maxTop)}px`,
       };
 
+  /**
+   * 🔴 버튼 숨김 사이트(`autoButton=false`)에서도 **사용자가 부른 것**은 그린다 — Alt+X로 연 저장 문구 목록과
+   *    Alt+D 안내(`fabHint`)는 이 묶음 안에 그려지므로, 그때만 묶음을 띄운다. 선택만 했을 때는 아무것도 안 뜬다.
+   */
+  const showFab = autoButton || snippetOpen || Boolean(fabHint);
+
   return (
     <>
-      {!open && (
+      {!open && showFab && (
         /**
          * S20 후속 — 커서를 올리면 가로로 펼쳐지며 두 갈래를 보여준다(2026-08-13 사용자 제안).
          * 🔴 **스니펫 경로는 LLM을 부르지 않는다** — 이미 완성된 문장이라 교정을 거치면 지연과

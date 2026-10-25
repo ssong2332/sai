@@ -11,7 +11,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { THREAD_CONTEXT_DEFAULT } from '../src/lib/storage.js';
 
-const READERS = ['../src/content/refineClient.js', '../src/content/SaiOverlay.jsx', '../src/sidepanel/App.jsx'];
+// 🔴 2026-10-25 — 사이드패널 설정 시트의 토글이 확장 설정 페이지로 옮겨 가면서, 이 값을 읽는 곳도
+//    `src/sidepanel/App.jsx` → `src/lib/displaySettings.js`(설정 페이지가 쓰는 표)로 바뀌었다.
+const READERS = ['../src/content/refineClient.js', '../src/content/SaiOverlay.jsx', '../src/lib/displaySettings.js'];
 
 test('🔴 직전 대화 참고는 기본 꺼짐이다', () => {
   assert.equal(THREAD_CONTEXT_DEFAULT, false);

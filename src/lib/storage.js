@@ -229,6 +229,17 @@ export const STORAGE_KEYS = {
    */
   AUTH: 'sai.auth',
   /**
+   * `string[]` — 선택해도 사이 버튼이 저절로 뜨지 않을 사이트(정규화한 호스트, 하위 도메인 포함) (2026-10-25).
+   * 🔴 단축키(Alt+D·Alt+X)는 이 목록과 무관하게 동작한다(사용자 결정).
+   * 🔴 사용자가 **직접 넣은** 호스트뿐이다 — 방문 기록이 아니다. 경로·쿼리는 저장하지 않는다(`src/lib/siteGate.js`).
+   */
+  SITE_BLOCKLIST: 'sai.sites.blocked',
+  /**
+   * `string[]` — 「통합」에서 **꺼 둔** 사이트 id(`INTEGRATIONS`, `src/lib/siteGate.js`). 없으면 전부 켜짐 (2026-10-25).
+   * 🔴 차단 목록과의 우선순위: 「끔」이 언제나 이긴다(`evaluateSiteGate` 판정표).
+   */
+  SITE_INTEGRATIONS_OFF: 'sai.sites.integrationsOff',
+  /**
    * 🔴 `URGENT_TAG: 'sai.urgentTag'`는 **삭제했다** (2026-08-14, S27 저장소 검사에서 발견).
    *    URGENT 태그를 상시 적용으로 바꾸면서 읽기를 없앴고, 이후 스위치를 되살릴 때는 **저장 없이
    *    매 결과마다 켜짐으로 초기화되는** 상태로 만들었다(옛 문장에 대한 선택이 새 문장에 남으면

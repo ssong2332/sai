@@ -43,6 +43,9 @@ const memory = {
   'sai.profile': { situationId: null, collabStyleId: 'direct' },
   'sai.profile.learned': { 'deadline-explicit': 6, 'fewer-apologies': 3, shorter: 2 },
   'sai.identity': { displayName: '박하늘', jobTitle: '백엔드 엔지니어' },
+  // 설정 페이지(2026-10-25) — 사이트별 켜고 끄기 목업.
+  'sai.sites.blocked': ['intranet.example.com', 'slack.com'],
+  'sai.sites.integrationsOff': ['discord'],
   'sai.decisionsConsent': true,
   'sai.decisionLogs': [
     {
@@ -104,8 +107,20 @@ globalThis.chrome = {
     },
     onMessage: { addListener() {}, removeListener() {} },
     getURL: (path) => `/${String(path).replace(/^\//, '')}`,
+    getManifest: () => ({ version: 'harness' }),
+    async openOptionsPage() {},
   },
   tabs: { async create() {} },
+  // 설정 페이지 「켜는 방법·단축키」 — 하나는 크롬이 비워 둔 상태(「지정 안 됨」)를 보여 준다.
+  commands: {
+    async getAll() {
+      return [
+        { name: '_execute_action', description: '', shortcut: 'Alt+S' },
+        { name: 'refine-selection', description: '선택한 문장 다듬기 / 뜻 풀기', shortcut: 'Alt+D' },
+        { name: 'open-snippets', description: '저장 문구 열기', shortcut: '' },
+      ];
+    },
+  },
   identity: {
     launchWebAuthFlow(_opts, cb) {
       cb?.(undefined);

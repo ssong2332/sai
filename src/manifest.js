@@ -36,7 +36,7 @@ export default defineManifest({
    *    L28 안전망·경고 상자가 들어갔는데 숫자가 그대로라 「다시 로드」가 됐는지 화면으로 알 수 없었다.
    *    `package.json`과 같은 값이어야 한다(`test/version.unit.test.js`).
    */
-  version: '0.1.16',
+  version: '0.1.17',
   /**
    * 🔴 **동작을 먼저, 은유는 빼고.** 예전 문구("사람과 사람, 언어와 언어 사이를 매끄럽게 잇는")는
    *    첫 줄이 은유라 무엇을 하는 도구인지 읽는 데 시간이 걸렸다.
@@ -78,6 +78,16 @@ export default defineManifest({
     default_path: 'src/sidepanel/index.html',
   },
   /**
+   * 확장 설정 페이지 (2026-10-25 사용자 결정 — DeepL처럼 사이드패널은 도구, 자세한 설정은 확장 안 페이지).
+   * 🔴 `open_in_tab: true` — chrome://extensions의 「확장 프로그램 옵션」이 팝업 상자가 아니라 **탭**으로 연다.
+   *    사이드패널 「자세한 설정」은 `chrome.runtime.openOptionsPage()`로 같은 페이지를 연다(이미 열려 있으면 그 탭으로 간다).
+   * 🔴 crxjs는 manifest에 적힌 HTML을 빌드에 넣는다 — `vite.config.js` 입력에 따로 넣지 않는다.
+   */
+  options_ui: {
+    page: 'src/settings/index.html',
+    open_in_tab: true,
+  },
+  /**
    * 번들 서체 (시안 A2, 2026-10-24) — 콘텐츠 스크립트가 호스트 문서에 `FontFace`로 등록하려면
    * 페이지 쪽에서 이 파일을 읽을 수 있어야 한다(`src/lib/saiFont.js`).
    * 🔴 서체 파일만 연다(`fonts/*.woff2`). 노출된 리소스는 페이지가 확장 설치 여부를 짐작하는 데 쓸 수
@@ -95,7 +105,7 @@ export default defineManifest({
    * 🔴 **"커스텀 지정" UI를 우리가 만들지 않는다** — 크롬은 확장이 단축키를 직접 재설정하는 API를
    *    주지 않는다(보안상 다른 확장·브라우저 단축키를 가로챌 수 있기 때문). 사용자가 바꾸는
    *    자리는 `chrome://extensions/shortcuts` 한 곳뿐이며, 확장은 그 페이지를 **열어줄 수만**
-   *    있다(`chrome.tabs.create`). 사이드패널 설정에서 그리로 보낸다.
+   *    있다(`chrome.tabs.create`). 확장 설정 페이지 「켜는 방법·단축키」(`src/settings/`)에서 그리로 보낸다(2026-10-25).
    * 🔴 기본값은 크롬 권장대로 `Alt` 조합을 쓴다 — `Ctrl+Shift+*`는 브라우저 기본 단축키와
    *    충돌이 잦다. 충돌 시 크롬이 조용히 미할당 상태로 두므로, 설정 화면 안내가 더 중요하다.
    */

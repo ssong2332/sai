@@ -6,6 +6,7 @@ import { METRIC_MESSAGE, sendClientMetric } from '../lib/metricsClient.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from '../core/refine/fallback.js';
 // 🔴 2026-10-24 — 관리용 웹사이트 브리지(`docs/WebSplit.md` 「C — 로컬 브리지」). 처리 규칙은 그 파일에 있다.
 import { handleSiteMessage } from './siteBridge.js';
+import { runToneReconcile } from '../lib/toneReconcile.js';
 
 // 툴바 아이콘 클릭 → 사이드 패널 열기 (Spec §1 UI 삼원화 — Side Panel 진입점)
 chrome.sidePanel
@@ -321,6 +322,16 @@ async function syncReservationAlarms() {
 
 chrome.runtime.onInstalled.addListener(syncReservationAlarms);
 chrome.runtime.onStartup.addListener(syncReservationAlarms);
+
+/**
+ * 「기본 톤」 ↔ 「협업 성향」 한 번 맞추기 (2026-10-25, `src/lib/toneReconcile.js` 판정표 — 화면에 보이는 값이 이긴다).
+ * 🔴 **설치·업데이트 때 한 번만** 돈다 — 0.1.17로 올라오는 기존 사용자가 대상이다. 그 뒤로는 톤을 바꾸는 모든 경로가
+ *    `setOnboardingFields`/`saveOnboarding`으로 두 값을 같이 맞추므로 다시 어긋날 길이 없다. 멱등·로컬 전용(네트워크 없음).
+ * 🔴 실패해도 조용히 넘어간다 — 다음 업데이트 때 다시 시도되고, 톤을 한 번 누르면 어차피 맞춰진다. 값을 로그에 싣지 않는다.
+ */
+chrome.runtime.onInstalled.addListener(() => {
+  runToneReconcile().catch(() => {});
+});
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes[RESERVATION_KEY]) syncReservationAlarms();
