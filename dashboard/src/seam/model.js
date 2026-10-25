@@ -340,3 +340,101 @@ export function threadRows(cur, prev) {
     return { ...e, vals, max: safeMax(vals), tot, pt, change, dir: pt == null || tot === pt ? '' : worse ? 'up' : 'down' };
   });
 }
+
+/* ── 실마다 따로 보기 — 「날짜별」 (2026-10-25 사용자 피드백) ───────────── */
+/*
+ * 🔴 입력은 나머지 Seam과 같은 `rows`(buildRows 결과의 이번 기간 조각)뿐이다 — 자료가 어디서
+ *    왔는지(주소창·확장 페이지·예시) 가정하지 않는다. 칸 번호 `i`는 그 `rows` 안의 위치다.
+ */
+
+/** 「날짜별」 표에서 날마다 칸을 따로 세우는 최대 날 수. 넘으면 합계 + 작은 막대로 접는다. */
+export const DAY_COLS_MAX = 7;
+
+/** a..b(순서 무관) 사이의 모든 칸 번호. 자료 범위 `n` 밖은 자른다. */
+export function rangeIndices(a, b, n = Infinity) {
+  const lo = Math.max(0, Math.min(a, b)), hi = Math.min(n - 1, Math.max(a, b));
+  const out = [];
+  for (let i = lo; i <= hi; i += 1) out.push(i);
+  return out;
+}
+
+/**
+ * 날짜 고르기 한 번의 결과. 항상 오름차순·중복 없음·범위 안.
+ * | 입력 | 결과 |
+ * |---|---|
+ * | 그냥 누름 | 그 날을 켜거나 끈다 |
+ * | Shift + 누름, 기준 날(`anchor`) 있음 | 기준 날 ~ 누른 날을 **모두 켠다**(이미 고른 날은 그대로) |
+ * | Shift + 누름, 기준 날 없음 | 그냥 누름과 같다 |
+ * | 범위 밖 `i` | 아무것도 바꾸지 않는다 |
+ */
+export function pickDays(selected, i, { shift = false, anchor = null, n = Infinity } = {}) {
+  const set = new Set((selected ?? []).filter((v) => Number.isInteger(v) && v >= 0 && v < n));
+  if (Number.isInteger(i) && i >= 0 && i < n) {
+    if (shift && Number.isInteger(anchor)) for (const k of rangeIndices(anchor, i, n)) set.add(k);
+    else if (set.has(i)) set.delete(i);
+    else set.add(i);
+  }
+  return [...set].sort((x, y) => x - y);
+}
+
+/** 고른 날만 — 범위 밖·중복 번호는 버리고 날짜 순으로. */
+function pickedRows(rows, idx) {
+  return [...new Set(idx ?? [])].filter((i) => Number.isInteger(i) && i >= 0 && i < rows.length).sort((x, y) => x - y).map((i) => rows[i]);
+}
+
+/** 「N일 선택 · 다듬은 글 A건 · 마찰 신호 B건 · 긍정 신호 C건」의 숫자. */
+export function selectedSummary(rows, idx) {
+  const picked = pickedRows(rows, idx);
+  return { days: picked.length, refined: sum(picked, ['refined']), f: sum(picked, F), p: sum(picked, P) };
+}
+
+/**
+ * 날짜 줄의 칸 색 단계(0~4). 0건은 0(중립), 나머지는 제곱근 눈금으로 1~4.
+ * 🔴 분모는 기간 안 하루 최대 마찰 신호 수 — 0·NaN이어도 1 아래로 내려가지 않는다.
+ */
+export function heatLevel(count, max) {
+  if (!Number.isFinite(count) || count <= 0) return 0;
+  const m = Number.isFinite(max) && max >= 1 ? max : 1;
+  return Math.max(1, Math.min(4, Math.ceil(Math.sqrt(Math.min(1, count / m)) * 4)));
+}
+
+/** 날짜 줄의 칸들 — 그날 마찰 신호 수와 색 단계, 주말·달 첫날 표시. */
+export function dayStrip(rows) {
+  const fc = rows.map((d) => sum([d], F));
+  const max = safeMax(fc);
+  return rows.map((d, i) => ({
+    i, date: d.date, wd: d.wd, f: fc[i], level: heatLevel(fc[i], max),
+    weekend: d.wd === 0 || d.wd === 6,
+    monthStart: i === 0 || d.date.getDate() === 1,
+  }));
+}
+
+/**
+ * 고른 날의 신호 표. 마찰 무리 → 긍정 무리, 각 줄은 날마다 값과 합계.
+ * 🔴 `showZero`가 아니면 고른 날 합계가 0인 줄은 뺀다(무리마다 `hidden`에 몇 줄 뺐는지 남긴다).
+ * 🔴 `compact` — 날이 `DAY_COLS_MAX`보다 많으면 화면은 날마다 칸 없이 합계 + 막대(`share`, 0~1)만 쓴다.
+ */
+export function dayTable(rows, idx, { showZero = false } = {}) {
+  const picked = pickedRows(rows, idx);
+  const all = EVENTS.map((e) => {
+    const vals = picked.map((d) => d.c[e.id] || 0);
+    return { id: e.id, kind: e.kind, label: e.label, desc: e.desc, vals, tot: vals.reduce((s, v) => s + v, 0) };
+  });
+  const max = safeMax(all.map((r) => r.tot));
+  const groups = [['f', '마찰 신호'], ['p', '긍정 신호']].map(([kind, label]) => {
+    const mine = all.filter((r) => r.kind === kind);
+    const shown = showZero ? mine : mine.filter((r) => r.tot > 0);
+    return {
+      kind, label,
+      tot: mine.reduce((s, r) => s + r.tot, 0),
+      rows: shown.map((r) => ({ ...r, share: frac(r.tot, max) })),
+      hidden: mine.length - shown.length,
+    };
+  });
+  return {
+    cols: picked.map((d) => ({ key: d.key, date: d.date, wd: d.wd, refined: d.c.refined || 0 })),
+    compact: picked.length > DAY_COLS_MAX,
+    groups,
+    hidden: groups.reduce((s, g) => s + g.hidden, 0),
+  };
+}
