@@ -16,6 +16,12 @@
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
     <script>
+      // 옛 확장(0.1.17 이하)은 팀 대시보드를 첫 화면 주소 + `#sai=…`로 연다 — 그 데이터째로 /dashboard/에 넘긴다.
+      if (location.pathname === '/' && location.hash.indexOf('#sai=') === 0) {
+        location.replace('/dashboard/' + location.hash);
+      }
+    </script>
+    <script>
       // 첫 페인트 전에 테마를 정한다 — 깜빡임 방지. 저장소가 막혀 있으면 시스템 설정을 따른다.
       try {
         var t = localStorage.getItem('sai-site-theme');

@@ -39,6 +39,7 @@ export default [
       // 소개·설정 웹사이트(2026-10-24) — 자체 의존성과 빌드 산출물. 소스(`site/src`)는 검사한다.
       'site/node_modules/**',
       'site/dist/**',
+      'hosting-dist/**',
       'sai-extension-*/**',
       // 🔴 Claude Code 워크트리(2026-10-14) — 다른 작업 사본의 빌드 산출물까지 검사해 `npm test`가 실패했다.
       '.claude/**',
