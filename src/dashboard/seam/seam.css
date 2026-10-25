@@ -32,6 +32,7 @@
   --stitch-tint: #e3f6ee;
   /* 「날짜별」 날짜 칸 — 그날 마찰 신호 수(호박색, 옅음 → 짙음). 0건은 --sheet(중립). */
   --heat-1: #fff1d1; --heat-2: #ffdc96; --heat-3: #ffc04d; --heat-4: #e59500; --heat-ink: #141920;
+  --leaf-1: #e3f6ee; --leaf-2: #b4e8cf; --leaf-3: #6dd3a6; --leaf-4: #1fae78; --cell3-ink: #141920;
   --focus: #3d5afe;
   --display: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -44,7 +45,7 @@
     --ink: #eef0f2; --ink-2: #b4bdc8; --ink-3: #8f99a6; --rule: rgba(238, 240, 242, 0.1);
     --loom: #05070a; --seam-text: #ff8a6b; --stitch-text: #4fd6a4; --snag-text: #ffc35a;
     --snag-tint: #33280f; --stitch-tint: #102a22; --focus: #8c9eff; --loom: #0d1117; --loom-ink: #eef0f2; --loom-dim: #8b95a3; --loom-rule: rgba(238, 240, 242, 0.12); --loom-fill: rgba(255, 255, 255, 0.06); --loom-fill-2: rgba(255, 255, 255, 0.018); --thread-a: #f4ece4; --thread-b: #9fb0ff; --stitch: #2fd39a; --snag: #ffb12e; --mark-bar: #f8f4f4; color-scheme: dark;
-    --heat-1: #2e240f; --heat-2: #5a4210; --heat-3: #a8730d; --heat-4: #ffb12e; --heat-ink: #141920;
+    --heat-1: #2e240f; --heat-2: #5a4210; --heat-3: #a8730d; --heat-4: #ffb12e; --heat-ink: #141920; --leaf-1: #10261d; --leaf-2: #154a33; --leaf-3: #1f7f57; --leaf-4: #2fd39a; --cell3-ink: #eef0f2;
   }
 }
 :root[data-theme="dark"] {
@@ -52,7 +53,7 @@
   --ink: #eef0f2; --ink-2: #b4bdc8; --ink-3: #8f99a6; --rule: rgba(238, 240, 242, 0.1);
   --loom: #05070a; --seam-text: #ff8a6b; --stitch-text: #4fd6a4; --snag-text: #ffc35a;
   --snag-tint: #33280f; --stitch-tint: #102a22; --focus: #8c9eff; --loom: #0d1117; --loom-ink: #eef0f2; --loom-dim: #8b95a3; --loom-rule: rgba(238, 240, 242, 0.12); --loom-fill: rgba(255, 255, 255, 0.06); --loom-fill-2: rgba(255, 255, 255, 0.018); --thread-a: #f4ece4; --thread-b: #9fb0ff; --stitch: #2fd39a; --snag: #ffb12e; --mark-bar: #f8f4f4; color-scheme: dark;
-    --heat-1: #2e240f; --heat-2: #5a4210; --heat-3: #a8730d; --heat-4: #ffb12e; --heat-ink: #141920;
+    --heat-1: #2e240f; --heat-2: #5a4210; --heat-3: #a8730d; --heat-4: #ffb12e; --heat-ink: #141920; --leaf-1: #10261d; --leaf-2: #154a33; --leaf-3: #1f7f57; --leaf-4: #2fd39a; --cell3-ink: #eef0f2;
 }
 * { box-sizing: border-box; }
 body { margin: 0; word-break: keep-all; overflow-wrap: anywhere; background: var(--paper); color: var(--ink); font: 400 15px/1.6 var(--display); -webkit-font-smoothing: antialiased; }
@@ -151,20 +152,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .sec-h h2 { margin: 0; font-size: clamp(24px, 3vw, 36px); letter-spacing: -0.04em; line-height: 1.1; font-weight: 800; }
 .sec-h p { margin: 6px 0 0; color: var(--ink-2); font-size: 14px; max-width: 60ch; }
 
-.threads { margin-top: 20px; display: grid; gap: 2px; background: var(--rule); border-radius: 20px; overflow: hidden; }
-.thread { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) 7rem; gap: 20px; align-items: center; padding: 16px 20px; background: var(--sheet); }
-.thread-name { font-weight: 700; font-size: 14.5px; }
-.thread-name small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
-.thread-tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; }
-.thread-tag.snag { background: var(--snag-tint); color: var(--snag-text); } .thread-tag.stitch { background: var(--stitch-tint); color: var(--stitch-text); }
-.spark { width: 100%; height: 44px; display: block; }
-.spark rect { rx: 1.5; }
-.spark .s { fill: var(--snag); } .spark .p { fill: var(--stitch); } .spark .base { stroke: var(--rule); }
-.spark .selband { fill: var(--hollow); }
-.thread-total { text-align: right; }
-.thread-total b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; }
-.thread-total span { font-size: 12px; color: var(--ink-3); }
-.thread-total .up { color: var(--snag-text); } .thread-total .down { color: var(--stitch-text); }
 
 .rhythm { margin-top: 20px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
 .wd { background: var(--sheet); border-radius: 18px; padding: 14px 14px 12px; display: grid; gap: 10px; }
@@ -253,8 +240,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   .story { grid-template-columns: 1fr; }
   .beat, .beat + .beat { padding: 20px 0 8px; border-left: 0; }
   .beat + .beat { border-top: 1px solid var(--rule); }
-  .thread { grid-template-columns: minmax(0, 1fr) 5.5rem; }
-  .thread .spark { grid-column: 1 / -1; grid-row: 2; }
   .rhythm { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .day { grid-template-columns: 1fr; }
   .day-note { grid-column: 1; }
@@ -290,71 +275,92 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 /* 빈 팀의 지수 자리 — 148px 「—」가 검은 막대처럼 보여 작고 흐리게(2026-10-25) */
 .index-n.is-empty { font-size: clamp(40px, 6vw, 64px); color: var(--loom-dim); letter-spacing: 0; }
 
-/* ── 실마다 따로 보기: 보기 전환 · 「날짜별」 (2026-10-25) ─────────────── */
-/* 기간 고르기(.range)와 같은 모양의 분할 단추 — 본문 바탕(--paper) 위라 색만 본문 토큰으로 */
-.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--hollow); }
-.seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--ink-3); cursor: pointer; transition: color .2s, background-color .2s; }
-.seg button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
-
-.dates { margin-top: 20px; display: grid; gap: 14px; }
-.dates-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-3); }
-.dates-key { display: inline-flex; align-items: center; gap: 3px; }
-.dates-key i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
-.dates-key i:last-child { margin-right: 6px; }
+/* ── 신호 지도: 신호 × 날짜 (2026-10-26 — 「흐름/날짜별」을 하나로) ───────── */
 .textbtn { border: 0; background: transparent; padding: 4px 2px; font-size: 13px; font-weight: 700; color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--bar); text-underline-offset: 3px; cursor: pointer; }
 .textbtn:hover:not(:disabled) { color: var(--ink); text-decoration-color: var(--ink); }
 .textbtn:disabled { opacity: .45; cursor: default; }
 .textbtn[aria-pressed="true"] { color: var(--ink); text-decoration-color: var(--ink); }
 
-.dstrip { display: grid; grid-template-columns: repeat(var(--cols, 30), minmax(0, 48px)); gap: 4px; }
-.dc { height: 46px; padding: 0; border: 0; border-radius: 9px; background: var(--sheet); color: var(--ink); cursor: pointer; display: grid; align-content: center; justify-items: center; gap: 1px; line-height: 1.1; transition: transform .2s var(--spring); }
-.dc:active { transform: scale(.94); }
-.dc-t { font-size: 10.5px; font-weight: 600; color: var(--ink-3); }
-.dc-n { font-size: 14px; font-weight: 800; letter-spacing: -0.02em; }
-.dc.wkend .dc-t { color: var(--seam-text); }
-.dc.wkend.lv0 { background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }
-.lv1 { background: var(--heat-1); } .lv2 { background: var(--heat-2); }
-.lv3 { background: var(--heat-3); } .lv4 { background: var(--heat-4); }
-.dc.lv3, .dc.lv4 { color: var(--heat-ink); }
-.dc.lv3 .dc-t, .dc.lv4 .dc-t { color: var(--heat-ink); opacity: .75; }
-.dc[aria-pressed="true"] { box-shadow: inset 0 0 0 2.5px var(--ink); }
-.dc.lv3[aria-pressed="true"], .dc.lv4[aria-pressed="true"] { box-shadow: inset 0 0 0 2.5px var(--heat-ink); }
-.dc::after { content: ""; width: 5px; height: 5px; border-radius: 999px; margin-top: 1px; }
-.dc[aria-pressed="true"]::after { background: currentColor; }
+.smap-top { margin-top: 18px; min-height: 30px; display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-3); }
+.smap-sum b { color: var(--ink); font-weight: 800; }
+.smap-sum { font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.smap-key { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
+.smap-key i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.smap-key i.f.lv1 { background: var(--heat-1); } .smap-key i.f.lv2 { background: var(--heat-2); } .smap-key i.f.lv3 { background: var(--heat-3); } .smap-key i.f.lv4 { background: var(--heat-4); }
+.smap-key i.p.lv1 { background: var(--leaf-1); } .smap-key i.p.lv2 { background: var(--leaf-2); } .smap-key i.p.lv3 { background: var(--leaf-3); } .smap-key i.p.lv4 { background: var(--leaf-4); }
+.smap-key i.f.lv4 { margin-right: 4px; } .smap-key i.p.lv1 { margin-left: 10px; } .smap-key i.p.lv4 { margin-right: 6px; }
 
-.dates-sum { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; font-size: 15px; font-weight: 600; color: var(--ink-2); }
-.dates-sum b { color: var(--ink); font-weight: 800; }
+/* contain: 표의 최소 폭이 페이지 폭을 밀어내지 않게(좁은 화면은 이 안에서 가로로 민다) */
+.smap-wrap { contain: inline-size; position: relative; margin-top: 10px; background: var(--sheet); border-radius: 20px; overflow-x: auto; overscroll-behavior-x: contain; }
+.smap table { width: 100%; min-width: calc(11rem + var(--n) * 12px + 10rem); table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 13px; user-select: none; -webkit-user-select: none; }
+.smap col.lab-c { width: 11.5rem; }
+.smap col.nc-c { width: 5.5rem; }
+.smap th, .smap td { padding: 0; border: 0; }
+.smap .lab { position: sticky; left: 0; z-index: 2; background: var(--sheet); text-align: left; padding: 8px 12px 8px 18px; font-weight: 700; font-size: 13.5px; line-height: 1.25; }
+.smap .lab small { display: block; font-weight: 400; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.dt { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--sheet); border-radius: 20px; overflow: hidden; font-size: 14px; }
-.dt th, .dt td { padding: 9px 14px; text-align: right; border-top: 1px solid var(--rule); vertical-align: middle; }
-.dt thead th { border-top: 0; font-size: 12.5px; font-weight: 700; color: var(--ink-3); white-space: nowrap; }
-.dt thead th small { display: block; font-size: 11px; font-weight: 600; }
-.dt .lab { text-align: left; font-weight: 700; width: auto; }
-.dt .lab small { display: block; font-weight: 400; font-size: 12px; color: var(--ink-3); }
-.dt .dcol, .dt .tot { width: 5.5rem; white-space: nowrap; }
-.dt td.z { color: var(--ink-3); opacity: .55; }
-.dt .tot { font-weight: 800; white-space: nowrap; }
-.dt tbody .tot { font-size: 17px; letter-spacing: -0.02em; }
-.dt .ref th, .dt .ref td { color: var(--ink-2); font-weight: 600; }
-.dt .ref .tot { font-size: 14px; font-weight: 700; }
-.dt .grp th { text-align: left; font-size: 12.5px; font-weight: 800; letter-spacing: .02em; padding-block: 7px; }
-.dt .grp th small { font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
-.dt .grp.f th { background: var(--snag-tint); color: var(--snag-text); }
-.dt .grp.p th { background: var(--stitch-tint); color: var(--stitch-text); }
-.dt .none td { text-align: left; color: var(--ink-3); font-size: 13px; }
-.dt .bcol { width: 22%; min-width: 80px; }
-.dt:not(.compact) .bcol { display: none; }
-.mbar { display: block; height: 8px; border-radius: 999px; background: var(--hollow); overflow: hidden; }
-.mbar i { display: block; height: 100%; border-radius: inherit; }
-.mbar.f i { background: var(--snag); } .mbar.p i { background: var(--stitch); }
+/* 날짜 머리 — 누르는 자리 */
+.smap thead th { vertical-align: bottom; padding-top: 14px; }
+.smap .dh { width: 100%; height: 40px; padding: 0 0 4px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; display: grid; align-content: end; justify-items: center; gap: 1px; line-height: 1; border-radius: 8px 8px 0 0; }
+/* 60일이면 칸이 숫자보다 좁다 — 줄바꿈 대신 옆 빈 칸으로 넘쳐 보이게(그 옆 날은 눈금만 있다) */
+.smap .dh { overflow: visible; white-space: nowrap; }
+.smap .dh-t { font-size: 10px; font-weight: 600; color: var(--ink-3); min-height: 10px; }
+.smap .dh-n { font-size: 12px; font-weight: 800; letter-spacing: -0.03em; }
+.smap .dh-tick { width: 1px; height: 6px; background: var(--rule); }
+.smap th.wk .dh-t, .smap th.wk .dh-n { color: var(--seam-text); }
+.smap .dh:hover { background: var(--hollow); }
+.smap th.on .dh { background: var(--ink); color: var(--sheet); }
+.smap th.on .dh .dh-t, .smap th.on .dh .dh-n { color: var(--sheet); }
+.smap .dh:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* 칸 — 신호마다 그 줄의 가장 많은 날이 가장 짙다 */
+.smap td.c { height: 30px; padding: 2px 1px; position: relative; cursor: pointer; text-align: center; vertical-align: middle; }
+.smap td.c::before { content: ""; position: absolute; inset: 3px 1px; border-radius: 4px; background: var(--hollow); opacity: .45; }
+.smap td.c.wk::before { opacity: .25; }
+.smap td.f.lv1::before { background: var(--heat-1); opacity: 1; } .smap td.f.lv2::before { background: var(--heat-2); opacity: 1; }
+.smap td.f.lv3::before { background: var(--heat-3); opacity: 1; } .smap td.f.lv4::before { background: var(--heat-4); opacity: 1; }
+.smap td.p.lv1::before { background: var(--leaf-1); opacity: 1; } .smap td.p.lv2::before { background: var(--leaf-2); opacity: 1; }
+.smap td.p.lv3::before { background: var(--leaf-3); opacity: 1; } .smap td.p.lv4::before { background: var(--leaf-4); opacity: 1; }
+.smap td.c .num { position: relative; font-size: 11.5px; font-weight: 800; color: var(--ink); }
+.smap td.lv3 .num { color: var(--cell3-ink); } .smap td.lv4 .num { color: var(--heat-ink); }
+.smap td.c.on { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.smap tr:last-child td.c.on { border-radius: 0 0 6px 6px; }
+
+/* 다듬은 글 — 바탕이 된 양이라 막대(회색)로 */
+.smap .ref td.c { height: 34px; vertical-align: bottom; }
+.smap .ref td.c::before { display: none; }
+.smap .ref td.c i { display: block; margin: 0 auto; width: 70%; min-height: 0; border-radius: 2px 2px 0 0; background: var(--bar); }
+.smap .ref td.c.on i { background: var(--ink-2); }
+
+/* 무리 머리 */
+.smap .grp th { text-align: left; padding: 10px 18px 6px; font-size: 12px; font-weight: 800; letter-spacing: .02em; border-top: 1px solid var(--rule); position: sticky; left: 0; }
+.smap .grp th span { margin-left: 10px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
+.smap .grp.f th { color: var(--snag-text); } .smap .grp.p th { color: var(--stitch-text); }
+.smap tr.none .lab { color: var(--ink-3); }
+
+/* 오른쪽 숫자 — 앞 기간 · 이번 기간 · 고른 날 */
+.smap .nc { text-align: right; padding: 6px 16px 6px 8px; white-space: nowrap; }
+.smap thead .nc { font-size: 12px; font-weight: 800; color: var(--ink-2); line-height: 1.25; }
+.smap thead .nc small { display: block; font-size: 10.5px; font-weight: 600; color: var(--ink-3); }
+.smap td.nc { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+.smap .ref td.nc { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.smap .prevc { color: var(--ink-3); }
+.smap td.prevc { font-weight: 600; }
+.smap td.nc .dv { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0; }
+.smap .dv.worse { color: var(--snag-text); } .smap .dv.better { color: var(--stitch-text); }
+.smap .selc { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.smap thead .selc { border-radius: 10px 10px 0 0; color: var(--ink); }
+.smap tr.none td.nc { color: var(--ink-3); }
+
+.smap-tip { position: absolute; z-index: 5; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--ink); color: var(--sheet); font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
 
 @media (max-width: 860px) {
-  .dstrip { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); }
-  /* 좁은 화면에서는 날마다 칸 없이 합계 + 막대만 — 375px에서 가로로 밀리지 않게 */
-  .dt .dcol { display: none; }
-  .dt:not(.compact) .bcol, .dt .bcol { display: table-cell; width: 28%; min-width: 0; }
-  .dt th, .dt td { padding: 9px 10px; }
-  .dt .tot { width: 4rem; }
+  .smap table { min-width: calc(8.5rem + var(--n) * 18px + 9rem); }
+  .smap col.lab-c { width: 8.5rem; }
+  .smap col.nc-c { width: 4.4rem; }
+  .smap .lab { padding-left: 14px; }
+  .smap .lab small { display: none; }
+  .smap .nc { padding-right: 12px; }
 }
 
 /* ── 0.1.21: 예시 안내 · 읽기 상태 줄 · 아직 안 읽은 팀 칸 (확장 페이지와 웹 예시 공용) ── */

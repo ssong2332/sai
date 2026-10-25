@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import {
   EVENTS, F, P, buildRows, splitWindow, periodOptions, defaultPeriod, ratio, healthOf, sum,
   worstDay, dailyGap, topCause, headline, deltaOf, storyFacts, actions, briefLines, briefText,
-  weekdayFold, threadRows, safeMax, frac, isEmpty, esc, dateKey, laneHeight,
+  weekdayFold, signalMap, safeMax, frac, isEmpty, esc, dateKey, laneHeight,
 } from '../src/dashboard/seam/model.js';
 import { computeHealthMetrics } from '../src/dashboard/seam/healthIndex.js';
 import { FRICTION_IDS, POSITIVE_IDS } from '../src/dashboard/seam/signals.js';
@@ -82,7 +82,7 @@ test('🔴 앞 기간에 다듬은 글이 하나도 없으면 비교하지 않�
   const { prev } = splitWindow(rows, 30);
   assert.equal(prev.length, 0);
   assert.equal(deltaOf(splitWindow(rows, 30).cur, prev, 30), null);
-  assert.ok(threadRows(splitWindow(rows, 30).cur, prev).every((t) => t.pt == null));
+  assert.ok(signalMap(splitWindow(rows, 30).cur, prev, []).groups.every((g) => g.pt == null));
 });
 
 /* ── ③ 지수 ── */
@@ -201,7 +201,7 @@ test('🔴 막대 분모는 1 아래로 내려가지 않는다 — 빈 배열·0
   const fold = weekdayFold([row({})]);
   assert.equal(fold.maxR, 1);
   assert.equal(fold.peak, -1);
-  for (const t of threadRows([row({}), row({})], [])) assert.ok(Number.isFinite(t.max) && t.max >= 1);
+  for (const t of signalMap([row({}), row({})], [], []).groups.flatMap((g) => g.rows)) assert.ok(Number.isFinite(t.max) && t.max >= 1);
 });
 
 test('요일의 결 — 다듬은 글이 있는 요일 중 마찰 비율이 가장 높은 요일', () => {

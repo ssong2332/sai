@@ -1,10 +1,10 @@
 /**
- * Seam 「실마다 따로 보기 — 날짜별」 순수 계산 (2026-10-25 사용자 피드백).
+ * Seam 「어떤 신호가, 언제」(신호 지도) 순수 계산 (2026-10-25 날짜별 → 2026-10-26 신호 지도로 합침).
  *
  * 🔴 이 테스트가 지키는 것:
  *    ① 날짜 고르기 — 켜고 끄기, Shift 범위는 기준~누른 날을 모두 켬, 범위 밖은 무시, 항상 오름차순·중복 없음
  *    ② 고른 날 합계 — 다듬은 글·마찰·긍정이 고른 날만 더해진다(중복 번호를 두 번 세지 않는다)
- *    ③ 표 — 마찰 무리 → 긍정 무리, 0건 줄 숨김/보기, 7일 넘으면 접기
+ *    ③ 신호 지도 — 줄 순서·날마다 값·줄마다 색 단계·고른 날 합계·앞 기간 비교 방향
  *    ④ 칸 색 단계 — 0건은 0, 그 밖은 1~4, NaN·0 분모에서도 깨지지 않는다
  *    ⑤ 같은 `rows`(buildRows)만 받는다 — 자료 출처를 가정하지 않는다
  */
@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  F, P, buildRows, dateKey, rangeIndices, pickDays, selectedSummary, heatLevel, dayStrip, dayTable, DAY_COLS_MAX,
+  F, P, buildRows, dateKey, rangeIndices, pickDays, selectedSummary, heatLevel, signalMap,
 } from '../src/dashboard/seam/model.js';
 
 const TODAY = new Date(2026, 9, 25); // 2026-10-25 (일)
@@ -62,48 +62,66 @@ test('selectedSummary — 고른 날만, 중복 번호는 한 번만', () => {
   assert.deepEqual(selectedSummary(rows, [99]), { days: 0, refined: 0, f: 0, p: 0 }, '범위 밖은 버린다');
 });
 
-/* ── ③ 표 ── */
+/* ── ③ 신호 지도 ── */
 
-test('dayTable — 마찰 무리 → 긍정 무리, 날짜 순 칸, 0건 줄은 숨긴다', () => {
-  const t = dayTable(rows, [3, 0]);
-  assert.deepEqual(t.cols.map((c) => c.key), [key(4), key(1)], '날짜 순');
-  assert.deepEqual(t.cols.map((c) => c.refined), [6, 8]);
-  assert.equal(t.compact, false);
-  assert.deepEqual(t.groups.map((g) => g.kind), ['f', 'p']);
-  const [fg, pg] = t.groups;
-  assert.deepEqual(fg.rows.map((r) => [r.id, r.vals, r.tot]), [['misread', [2, 4], 6]]);
-  assert.equal(fg.tot, 6);
-  assert.equal(fg.hidden, F.length - 1);
-  assert.deepEqual(pg.rows.map((r) => [r.id, r.tot]), [['clear', 1], ['schedule', 2]]);
-  assert.equal(t.hidden, F.length - 1 + P.length - 2);
+test('signalMap — 다듬은 글 + 마찰 무리 → 긍정 무리, 날마다 값·합계', () => {
+  const m = signalMap(rows, [], []);
+  assert.deepEqual(m.refined.vals, [6, 3, 0, 8, 1]);
+  assert.equal(m.refined.tot, 18);
+  assert.deepEqual(m.groups.map((g) => g.kind), ['f', 'p']);
+  assert.equal(m.groups[0].rows.length, F.length, '0건 줄도 뺀 적 없다 — 늘 같은 자리');
+  assert.equal(m.groups[1].rows.length, P.length);
+  const mis = m.groups[0].rows.find((r) => r.id === 'misread');
+  assert.deepEqual(mis.vals, [2, 0, 0, 4, 0]);
+  assert.equal(mis.tot, 6);
+  assert.equal(m.groups[0].tot, 8, '마찰 = 오해 6 + 긴급도 1 + 하소연 1');
+  assert.equal(m.groups[1].tot, 3);
 });
 
-test('dayTable — showZero면 여덟 줄 모두, 숨긴 줄 0', () => {
-  const t = dayTable(rows, [2], { showZero: true });
-  assert.equal(t.groups[0].rows.length, F.length);
-  assert.equal(t.groups[1].rows.length, P.length);
-  assert.equal(t.hidden, 0);
-  for (const g of t.groups) for (const r of g.rows) assert.equal(r.share, 0, '0건이면 막대 0 — NaN 아님');
+test('signalMap — 칸 색은 그 줄의 하루 최대 기준(드문 신호도 가장 많은 날이 4)', () => {
+  const m = signalMap(rows, [], []);
+  const rowOf = (id) => m.groups.flatMap((g) => g.rows).find((r) => r.id === id);
+  assert.deepEqual(rowOf('misread').levels, [3, 0, 0, 4, 0]);
+  assert.deepEqual(rowOf('venting').levels, [0, 4, 0, 0, 0], '하루 1건뿐이어도 그 줄에선 가장 짙다');
+  assert.ok(rowOf('forceOffHours').levels.every((v) => v === 0), '0건 줄 — 0으로 나누지 않는다');
 });
 
-test('dayTable — 막대 비율은 0~1, 가장 큰 줄이 1', () => {
-  const t = dayTable(rows, [0, 1, 3]);
-  const all = t.groups.flatMap((g) => g.rows);
-  for (const r of all) assert.ok(r.share >= 0 && r.share <= 1, r.id);
-  assert.equal(all.find((r) => r.id === 'misread').share, 1);
+test('signalMap — 고른 날 합계는 고른 날만, 없으면 null', () => {
+  const none = signalMap(rows, [], []);
+  assert.equal(none.refined.sel, null);
+  assert.equal(none.groups[0].sel, null);
+  assert.equal(none.first, null);
+  const m = signalMap(rows, [], [3, 0, 3, 99]);
+  assert.deepEqual(m.picked, [0, 3], '중복·범위 밖은 버리고 날짜 순');
+  assert.equal(m.refined.sel, 14);
+  assert.equal(m.groups[0].sel, 6);
+  assert.equal(m.groups[1].sel, 3);
+  assert.deepEqual(m.days.map((d) => d.on), [true, false, false, true, false]);
+  assert.equal(dateKey(m.first), key(4));
+  assert.equal(dateKey(m.last), key(1));
 });
 
-test(`dayTable — ${DAY_COLS_MAX}일을 넘으면 접는다(합계만)`, () => {
-  const long = buildRows({}, 30, TODAY);
-  assert.equal(dayTable(long, rangeIndices(0, DAY_COLS_MAX - 1)).compact, false);
-  assert.equal(dayTable(long, rangeIndices(0, DAY_COLS_MAX)).compact, true);
+test('signalMap — 앞 기간 비교: 마찰은 늘면 worse, 긍정은 줄면 worse, 앞 기간 없으면 null', () => {
+  const prev = buildRows({ [key(9)]: { refined: 10, misread: 1, clear: 5 } }, 5, new Date(2026, 9, 20));
+  const m = signalMap(rows, prev, []);
+  const rowOf = (id) => m.groups.flatMap((g) => g.rows).find((r) => r.id === id);
+  assert.equal(rowOf('misread').pt, 1);
+  assert.equal(rowOf('misread').dir, 'worse');
+  assert.equal(rowOf('clear').pt, 5);
+  assert.equal(rowOf('clear').dir, 'worse', '긍정이 5 → 1로 줄었다');
+  assert.equal(rowOf('sensitiveBlocked').dir, '', '0 → 0은 변화 없음');
+  assert.equal(m.refined.pt, 10);
+  const solo = signalMap(rows, [], []);
+  assert.ok(solo.groups.flatMap((g) => g.rows).every((r) => r.pt == null && r.dir === ''));
+  assert.equal(solo.groups[0].pt, null);
 });
 
-test('dayTable — 아무 날도 안 고르면 빈 칸·0', () => {
-  const t = dayTable(rows, []);
-  assert.equal(t.cols.length, 0);
-  assert.deepEqual(t.groups.map((g) => g.rows.length), [0, 0]);
-  assert.deepEqual(t.groups.map((g) => g.tot), [0, 0]);
+test('signalMap — 주말·달 첫날 표시', () => {
+  const m = signalMap(rows, [], []);
+  assert.deepEqual(m.days.map((d) => d.weekend), [false, false, false, true, true], '10-24 토 · 10-25 일');
+  assert.equal(m.days[0].monthStart, true, '첫 칸은 달을 적는다');
+  const oct = signalMap(buildRows({}, 30, TODAY), [], []);
+  assert.deepEqual(oct.days.filter((d) => d.monthStart).map((d) => dateKey(d.date)), ['2026-09-26', '2026-10-01']);
 });
 
 /* ── ④ 칸 색 ── */
@@ -117,15 +135,4 @@ test('heatLevel — 0건은 0, 최대는 4, 깨진 값에도 범위 안', () => 
     const v = heatLevel(c, m);
     assert.ok(Number.isInteger(v) && v >= 0 && v <= 4, `${c}/${m} → ${v}`);
   }
-});
-
-test('dayStrip — 칸마다 마찰 신호 수·단계·주말·달 첫날', () => {
-  const s = dayStrip(rows);
-  assert.deepEqual(s.map((c) => c.f), [2, 2, 0, 4, 0]);
-  assert.deepEqual(s.map((c) => c.level), [3, 3, 0, 4, 0]);
-  assert.deepEqual(s.map((c) => c.weekend), [false, false, false, true, true], '10-24 토 · 10-25 일');
-  assert.equal(s[0].monthStart, true, '첫 칸은 달을 적는다');
-  const oct = dayStrip(buildRows({}, 30, TODAY));
-  assert.deepEqual(oct.filter((c) => c.monthStart).map((c) => dateKey(c.date)), ['2026-09-26', '2026-10-01']);
-  assert.ok(oct.every((c) => c.level === 0), '빈 기간 — 0으로 나누지 않는다');
 });

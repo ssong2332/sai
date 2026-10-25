@@ -10,17 +10,12 @@ import {
   sum, ratio, healthOf, safeMax, laneHeight, frac, fmtD, pct, esc,
   splitWindow, periodOptions, defaultPeriod, isEmpty,
   dailyGap, worstDay, topCause, headline, deltaOf, storyFacts,
-  actions, briefLines, briefText, weekdayFold, threadRows,
-  pickDays, selectedSummary, dayStrip, dayTable, PERIODS,
+  actions, briefLines, briefText, weekdayFold,
+  pickDays, rangeIndices, selectedSummary, signalMap, PERIODS,
 } from './model.js';
 import { daysNeeded } from '../range.js';
 
 const THEME_KEY = 'sai-dashboard-theme';
-/** 「실마다 따로 보기」 보기 방식(흐름/날짜별) — 이 브라우저의 편의 설정일 뿐이다. */
-const VIEW_KEY = 'sai-dashboard-threads-view';
-function readView() {
-  try { return localStorage.getItem(VIEW_KEY) === 'dates' ? 'dates' : 'flow'; } catch { return 'flow'; }
-}
 const shortD = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
 const $ = (id) => document.getElementById(id);
 const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -60,7 +55,7 @@ export function mount(teams, opts = {}) {
   const first = Number.isInteger(opts.initial) && teams[opts.initial] ? opts.initial : 0;
   // picked·anchor·focus는 「날짜별」의 고른 날·Shift 기준 날·키보드 위치(이번 기간 rows 안의 칸 번호).
   // compare — 「앞 기간과 비교」를 위해 더 읽어도 되는가. 웹 예시는 자료가 이미 다 있으므로 늘 켜져 있다.
-  const state = { team: first, days: lazy ? 30 : defaultPeriod(teams[first].coverageDays), compare: !lazy, sel: null, view: readView(), picked: null, anchor: null, focus: null, showZero: false };
+  const state = { team: first, days: lazy ? 30 : defaultPeriod(teams[first].coverageDays), compare: !lazy, sel: null, picked: [], anchor: null, focus: null, dragging: false };
   /** 진행 중인 읽기 · 실패한 읽기({message, want}). 화면은 둘 중 하나만 말한다. */
   const net = { busy: false, error: null, seq: 0 };
   let briefCopy = '';
@@ -165,63 +160,55 @@ export function mount(teams, opts = {}) {
   function placeCursor(rows) {
     const svg = $('weave'), g = svg._geo, i = state.sel;
     svg.querySelector('#cursor').innerHTML = `<line class="cursor" x1="${g.x(i)}" y1="12" x2="${g.x(i)}" y2="${g.H - 30}"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid - g.gap[i] / 2}" r="4.5"/><circle class="cursor-dot" cx="${g.x(i)}" cy="${g.mid + g.gap[i] / 2}" r="4.5"/>${tip(g, i, rows[i])}`;
-    $('th-day').textContent = fmtD(rows[i].date);
     const d = rows[i], fN = sum([d], F), pN = sum([d], P), ref = d.c.refined || 0;
     const chipRow = (kind) => EVENTS.filter((e) => e.kind === kind).map((e) => `<span class="chip ${kind === 'f' ? 'snag' : 'stitch'}${d.c[e.id] ? '' : ' zero'}"><b class="num">${d.c[e.id] || 0}</b>${e.label}</span>`).join('');
     $('day').innerHTML = `<div class="day-date num">${fmtD(d.date)}<small>${WD[d.wd]}요일 · 다듬은 메시지 ${ref}건</small></div>
       <div class="chip-rows"><div class="chip-row"><span class="chip-k f">마찰 신호 ${fN}건</span><div class="chips">${chipRow('f')}</div></div><div class="chip-row"><span class="chip-k p">긍정 신호 ${pN}건</span><div class="chips">${chipRow('p')}</div></div></div>
       <div class="day-note">${ref === 0 ? '이날은 다듬은 메시지가 없어요.' : `다듬은 글 ${ref}건에서 마찰 신호 ${fN}건 · 긍정 신호 ${pN}건${fN > ref ? ' — 한 글에서 신호가 여러 개 잡히기도 해요' : ''}${ref < STEADY_MIN ? ' · 글이 적은 날이라 흐름 판단에는 덜 반영했어요' : ''}`}</div>`;
-    // 「날짜별」은 위에서 커서가 지나갈 때마다 다시 그리지 않는다 — 누르거나 화살표로 고를 때만(pick의 commit).
-    if (state.view === 'flow') {
-      const { cur, prev } = windowRows();
-      drawThreads(cur, prev);
-    }
   }
 
-  /* ── 실마다 따로 보기: 흐름 / 날짜별 ── */
-  function drawThreadSection() {
-    const dates = state.view === 'dates';
-    $('threads').hidden = dates;
-    $('dates').hidden = !dates;
-    $('th-p-flow').hidden = dates;
-    $('th-p-dates').hidden = !dates;
-    $('th-view').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === state.view)));
+  /* ── 신호 지도: 신호 × 날짜 (2026-10-26 — 「흐름/날짜별」 두 보기를 하나로) ── */
+  function drawMap() {
     const { cur, prev } = windowRows();
-    if (dates) drawDates(cur); else drawThreads(cur, prev);
-  }
-
-  function drawDates(cur) {
-    const n = cur.length;
-    if (state.picked == null) { state.picked = state.sel == null ? [] : [state.sel]; state.anchor = state.sel; }
-    const picked = new Set(state.picked);
-    const focusI = Math.max(0, Math.min(n - 1, state.focus ?? state.picked[state.picked.length - 1] ?? state.sel ?? n - 1));
-    const strip = dayStrip(cur);
-    const cells = strip.map((c) => `<button type="button" class="dc lv${c.level}${c.weekend ? ' wkend' : ''}" data-i="${c.i}" aria-pressed="${picked.has(c.i)}" tabindex="${c.i === focusI ? 0 : -1}" aria-label="${fmtD(c.date)} ${WD[c.wd]}요일 · 마찰 신호 ${c.f}건"><span class="dc-t" aria-hidden="true">${c.monthStart ? `${c.date.getMonth() + 1}월` : WD[c.wd]}</span><span class="dc-n num" aria-hidden="true">${c.date.getDate()}</span></button>`).join('');
-    const cols = n <= 30 ? n : Math.ceil(n / 2);
-
-    const s = selectedSummary(cur, state.picked);
-    const t = dayTable(cur, state.picked, { showZero: state.showZero });
-    const dcols = t.compact ? [] : t.cols;
-    const span = 3 + dcols.length;
-    const head = `<tr><th scope="col" class="lab">신호</th>${dcols.map((c) => `<th scope="col" class="dcol num">${shortD(c.date)}<small>${WD[c.wd]}</small></th>`).join('')}<th scope="col" class="tot">${t.compact ? `${s.days}일 합계` : '합계'}</th><th class="bcol" aria-hidden="true"></th></tr>`;
-    const refRow = `<tr class="ref"><th scope="row" class="lab">다듬은 글</th>${dcols.map((c) => `<td class="dcol num">${c.refined}</td>`).join('')}<td class="tot num">${s.refined}</td><td class="bcol"></td></tr>`;
-    const body = t.groups.map((g) => {
-      const rows = g.rows.length
-        ? g.rows.map((r) => `<tr><th scope="row" class="lab">${r.label}<small>${r.desc}</small></th>${t.compact ? '' : r.vals.map((v) => `<td class="dcol num${v ? '' : ' z'}">${v}</td>`).join('')}<td class="tot num">${r.tot}</td><td class="bcol"><span class="mbar ${g.kind}" aria-hidden="true"><i style="width:${Math.round(r.share * 100)}%"></i></span></td></tr>`).join('')
-        : `<tr class="none"><td colspan="${span}">고른 날에는 ${g.label}가 없어요</td></tr>`;
-      return `<tr class="grp ${g.kind}"><th scope="colgroup" colspan="${span}">${g.label} <b class="num">${g.tot}</b>건${g.hidden && g.rows.length ? `<small> · 0건 ${g.hidden}줄 숨김</small>` : ''}</th></tr>${rows}`;
+    const m = signalMap(cur, prev, state.picked), n = cur.length;
+    const focusI = Math.max(0, Math.min(n - 1, state.focus ?? m.picked[m.picked.length - 1] ?? n - 1));
+    const sel = m.picked.length > 0, cmp = prev.length > 0;
+    // 날짜 숫자는 한 달 길이까지 모두, 그보다 길면 달 첫날·월요일만. 칸 안 숫자는 2주 보기에서만.
+    const allNums = n <= 31, inCell = n <= 14;
+    const dayHead = m.days.map((d) => {
+      // 월요일 숫자가 달 첫날과 2칸 안에 붙으면 겹친다 — 그때는 달 첫날만.
+      const nearMonth = m.days.some((o) => o.monthStart && Math.abs(o.i - d.i) <= 2);
+      const show = allNums || d.monthStart || (d.wd === 1 && !nearMonth);
+      const top = d.monthStart ? `${d.date.getMonth() + 1}월` : allNums ? WD[d.wd] : '';
+      return `<th scope="col" class="d${d.weekend ? ' wk' : ''}${d.on ? ' on' : ''}"><button type="button" class="dh" data-i="${d.i}" tabindex="${d.i === focusI ? 0 : -1}" aria-pressed="${d.on}" aria-label="${fmtD(d.date)} ${WD[d.wd]}요일">${show ? `<span class="dh-t">${top}</span><span class="dh-n num">${d.date.getDate()}</span>` : '<span class="dh-tick"></span>'}</button></th>`;
     }).join('');
+    const span = (a, b) => (a.getTime() === b.getTime() ? shortD(a) : `${shortD(a)}~${shortD(b)}`);
+    const numHead = (cmp ? `<th scope="col" class="nc prevc">앞 ${state.days}일<small>${span(prev[0].date, prev[prev.length - 1].date)}</small></th>` : '')
+      + `<th scope="col" class="nc">이번 ${state.days}일<small>${span(cur[0].date, cur[n - 1].date)}</small></th>`
+      + (sel ? `<th scope="col" class="nc selc">고른 ${m.picked.length}일<small>${span(m.first, m.last)}</small></th>` : '');
+    const diff = (r) => (r.pt == null || r.pt === r.tot ? '' : `<small class="dv ${r.dir}">${r.tot > r.pt ? '+' : '−'}${Math.abs(r.tot - r.pt)}</small>`);
+    const nums = (r) => `${cmp ? `<td class="nc prevc num">${r.pt}</td>` : ''}<td class="nc num">${r.tot}${diff(r)}</td>${sel ? `<td class="nc selc num">${r.sel}</td>` : ''}`;
+    const tdc = (i, cls) => `c ${cls}${m.days[i].on ? ' on' : ''}${m.days[i].weekend ? ' wk' : ''}`;
+    const cells = (r, kind) => r.vals.map((v, i) => `<td class="${tdc(i, `${kind} lv${r.levels[i]}`)}" data-i="${i}" data-v="${v}" data-k="${r.label}">${inCell && v ? `<span class="num">${v}</span>` : ''}</td>`).join('');
+    const refBars = m.refined.vals.map((v, i) => `<td class="${tdc(i, 'rf')}" data-i="${i}" data-v="${v}" data-k="다듬은 글"><i style="height:${Math.round((v / m.refined.max) * 100)}%"></i></td>`).join('');
+    const cols = 1 + n + (cmp ? 1 : 0) + 1 + (sel ? 1 : 0);
+    const body = m.groups.map((g) => `<tr class="grp ${g.kind}"><th scope="colgroup" colspan="${cols}">${g.label}<span class="num">이번 ${g.tot}건${cmp && g.pt !== g.tot ? ` · 앞 기간 ${g.pt}건` : ''}${sel ? ` · 고른 날 ${g.sel}건` : ''}</span></th></tr>`
+      + g.rows.map((r) => `<tr${r.tot ? '' : ' class="none"'}><th scope="row" class="lab">${r.label}<small>${r.desc}</small></th>${cells(r, g.kind)}${nums(r)}</tr>`).join('')).join('');
 
-    $('dates').innerHTML = `<div class="dates-top"><span class="dates-key"><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i>마찰 신호가 많은 날일수록 짙어요</span>
-        <button type="button" class="textbtn" data-act="clear"${s.days ? '' : ' disabled'}>선택 지우기</button></div>
-      <div class="dstrip" role="group" aria-label="날짜 고르기 — 왼쪽·오른쪽 화살표로 옮기고 Enter로 켜고 꺼요" style="--cols:${cols}">${cells}</div>
-      <div class="dates-sum"><span aria-live="polite">${s.days ? `<b class="num">${s.days}</b>일 선택 · 다듬은 글 <b class="num">${s.refined}</b>건 · 마찰 신호 <b class="num">${s.f}</b>건 · 긍정 신호 <b class="num">${s.p}</b>건` : '위에서 날짜를 하나 이상 골라 주세요.'}</span>
-        ${s.days ? `<button type="button" class="textbtn" data-act="zero" aria-pressed="${state.showZero}">0건도 보기</button>` : ''}</div>
-      ${s.days ? `<table class="dt${t.compact ? ' compact' : ''}"><caption class="sr">고른 날의 신호별 건수</caption><thead>${head}</thead><tbody>${refRow}${body}</tbody></table>` : ''}`;
+    $('smap').innerHTML = `<table style="--n:${n}"><caption class="sr">신호별 날짜별 건수${sel ? ` — 고른 ${m.picked.length}일` : ''}</caption>
+      <colgroup><col class="lab-c">${'<col>'.repeat(n)}${cmp ? '<col class="nc-c">' : ''}<col class="nc-c">${sel ? '<col class="nc-c">' : ''}</colgroup>
+      <thead><tr><th scope="col" class="lab corner"></th>${dayHead}${numHead}</tr></thead>
+      <tbody><tr class="ref"><th scope="row" class="lab">다듬은 글<small>신호를 센 바탕이 된 글</small></th>${refBars}${nums(m.refined)}</tr>${body}</tbody></table>`;
+
+    const s = selectedSummary(cur, m.picked);
+    const gapped = m.picked.length !== m.picked[m.picked.length - 1] - m.picked[0] + 1;
+    $('smap-top').innerHTML = sel
+      ? `<span class="smap-sum" aria-live="polite"><b>${m.picked.length > 1 ? `${fmtD(m.first)} ~ ${fmtD(m.last)}` : `${fmtD(m.first)} (${WD[cur[m.picked[0]].wd]})`}</b>${m.picked.length > 1 ? ` · ${gapped ? '그중 ' : ''}${m.picked.length}일` : ''} — 다듬은 글 <b class="num">${s.refined}</b>건 · 마찰 신호 <b class="num">${s.f}</b>건 · 긍정 신호 <b class="num">${s.p}</b>건</span><button type="button" class="textbtn" data-act="clear">선택 지우기</button>`
+      : `<span class="smap-sum" aria-live="polite">날짜를 누르거나 끌어서 고르면 오른쪽에 그 날들의 합계가 붙어요. Ctrl을 누른 채 누르면 하루씩 더해요.</span><span class="smap-key" aria-hidden="true"><i class="f lv1"></i><i class="f lv2"></i><i class="f lv3"></i><i class="f lv4"></i>마찰<i class="p lv1"></i><i class="p lv2"></i><i class="p lv3"></i><i class="p lv4"></i>긍정 · 짙을수록 많음</span>`;
   }
 
   function refocusDay(i) {
-    const b = $('dates').querySelector(`.dc[data-i="${i}"]`);
+    const b = $('smap').querySelector(`.dh[data-i="${i}"]`);
     if (b) b.focus();
   }
 
@@ -237,24 +224,6 @@ export function mount(teams, opts = {}) {
       <article class="beat"><div class="beat-k">요일</div>
         <p class="beat-t">${s.offTop ? `오프타임 강행은 <em class="r">${WD[s.offTop.wd]}요일</em>에 가장 많았어요.` : '이 기간에는 오프타임 강행이 없었어요.'}</p>
         <p class="beat-n">${s.offTop ? `${s.offTop.count}건 — 마감이 몰리는 요일엔 예약 제안을 먼저 써 보세요.` : '퇴근 시간 뒤 메시지는 모두 예약으로 나갔어요.'}</p></article>`;
-  }
-
-  function drawThreads(cur, prev) {
-    const sel = state.sel, n = cur.length, w = 600, h = 44, bw = w / n;
-    // 고른 날은 빨간 막대 대신 회색 세로 띠로 — 막대 색은 그대로 둔다(2026-10-25 사용자 지적).
-    const band = sel == null ? '' : `<rect class="selband" x="${(sel * bw).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${h}"/>`;
-    $('threads').innerHTML = threadRows(cur, prev).map((e) => {
-      const bars = band + e.vals.map((v, i) => {
-        if (!v) return '';
-        const bh = Math.max(3, (v / e.max) * (h - 6));
-        return `<rect class="${e.kind === 'f' ? 's' : 'p'}" x="${(i * bw + bw * 0.18).toFixed(1)}" y="${(h - 2 - bh).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" height="${bh.toFixed(1)}"/>`;
-      }).join('');
-      return `<div class="thread">
-        <div class="thread-name"><span class="thread-tag ${e.kind === 'f' ? 'snag' : 'stitch'}">${e.kind === 'f' ? '마찰' : '긍정'}</span><br>${e.label}<small>${e.desc}</small></div>
-        <svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${e.label} 날짜별 ${e.tot}건"><line class="base" x1="0" y1="${h - 1.5}" x2="${w}" y2="${h - 1.5}"/>${bars}</svg>
-        <div class="thread-total"><b class="num">${e.tot}</b><span class="${e.dir}">${e.pt == null ? '비교할 앞 기간 없음' : e.change}</span></div>
-      </div>`;
-    }).join('');
   }
 
   function drawRhythm(cur) {
@@ -478,7 +447,7 @@ export function mount(teams, opts = {}) {
     const { cur, prev } = windowRows();
     state.sel = null;
     // 기간·팀이 바뀌면 칸 번호의 뜻이 바뀐다 — 고른 날을 비우고 위에서 고른 날로 다시 시작한다.
-    state.picked = null; state.anchor = null; state.focus = null;
+    state.picked = []; state.anchor = null; state.focus = null;
     $('kick').textContent = `최근 ${state.days}일`;
     const hl = headline(cur, prev, state.days, subject);
     $('hl').innerHTML = hl.thin ? `${esc(hl.lead)} <span class="thin">${esc(hl.thin)}</span> ${esc(hl.rest)}` : esc(hl.lead);
@@ -503,7 +472,7 @@ export function mount(teams, opts = {}) {
       drawInbound(cur, prev);
       drawTemp(cur);
       drawRhythm(cur);
-      drawThreadSection();
+      drawMap();
     }
     drawCompare();
   }
@@ -537,9 +506,9 @@ export function mount(teams, opts = {}) {
     const rows = windowRows().cur;
     state.sel = Math.max(0, Math.min(rows.length - 1, i));
     placeCursor(rows);
-    if (commit && state.view === 'dates') {
+    if (commit) {
       state.picked = [state.sel]; state.anchor = state.sel; state.focus = state.sel;
-      drawDates(rows);
+      drawMap();
     }
   }
   weave.addEventListener('pointermove', (e) => { const t = e.target.closest('.hit'); if (t) pick(Number(t.dataset.i)); });
@@ -550,43 +519,82 @@ export function mount(teams, opts = {}) {
     if (e.key === 'End') { e.preventDefault(); pick(1e9, true); }
   });
 
-  $('th-view').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-view]');
-    if (!b || b.dataset.view === state.view) return;
-    state.view = b.dataset.view === 'dates' ? 'dates' : 'flow';
-    try { localStorage.setItem(VIEW_KEY, state.view); } catch { /* 저장이 막혀도 이번 화면에서는 바뀐다 */ }
-    drawThreadSection();
+  /*
+   * 신호 지도 고르기 — 판정표
+   * | 입력 | 결과 |
+   * |---|---|
+   * | 누름 (그 하루만 골라져 있지 않음) | 그 하루만 |
+   * | 누름 (그 하루만 골라져 있음) | 선택을 지운다 |
+   * | 누른 채 끌기 | 누른 날 ~ 지금 날 |
+   * | Shift + 누름 | 기준 날 ~ 누른 날 (기준이 없으면 그 하루) |
+   * | Ctrl/⌘ + 누름 | 그 날을 더하거나 뺀다 |
+   * | 날짜 머리에서 ←/→ | 옮겨서 그 하루 · Shift면 기준 날부터 늘림 · Esc는 선택 지움 |
+   */
+  const smap = $('smap'), tipEl = $('smap-tip'), smapWrap = $('smap-wrap');
+  const nDays = () => windowRows().cur.length;
+  function setPicked(next, focus) {
+    if (focus != null) state.focus = focus;
+    const same = next.length === state.picked.length && next.every((v, k) => v === state.picked[k]);
+    if (!same) { state.picked = next; drawMap(); }
+  }
+  function choose(i, e) {
+    const n = nDays();
+    if (e.shiftKey && state.anchor != null) { setPicked(rangeIndices(state.anchor, i, n), i); return; }
+    state.anchor = i;
+    if (e.ctrlKey || e.metaKey) { setPicked(pickDays(state.picked, i, { n }), i); return; }
+    setPicked(state.picked.length === 1 && state.picked[0] === i ? [] : [i], i);
+  }
+  smap.addEventListener('pointerdown', (e) => {
+    const t = e.target.closest('[data-i]');
+    if (!t || e.button !== 0) return;
+    e.preventDefault();
+    const i = Number(t.dataset.i);
+    choose(i, e);
+    state.dragging = !e.shiftKey && !e.ctrlKey && !e.metaKey;
+    refocusDay(i);
   });
-
-  const dates = $('dates');
-  dates.addEventListener('click', (e) => {
-    const cur = windowRows().cur;
-    const cell = e.target.closest('.dc');
-    if (cell) {
-      const i = Number(cell.dataset.i);
-      state.picked = pickDays(state.picked, i, { shift: e.shiftKey, anchor: state.anchor, n: cur.length });
-      if (!e.shiftKey || state.anchor == null) state.anchor = i;
-      state.focus = i;
-      drawDates(cur);
-      refocusDay(i);
-      return;
-    }
-    const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'clear') { state.picked = []; state.anchor = null; drawDates(cur); refocusDay(state.focus ?? state.sel); }
-    if (act === 'zero') { state.showZero = !state.showZero; drawDates(cur); dates.querySelector('[data-act="zero"]')?.focus(); }
+  smap.addEventListener('pointerover', (e) => {
+    const t = e.target.closest('[data-i]');
+    if (!t) return;
+    const i = Number(t.dataset.i);
+    if (state.dragging && state.anchor != null) setPicked(rangeIndices(state.anchor, i, nDays()), i);
+    // 칸 말풍선 — 그날·그 신호의 건수. 날짜 머리 위에서는 띄우지 않는다.
+    const cell = e.target.closest('td.c');
+    if (!cell) { tipEl.hidden = true; return; }
+    const d = windowRows().cur[i];
+    tipEl.textContent = `${fmtD(d.date)} (${WD[d.wd]}) · ${cell.dataset.k} ${cell.dataset.v}건`;
+    tipEl.hidden = false;
+    const box = smapWrap.getBoundingClientRect(), r = cell.getBoundingClientRect(), w = tipEl.offsetWidth;
+    const left = r.left - box.left + smapWrap.scrollLeft + r.width / 2 - w / 2;
+    tipEl.style.left = `${Math.min(Math.max(left, 4), smapWrap.scrollWidth - w - 4)}px`;
+    tipEl.style.top = `${r.top - box.top - tipEl.offsetHeight - 6}px`;
   });
-  dates.addEventListener('keydown', (e) => {
-    const cell = e.target.closest('.dc');
-    if (!cell) return;
-    const n = windowRows().cur.length, i = Number(cell.dataset.i);
+  smap.addEventListener('pointerleave', () => { tipEl.hidden = true; });
+  window.addEventListener('pointerup', () => { state.dragging = false; });
+  // 키보드로 누른 날짜 머리(포인터 없이 온 click — pointerdown이 이미 처리한 click은 detail이 1 이상).
+  smap.addEventListener('click', (e) => {
+    const b = e.target.closest('.dh');
+    if (b && e.detail === 0) choose(Number(b.dataset.i), e);
+  });
+  smap.addEventListener('keydown', (e) => {
+    const b = e.target.closest('.dh');
+    if (!b) return;
+    const n = nDays(), i = Number(b.dataset.i);
+    if (e.key === 'Escape') { e.preventDefault(); state.anchor = null; setPicked([], i); refocusDay(i); return; }
     const to = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: n - 1 }[e.key];
     if (to == null) return;
     e.preventDefault();
     const j = Math.max(0, Math.min(n - 1, to));
-    cell.tabIndex = -1;
-    const next = dates.querySelector(`.dc[data-i="${j}"]`);
-    if (next) { next.tabIndex = 0; next.focus(); }
-    state.focus = j;
+    if (e.shiftKey) { if (state.anchor == null) state.anchor = i; setPicked(rangeIndices(state.anchor, j, n), j); }
+    else { state.anchor = j; setPicked([j], j); }
+    refocusDay(j);
+  });
+  $('smap-top').addEventListener('click', (e) => {
+    if (e.target.closest('[data-act]')?.dataset.act !== 'clear') return;
+    const f = state.focus;
+    state.anchor = null;
+    setPicked([]);
+    refocusDay(f ?? nDays() - 1);
   });
 
   $('copy').addEventListener('click', async () => {

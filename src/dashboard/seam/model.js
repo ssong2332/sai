@@ -328,27 +328,11 @@ export function weekdayFold(rows) {
   return { by, peak, maxR: safeMax(by.map((b) => b.r)) };
 }
 
-/* ── 실마다 따로 보기 ─────────────────────────────────────────────────── */
-
-export function threadRows(cur, prev) {
-  return EVENTS.map((e) => {
-    const vals = cur.map((d) => d.c[e.id] || 0);
-    const tot = vals.reduce((s, v) => s + v, 0);
-    const pt = prev.length ? sum(prev, [e.id]) : null;
-    const change = pt == null ? '' : tot === pt ? '앞 기간과 같음' : `앞 기간 ${pt} → ${tot}`;
-    const worse = pt != null && (e.kind === 'f' ? tot > pt : tot < pt);
-    return { ...e, vals, max: safeMax(vals), tot, pt, change, dir: pt == null || tot === pt ? '' : worse ? 'up' : 'down' };
-  });
-}
-
-/* ── 실마다 따로 보기 — 「날짜별」 (2026-10-25 사용자 피드백) ───────────── */
+/* ── 신호 지도 — 신호 × 날짜 (2026-10-26 사용자 피드백으로 「흐름/날짜별」 두 보기를 하나로) ── */
 /*
  * 🔴 입력은 나머지 Seam과 같은 `rows`(buildRows 결과의 이번 기간 조각)뿐이다 — 자료가 어디서
  *    왔는지(확장 페이지의 Firestore 읽기·예시) 가정하지 않는다. 칸 번호 `i`는 그 `rows` 안의 위치다.
  */
-
-/** 「날짜별」 표에서 날마다 칸을 따로 세우는 최대 날 수. 넘으면 합계 + 작은 막대로 접는다. */
-export const DAY_COLS_MAX = 7;
 
 /** a..b(순서 무관) 사이의 모든 칸 번호. 자료 범위 `n` 밖은 자른다. */
 export function rangeIndices(a, b, n = Infinity) {
@@ -389,8 +373,8 @@ export function selectedSummary(rows, idx) {
 }
 
 /**
- * 날짜 줄의 칸 색 단계(0~4). 0건은 0(중립), 나머지는 제곱근 눈금으로 1~4.
- * 🔴 분모는 기간 안 하루 최대 마찰 신호 수 — 0·NaN이어도 1 아래로 내려가지 않는다.
+ * 칸 색 단계(0~4). 0건은 0(중립), 나머지는 제곱근 눈금으로 1~4.
+ * 🔴 분모는 그 줄(신호)의 기간 안 하루 최대 — 0·NaN이어도 1 아래로 내려가지 않는다.
  */
 export function heatLevel(count, max) {
   if (!Number.isFinite(count) || count <= 0) return 0;
@@ -398,43 +382,46 @@ export function heatLevel(count, max) {
   return Math.max(1, Math.min(4, Math.ceil(Math.sqrt(Math.min(1, count / m)) * 4)));
 }
 
-/** 날짜 줄의 칸들 — 그날 마찰 신호 수와 색 단계, 주말·달 첫날 표시. */
-export function dayStrip(rows) {
-  const fc = rows.map((d) => sum([d], F));
-  const max = safeMax(fc);
-  return rows.map((d, i) => ({
-    i, date: d.date, wd: d.wd, f: fc[i], level: heatLevel(fc[i], max),
-    weekend: d.wd === 0 || d.wd === 6,
-    monthStart: i === 0 || d.date.getDate() === 1,
-  }));
-}
-
 /**
- * 고른 날의 신호 표. 마찰 무리 → 긍정 무리, 각 줄은 날마다 값과 합계.
- * 🔴 `showZero`가 아니면 고른 날 합계가 0인 줄은 뺀다(무리마다 `hidden`에 몇 줄 뺐는지 남긴다).
- * 🔴 `compact` — 날이 `DAY_COLS_MAX`보다 많으면 화면은 날마다 칸 없이 합계 + 막대(`share`, 0~1)만 쓴다.
+ * 신호 지도 한 장 — 줄은 신호(다듬은 글 + 마찰 무리 + 긍정 무리), 칸은 날.
+ * | 값 | 뜻 |
+ * |---|---|
+ * | `vals`·`levels` | 날마다 건수와 색 단계(**그 줄의** 하루 최대 기준 — 드문 신호도 무늬가 보인다) |
+ * | `tot` | 이번 기간 합계 |
+ * | `sel` | 고른 날 합계. 고른 날이 없으면 null |
+ * | `pt` | 앞 같은 길이 기간 합계. 앞 기간이 없으면 null |
+ * | `dir` | 앞 기간보다 나빠졌으면 'worse'(마찰↑·긍정↓), 좋아졌으면 'better', 같거나 비교 없음은 '' |
  */
-export function dayTable(rows, idx, { showZero = false } = {}) {
-  const picked = pickedRows(rows, idx);
-  const all = EVENTS.map((e) => {
-    const vals = picked.map((d) => d.c[e.id] || 0);
-    return { id: e.id, kind: e.kind, label: e.label, desc: e.desc, vals, tot: vals.reduce((s, v) => s + v, 0) };
-  });
-  const max = safeMax(all.map((r) => r.tot));
-  const groups = [['f', '마찰 신호'], ['p', '긍정 신호']].map(([kind, label]) => {
-    const mine = all.filter((r) => r.kind === kind);
-    const shown = showZero ? mine : mine.filter((r) => r.tot > 0);
+export function signalMap(cur, prev = [], picked = []) {
+  const idx = [...new Set(picked ?? [])].filter((i) => Number.isInteger(i) && i >= 0 && i < cur.length).sort((x, y) => x - y);
+  const hasSel = idx.length > 0, hasPrev = prev.length > 0;
+  const line = (id, kind) => {
+    const vals = cur.map((d) => d.c[id] || 0);
+    const max = safeMax(vals);
+    const tot = vals.reduce((s, v) => s + v, 0);
+    const pt = hasPrev ? sum(prev, [id]) : null;
+    const worse = pt != null && (kind === 'p' ? tot < pt : tot > pt);
     return {
-      kind, label,
-      tot: mine.reduce((s, r) => s + r.tot, 0),
-      rows: shown.map((r) => ({ ...r, share: frac(r.tot, max) })),
-      hidden: mine.length - shown.length,
+      vals, max, levels: vals.map((v) => heatLevel(v, max)), tot,
+      sel: hasSel ? idx.reduce((s, i) => s + vals[i], 0) : null,
+      pt, dir: pt == null || pt === tot ? '' : worse ? 'worse' : 'better',
     };
+  };
+  const groups = [['f', '마찰 신호'], ['p', '긍정 신호']].map(([kind, label]) => {
+    const rows = EVENTS.filter((e) => e.kind === kind).map((e) => ({ id: e.id, label: e.label, desc: e.desc, ...line(e.id, kind) }));
+    const add = (k) => (rows.some((r) => r[k] == null) ? null : rows.reduce((s, r) => s + r[k], 0));
+    return { kind, label, rows, tot: add('tot'), sel: add('sel'), pt: add('pt') };
   });
   return {
-    cols: picked.map((d) => ({ key: d.key, date: d.date, wd: d.wd, refined: d.c.refined || 0 })),
-    compact: picked.length > DAY_COLS_MAX,
+    days: cur.map((d, i) => ({
+      i, date: d.date, wd: d.wd, weekend: d.wd === 0 || d.wd === 6,
+      monthStart: i === 0 || d.date.getDate() === 1, on: idx.includes(i),
+    })),
+    refined: { id: 'refined', label: '다듬은 글', ...line('refined', 'n'), dir: '' },
     groups,
-    hidden: groups.reduce((s, g) => s + g.hidden, 0),
+    picked: idx,
+    first: hasSel ? cur[idx[0]].date : null,
+    last: hasSel ? cur[idx[idx.length - 1]].date : null,
   };
 }
+
