@@ -23,6 +23,17 @@ const EVENTS = [
   { id: 'sensitiveBlocked', kind: 'positive', label: '민감정보 전송을 막음', desc: '보내기 전에 가드가 걸러낸 건수' },
   { id: 'urgencyGap', kind: 'friction', label: '긴급도가 실제와 다름', desc: '완곡한 표현이 실제 긴급도를 가린 메시지' },
   { id: 'missing', kind: 'friction', label: '기한·영향이 빠진 요청', desc: '무엇을 언제까지인지 없이 나간 요청' },
+  /**
+   * 2026-10-25 추가(L34) — **맥락 카운트**. 🔴 `kind: 'context'`는 긍정·마찰 막대와 추이,
+   *    건강도 지수 어디에도 들어가지 않는다(`POSITIVE_IDS`·`FRICTION_IDS`에서 빠진다).
+   *    시나리오의 `context` 배열로만 넘어간다.
+   */
+  { id: 'decoded', kind: 'context', label: '뜻 풀기한 메시지', desc: '받은 메시지를 풀어 본 횟수' },
+  { id: 'decodeUrgencyGap', kind: 'context', label: '겉보기와 실제 긴급도가 다른 받은 메시지', desc: '표현은 가벼운데 실제로는 급했던(또는 그 반대) 메시지' },
+  { id: 'urgencyCritical', kind: 'context', label: '긴급(CRITICAL)으로 다듬음', desc: '다듬기에 최종 적용된 긴급도' },
+  { id: 'urgencyNormal', kind: 'context', label: '보통(NORMAL)으로 다듬음', desc: '다듬기에 최종 적용된 긴급도' },
+  { id: 'urgencyLow', kind: 'context', label: '낮음(LOW)으로 다듬음', desc: '다듬기에 최종 적용된 긴급도' },
+  { id: 'teamGlossaryApplied', kind: 'context', label: '팀 용어집이 적용된 메시지', desc: '팀 용어가 1개 이상 반영된 다듬기(메시지 단위)' },
 ];
 
 /**
@@ -37,6 +48,9 @@ export const EVENT_LABEL = Object.fromEntries(EVENTS.map((e) => [e.id, e.label])
 
 export const POSITIVE_IDS = EVENTS.filter((e) => e.kind === 'positive').map((e) => e.id);
 export const FRICTION_IDS = EVENTS.filter((e) => e.kind === 'friction').map((e) => e.id);
+export const CONTEXT_IDS = EVENTS.filter((e) => e.kind === 'context').map((e) => e.id);
+/** 테스트가 확장·서버 키 집합과 대조하는 데 쓴다. */
+export const EVENT_IDS = EVENTS.map((e) => e.id);
 
 function safeCount(value) {
   return Number.isInteger(value) && value >= 0 && value <= 1_000_000 ? value : 0;
@@ -85,6 +99,8 @@ function toScenario(entry) {
     total: safeCount(counts.refined),
     positive: rows.filter((row) => row.kind === 'positive'),
     friction: rows.filter((row) => row.kind === 'friction'),
+    // 🔴 L34 — 막대·지수에 쓰지 않는 맥락 카운트. 화면이 아직 그리지 않아도 데이터는 살아 넘어온다.
+    context: rows.filter((row) => row.kind === 'context'),
   };
 }
 

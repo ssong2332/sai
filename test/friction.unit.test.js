@@ -144,7 +144,7 @@ test('🔴 refined는 막대로 그리는 신호가 아니라 분모다', () => 
 test('🔴 모든 이벤트에 극성과 화면 문구가 있다 — 빠지면 대시보드가 빈칸을 그린다', () => {
   for (const key of Object.values(FRICTION_EVENTS)) {
     assert.ok(
-      ['friction', 'positive', 'volume'].includes(EVENT_POLARITY[key]),
+      ['friction', 'positive', 'volume', 'context'].includes(EVENT_POLARITY[key]),
       `${key}: 극성 없음`,
     );
     assert.equal(typeof EVENT_LABELS[key], 'string');

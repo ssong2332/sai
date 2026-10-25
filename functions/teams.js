@@ -25,7 +25,7 @@ import { randomInt } from 'node:crypto';
  * 마찰 문서에 허용된 카운트 키 — `src/lib/friction.js`의 `FRICTION_EVENTS`와 같아야 한다.
  * 🔴 `refined`는 신호가 아니라 **건강도 지수의 분모**다(Spec §3 「정규화된 마찰」).
  */
-const COUNT_KEYS = [
+export const COUNT_KEYS = [
   'misread',
   'venting',
   'forceOffHours',
@@ -36,6 +36,13 @@ const COUNT_KEYS = [
   'urgencyGap',
   'missing',
   'sensitiveBlocked',
+  // 2026-10-25 추가(L34) — 맥락 카운트 6종. 건강도 지수에 들어가지 않는다(`src/lib/friction.js` 판정표).
+  'decoded',
+  'decodeUrgencyGap',
+  'urgencyCritical',
+  'urgencyNormal',
+  'urgencyLow',
+  'teamGlossaryApplied',
 ];
 
 /** 사람이 읽고 옮겨 적는 코드다 — 헷갈리는 글자(0/O, 1/I)를 뺀다. */

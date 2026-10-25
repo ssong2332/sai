@@ -73,6 +73,7 @@ export default function App() {
       total: counts.refined ?? 0,
       positive: baseLive.positive.map((row) => ({ ...row, count: counts[row.id] ?? 0 })),
       friction: baseLive.friction.map((row) => ({ ...row, count: counts[row.id] ?? 0 })),
+      context: (baseLive.context ?? []).map((row) => ({ ...row, count: counts[row.id] ?? 0 })),
     };
   }, [baseLive, rangeDays]);
 
