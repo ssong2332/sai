@@ -130,12 +130,15 @@ https://sai-refine.aiisgod.workers.dev/v1/team     # 팀·계정 삭제·지표
   같은 파일을 임포트하므로 어긋날 수 없다.
 - 어느 쪽이 답했는지는 응답의 `providerUsed`·`modelUsed`에 남는다.
 
-### 모니터링 (2026-10-27 결정 — M1 + M2)
+### 모니터링 (2026-10-27 결정 — M1 + M2, **보류**: 실사용자가 생기는 비공개 베타 시작 때 켠다 — Tasks L35)
+
+> 🔴 지금은 정기 감시를 하지 않는다. M1은 베타 시작 때 등록하고, M2는 필요할 때만 실행한다.
+> `/health`는 Firestore에 실제로 접속하지 않으므로 Firestore·Auth 장애는 M1으로 잡히지 않는다.
 
 | 무엇을 잡나 | 방법 | 누가 |
 |---|---|---|
-| **멈춤** | 외부 가동 감시(UptimeRobot 등 무료)가 5분마다 `https://sai-refine.aiisgod.workers.dev/health`를 확인 → 실패 시 메일 | 👤 사용자(가입·등록) |
-| **품질 저하** | 주 1회 `SAI_SERVICE_ACCOUNT_FILE=<키 경로> npm --prefix workers/refine run report` — 최근 7일 요청·실패율·응답 시간·사용자 + `/health`. 경고 판정표는 [reportCore.mjs](workers/refine/scripts/reportCore.mjs) | 실행하는 사람 |
+| **멈춤** | 외부 가동 감시(UptimeRobot 등 무료)가 5분마다 `https://sai-refine.aiisgod.workers.dev/health`를 확인 → 실패 시 메일 | 👤 사용자(가입·등록) — **베타 시작 때** |
+| **품질 저하** | 필요할 때(베타 이후 주 1회) `SAI_SERVICE_ACCOUNT_FILE=<키 경로> npm --prefix workers/refine run report` — 최근 7일 요청·실패율·응답 시간·사용자 + `/health`. 경고 판정표는 [reportCore.mjs](workers/refine/scripts/reportCore.mjs) | 실행하는 사람 |
 | 실시간 원인 | `wrangler tail` + 숫자만 거르는 필터(CLAUDE.md) · Cloudflare 대시보드 관측 | 필요할 때 |
 
 🔴 실사용자가 생기면 M3(Worker Cron으로 매일 자동 점검 + 메일)를 검토한다.
