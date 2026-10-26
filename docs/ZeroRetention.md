@@ -5,7 +5,7 @@
 
 ## 금지 (다른 모든 편의보다 우선)
 
-- 메시지 **본문·교정문·수정문**을 Firestore·Functions 로그·`chrome.storage` 어디에도 쓰지 않는다.
+- 메시지 **본문·교정문·수정문**을 Firestore·Functions 로그·`chrome.storage` 어디에도 쓰지 않는다. 서버 로그는 지금 **Cloudflare Worker**(`wrangler tail`)다(2026-10-27, 확장 0.1.30~) — Functions 로그와 같은 규칙.
 - 상류(LLM·네트워크) **에러 메시지를 그대로 로그·응답에 싣지 않는다** — 본문이 섞여 올 수 있다.
 - 스키마 검증 실패 정보를 만들 때 **위반한 값**을 담지 않는다. 담는 것은 `필드:사유` 코드뿐.
 - "디버깅 중이니 잠깐만" 로그도 금지. 잠깐이 남는다.
@@ -15,7 +15,7 @@
 | 조건 | 판정 |
 |---|---|
 | 본문이 Firestore 문서에 기록됨 | ✕ 위반 |
-| 본문이 Functions 로그(`console.*`/logger)로 나감 | ✕ 위반 |
+| 본문이 서버 로그(Worker·Functions의 `console.*`/logger)로 나감 | ✕ 위반 |
 | 본문 조각이 에러 메시지·스택에 실려 로그로 나감 | ✕ 위반 |
 | 본문이 `chrome.storage`에 **자동으로** 영속됨 | ✕ 위반 |
 | 사용자가 **버튼을 눌러 직접 저장한** 문장이 `chrome.storage`에만 남음 (스니펫 — 권장 10) | ✓ 허용 — 아래 단서 참조 |
@@ -41,6 +41,7 @@
 |---|---|---|
 | Firestore 쓰기 | **쓰기 코드 자체가 0건** | `functions/`·`src/`·`server/` 전수 grep |
 | Functions 로그 | enum·수치·불리언만 보간 | `functions/index.js:98,110` 로거 문자열 직접 확인 |
+| Worker 로그 (2026-10-27 추가) | 사유 코드·수치만 — 상한 확인 실패도 `error.code ?? name`만 | `workers/refine/src/handler.js` ⑥ 블록. 실측 수집은 숫자만 거르는 tail 필터(CLAUDE.md) |
 | 에러 로그 | `error.name`만 기록(메시지 미기록) | `functions/index.js:120` |
 | 스키마 검증 `issues` | `필드:사유` 고정 코드만 | `refine/schema.js`·`decode/schema.js` |
 | 캐시 **값** | 교정문 보관 — **메모리 전용**(`Map`+TTL, 직렬화 없음) | `MemoryCacheStore` 구현 확인 |

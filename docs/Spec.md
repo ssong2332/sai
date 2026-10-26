@@ -62,7 +62,7 @@
 | 필수 1 | 긴급도 기반 톤 변환 | ✅ | Critical/Normal/Low를 사용자가 고르고, 안 고르면 AI가 판정해 기본값으로 보여 준다. AI 판정이 실패하면 Normal + 실패 안내 |
 | 필수 2 | 우선순위 참고 (국가 고정관념 방지) | ✅ | **1순위** 내 상황(코드 리뷰·장애 대응·일정 조율·진행 보고) + 기본 톤 · **2순위** 3회 이상 쌓인 내 수정 패턴(3회 미만 유형은 쓰지 않음) · **3순위** 국가·문화권 일반 특성 |
 | 필수 3 | 역번역 상시 노출 + 토글 | ✅ | 교정문 아래 한국어 뜻을 기본으로 보여 주고, 끄기는 기기에 저장. ↻로 다시 만들기(권장 3) |
-| 필수 4 | 하소연 → 태스크 티켓 | ✅ | 하소연을 감지하면 제안하고, 수락하면 **문제 / 영향 / 요청** + 우려 수준. 네 칸이 모두 비면 제안하지 않는다 |
+| 필수 4 | 하소연 → 태스크 티켓 | ✅ | 하소연을 감지하면 제안하고, 수락하면 **문제 / 영향 / 다음 할 일** + 우려 수준. 세 칸은 **상대 언어**로 만들고 칸마다 내 언어 역번역을 붙인다(우려 수준은 내 언어, 보내지 않음). 「다음 할 일」은 작성자의 약속을 상대 요청으로 바꾸지 않는다. 「없음」 칸은 보내는 글에서 뺀다(2026-10-27, prompt refine-v23). 네 칸이 모두 비면 제안하지 않는다 |
 | 필수 5 | 심리스 교체 · Zero Retention · 클립보드 폴백 | ✅ | 적용하면 입력창 글을 바로 바꾼다. 실패하면 클립보드에 복사하고 Ctrl+V 안내. 5초 되돌리기(부가 1). 🔴 본문 무저장은 위 「금지 1」 |
 | 필수 6 | 퇴근 요정 (예약 **알림**) | ✅ 축소 | 상대가 업무 시간 밖이면 **상대 현지 09:00**을 제안하고, 주말·공휴일(Nager.Date)이면 다음 영업일로 미룬다. Low + 업무 외 시간이면 바로 적용 대신 「예약」만 보인다. 예약은 **보낼 때를 알려 주는 알림**이다(확장은 메시지를 대신 보내지 않는다). 상대 업무시간 학습은 없다(09:00 고정) |
 | 필수 7 | 용어집 | ✅ | 우선순위 개인 > 팀 > 기본 AI. 개인 용어집은 기기에, 팀 용어집은 Firestore. 「원문 유지」 지원. 「연동」은 CSV·TSV 붙여넣기 가져오기. 관리: 사이드 패널 보관함 · 설정 페이지 |
@@ -154,7 +154,7 @@
 ### 6-3. AI 파이프라인 — 단일 통합 호출 `POST /v1/refine`
 * **순차 호출 금지, 1회 호출로 구조화 JSON.** 모드 4개: 다듬기 · 뜻 풀기 · 결정 · 회신
 * provider 선택은 `src/core/refine/failover.js` `pickDefaultProvider` **한 곳** — ANTHROPIC 키 → anthropic, 없으면 GROQ. 폴오버는 사유가 `quota`·`auth`이고 요청이 provider를 명시하지 않았을 때만. 확장은 provider를 싣지 않는다
-* 다듬기 반환(주요 필드): `refined` · `refinedReason` · `backTranslation` · `urgency`(+`urgencySource`·`urgencyNotice`) · `detectedIntent` · `ticket` · `appliedGlossary` · `preserved` · `misreadRisks` · `missingElements` · `fallback`/`fallbackReason`. 정의: `src/core/refine/schema.js`
+* 다듬기 반환(주요 필드): `refined` · `refinedReason` · `backTranslation` · `urgency`(+`urgencySource`·`urgencyNotice`) · `detectedIntent` · `ticket` · `ticketBackTranslation`(v23) · `appliedGlossary` · `preserved` · `misreadRisks` · `missingElements` · `fallback`/`fallbackReason`. 정의: `src/core/refine/schema.js`
 * 코어 단일 출처 `src/core/` — Functions는 `scripts/sync-core.mjs`로 복사해 쓰고, Worker는 직접 번들한다
 
 ---

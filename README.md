@@ -20,17 +20,18 @@
 
 | 항목 | 값 |
 |---|---|
-| 확장 버전 | **v0.1.6** (`src/manifest.js`의 `version`은 릴리스 태그와 같은 값을 유지한다) |
-| 주 provider | Anthropic Claude `claude-haiku-5-5` (사고 끔, 2026-10-23 — Spec §0) |
+| 확장 버전 | **v0.1.44** (2026-10-27 — `package.json`과 `src/manifest.js`를 같은 값으로, 확장 동작이 바뀌는 PR마다 올린다) |
+| 서버 | **Cloudflare Workers** `sai-refine.aiisgod.workers.dev` — 교정 `/v1/refine`·팀 `/v1/team` (확장 0.1.30~). Cloud Functions는 2026-10-28 GCP 체험 종료로 중단(감수) |
+| 주 provider | Anthropic Claude `claude-haiku-5-5` (사고 끔, 2026-10-23 — Spec §0) · 프롬프트 `refine-v23` |
 | 한도 폴오버 | **anthropic → groq** ([src/core/refine/failover.js](src/core/refine/failover.js)) — Gemini·OpenAI는 명시 요청만 |
-| 단위 테스트 | 775건 |
+| 단위 테스트 | 확장 1127건 · Worker 97건 |
 
 🔴 **교정 품질을 고칠 때 «어느 쪽»을 배포해야 하는지 반드시 확인한다** (2026-08-20에 실제로
 틀렸다 — 서버만 배포하고 「반영됐다」고 안내했는데 절반만 반영됐다).
 
 | 무엇 | 어디에 있나 | 무엇을 배포해야 하나 |
 |---|---|---|
-| 프롬프트 «틀»(규칙 문장·조립 순서·`REFINE_PROMPT_VERSION`) | 서버 `src/core/refine/prompt.js` | `firebase deploy --only functions` |
+| 프롬프트 «틀»(규칙 문장·조립 순서·`REFINE_PROMPT_VERSION`) | 서버 `src/core/refine/prompt.js` (Worker 번들에 들어감) | `workers/refine/` 안에서 `npx wrangler deploy` (사용자 실행) |
 | **말투 힌트** `COLLAB_STYLES` | **확장** `src/lib/profile.js` | **새 릴리스(zip)** |
 | **수신자 태그 힌트** `RECIPIENT_TAGS` | **확장** `src/lib/recipients.js` | **새 릴리스(zip)** |
 | **상황 템플릿 힌트** `SITUATION_TEMPLATES` | **확장** `src/lib/profile.js` | **새 릴리스(zip)** |
@@ -82,7 +83,7 @@ npm run dev
 | 변수 | 위치 | 설명 |
 |---|---|---|
 | `OPENAI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖 — 명시 요청만(키 무효 2026-09-28~). 서버 전용, 클라이언트 번들 포함 금지 |
-| `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖(2026-10-23) — 명시 요청만. 🔴 배포 Functions는 사슬 시크릿 등록 전까지 **임시 기본** |
+| `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖(2026-10-23) — 명시 요청만. (옛 Functions의 임시 기본이었으나 Functions는 10-28 중단) |
 | `ANTHROPIC_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **기본 provider**(2026-10-23, Claude Haiku 5.5, 사고 끔 — `SAI_ANTHROPIC_THINKING=adaptive`로만 켬). 폴오버 1단계 |
 | `GROQ_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **폴오버 예비**(2026-10-23, `openai/gpt-oss-120b`). 폴오버 2단계 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
@@ -98,20 +99,20 @@ npm run dev
 확장은 LLM을 직접 부르지 않는다 — **API 키가 확장 번들에 들어가면 안 되기 때문**이다.
 [src/config.js](src/config.js)의 `REFINE_ENDPOINT`가 백엔드 주소를 정한다.
 
-### 프로덕션
+### 프로덕션 (확장 0.1.30~)
 
 ```
-https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/refineV1
+https://sai-refine.aiisgod.workers.dev/v1/refine   # 교정·뜻 풀기·결정·회신
+https://sai-refine.aiisgod.workers.dev/v1/team     # 팀·계정 삭제·지표
 ```
 
-- `functions/index.js`는 `src/core/{refine,decode,decisions,reply}`(→ `scripts/sync-core.mjs`가
-  배포 직전 `functions/core/`로 복사)를 얇게 감싼 Cloud Functions 2세대다.
-- 🔴 **로그인하지 않으면 401이다.** 인증이 없던 시절에는 URL만 알면 누구나 우리 키를 썼다.
-  하루 교정 상한도 서버가 센다(한국 시간 자정 초기화).
-- 🔴 **CORS는 확장 ID 오리진으로 좁혀져 있다** — `refineV1`은 전체 허용이 아니다.
-- 배포: `firebase deploy --only functions` · 확인: `curl …/health`
-- 🔴 **새 함수를 추가하면 `invoker: 'public'`을 명시한다.** 2세대 기본값은 「인증된 호출자만」이고
-  Firebase ID 토큰은 Cloud IAM 신원이 아니라, 로그인한 사용자여도 IAM 단계에서 먼저 잘린다.
+- `workers/refine/`는 공유 코어 `src/core/{refine,decode,decisions,reply}`를 **복사 없이 번들**하고,
+  팀 판정은 `functions/teams.js`·`account.js`를 그대로 부른다(Firestore는 서비스 계정 REST — `wrangler.toml` `[alias]`).
+- 🔴 **로그인하지 않으면 401이다.** Firebase ID 토큰을 `jose`로 검증한다. 하루 교정 상한도 서버가 센다.
+- 🔴 **CORS는 확장 오리진만** 허용한다(다른 오리진 403).
+- 배포: `workers/refine/` 안에서 `npx wrangler deploy` (🔴 사용자 실행) · 확인: `curl https://sai-refine.aiisgod.workers.dev/health`
+- 옛 Cloud Functions(`refineV1`·`teamV1`, `functions/index.js`)는 2026-10-28 GCP 체험 종료로 멈춘다(Tasks L27 — 감수).
+  `functions/`의 팀·계정 코드는 Worker가 그대로 쓰므로 지우지 않는다.
 
 ### 한도 폴오버
 
