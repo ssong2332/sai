@@ -117,3 +117,16 @@ test('🔴 문장으로 끝나는 짧은 줄은 이름이 아니다 — 「컴�
 test('🔴 다음 줄이 더 짧으면 집지 않는다 — 이름 위에 본문이 오지는 않는다', () => {
   assert.deepEqual(detectSpeakerNames(['홍길동', '네']), []);
 });
+
+test('🔴 collectThreadContext().messages 모양({text})도 받는다 — L18 7-3 실측: 문자열만 받아 실화면 감지가 0건이었다', () => {
+  assert.deepEqual(detectSpeakerNames([{ text: 'Sarah: can you check this today' }, { text: '홍길동：자료 확인 부탁드립니다' }]), [
+    'Sarah',
+    '홍길동',
+  ]);
+});
+
+test('🔴 숫자로 끝나는 조각은 이름이 아니다 — Slack 「이름 + 시각」 머리줄 (L18 7-3 실측 조각 그대로)', () => {
+  const slack = ['9월 28일 일요일', 'Slack에 가입했습니다. 시간을 내어 인사해보세요.', '이준호 오후 7:32 👋 안녕하세요', '7:32오후 7:32', '이준호:오후 7:32:소통해요'];
+  assert.deepEqual(detectSpeakerNames(slack.map((text) => ({ text }))), ['이준호']);
+  assert.deepEqual(detectSpeakerNames(['Sarah 10: see you']), []);
+});

@@ -28,6 +28,9 @@ const NAME_BEFORE_BRACKET = /^\s*([^\s<(][^<(\n]{0,29})\s*[<(]/;
  */
 const REJECT = [
   /^\d/, // 숫자로 시작 (시각·날짜·번호)
+  // 🔴 숫자로 끝남 — 「이름 + 시각」 머리줄(Slack `이준호 오후 7:32`)에서 시각의 `:` 앞이 붙은 조각이다
+  //    (2026-10-26 L18 7-3 실측 · 사용자 승인). `Alex2`처럼 숫자로 끝나는 이름은 손으로 추가한다.
+  /\d$/,
   /^https?$/i,
   /^(re|fw|fwd|참고|공지|알림|note|todo|tip)$/i,
   // 🔴 말줄임 — 잘린 문장 조각이다. `…`는 **한 글자**(U+2026)라 `{2,}`로는 안 잡힌다
@@ -64,7 +67,10 @@ function looksLikeStandaloneName(line) {
 /**
  * 직전 대화 줄들에서 발화자 이름 후보를 뽑는다.
  *
- * @param {string[]} lines `collectThreadContext()`가 모은 대화 조각.
+ * @param {(string|{text: string})[]} lines `collectThreadContext()`가 모은 대화 조각.
+ *   🔴 **`{text}` 객체도 받는다** (2026-10-26 L18 7-3 실측). `collectThreadContext().messages`는 객체 배열인데
+ *   예전엔 문자열만 받아 모든 줄이 「[object Object]」가 됐다 — 실제 화면에서 감지가 **한 번도** 되지 않았다
+ *   (단위 테스트는 문자열 배열만 넣어 통과했다).
  * @param {number} [limit] 최대 후보 수.
  * @returns {string[]} 자주 나온 순. 없으면 빈 배열.
  */
@@ -72,7 +78,7 @@ export function detectSpeakerNames(lines, limit = 3) {
   const counts = new Map();
   const list = Array.isArray(lines) ? lines : [];
   for (const [index, raw] of list.entries()) {
-    const line = String(raw ?? '');
+    const line = String((raw && typeof raw === 'object' ? raw.text : raw) ?? '');
     /**
      * 🔴 **구조가 `X: Y`·`X <Y>`면 그 구조로만 판정하고, 실패해도 아래 「별도 줄」로 흘리지
      *    않는다** (2026-08-16 테스트가 잡은 결함). 흘리면 이름 부분이 걸러진 줄이 **통째로**
@@ -102,7 +108,8 @@ export function detectSpeakerNames(lines, limit = 3) {
      *    ③ 20자 이내
      *    그래도 확신이 없으면 집지 않는다 — 잘못 집으면 사용자가 모르는 사람을 등록하게 된다.
      */
-    const next = String(list[index + 1] ?? '');
+    const nextRaw = list[index + 1];
+    const next = String((nextRaw && typeof nextRaw === 'object' ? nextRaw.text : nextRaw) ?? '');
     if (next.length <= line.length) continue;
     if (!looksLikeStandaloneName(line)) continue;
     const name = line.trim();

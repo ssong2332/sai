@@ -205,19 +205,44 @@ export default function RefinePopup({
   const [newRegionId, setNewRegionId] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState('');
+  /**
+   * 🔴 **감지된 이름으로 연 폼인가** (2026-10-26 L18 7-3 사용자 요청). 「＋ 이준호」를 누르면 바로 등록하지 않고
+   *    이 폼을 이름이 채워진 채로 연다. 이때만 **지역이 선택**이다 — 안 고르면 예전처럼 내 시간대·언어 미지정으로
+   *    둔다(`onAddPerson`). 「＋ 새 사람 추가」는 지금처럼 지역 필수(아래 `submitAdd` 주석).
+   */
+  const [addFromDetected, setAddFromDetected] = useState(false);
 
   const closeAdd = () => {
     setAdding(false);
     setNewName('');
     setNewRegionId('');
     setAddError('');
+    setAddFromDetected(false);
+  };
+
+  const openAddForDetected = (name) => {
+    setAdding(true);
+    setNewName(name);
+    setNewRegionId('');
+    setAddError('');
+    setAddFromDetected(true);
   };
 
   const submitAdd = async () => {
     const name = newName.trim();
     const region = REGIONS.find((entry) => entry.id === newRegionId) ?? null;
+    if (addFromDetected && name !== '' && !region) {
+      setAddBusy(true);
+      try {
+        await onAddPerson?.(name);
+        closeAdd();
+      } finally {
+        setAddBusy(false);
+      }
+      return;
+    }
     if (name === '' || !region) {
-      setAddError('이름과 지역을 모두 채워 주세요');
+      setAddError(addFromDetected ? '이름을 채워 주세요' : '이름과 지역을 모두 채워 주세요');
       return;
     }
     setAddBusy(true);
@@ -983,7 +1008,7 @@ export default function RefinePopup({
               key={name}
               type="button"
               className="sai-person-add"
-              onClick={() => onAddPerson?.(name)}
+              onClick={() => openAddForDetected(name)}
             >
               ＋ {name}
             </button>
@@ -1162,7 +1187,7 @@ export default function RefinePopup({
             value={newRegionId}
             onChange={(event) => setNewRegionId(event.target.value)}
           >
-            <option value="">지역을 고르세요</option>
+            <option value="">{addFromDetected ? '지역 (선택 — 안 고르면 내 시간대)' : '지역을 고르세요'}</option>
             {REGIONS.map((region) => (
               <option key={region.id} value={region.id}>
                 {region.label}
@@ -1193,7 +1218,7 @@ export default function RefinePopup({
             {addError !== '' ? (
               <span className="sai-add-error">{addError}</span>
             ) : (
-              '지역을 고르면 시간대와 쓸 언어가 함께 정해져요. 나머지는 사이드패널에서 바꿀 수 있어요.'
+              `지역을 고르면 시간대와 쓸 언어가 함께 정해져요.${addFromDetected ? ' 안 고르면 내 시간대로 두고 언어는 비워 둬요.' : ''} 나머지는 사이드패널에서 바꿀 수 있어요.`
             )}
           </p>
         </div>
