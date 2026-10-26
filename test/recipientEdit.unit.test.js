@@ -160,6 +160,29 @@ test('🔴 팀장을 넘겨받으면 로컬 역할이 owner로 바뀐다', async
   assert.equal(store[TEAMS_KEY][0].canViewDashboard, true);
 });
 
+test('🔴 팀장이 바꾼 이름이 팀원 목록에도 반영된다 · 이름을 안 주는 서버면 옛 이름 유지 (L18 4-7)', async () => {
+  const store = installStorage({
+    [TEAMS_KEY]: [
+      { teamId: 'a', name: '옛 이름', role: 'member', canViewDashboard: true },
+      { teamId: 'b', name: 'B', role: 'member', canViewDashboard: false },
+    ],
+    [ACTIVE_KEY]: 'a',
+    'sai.auth': { idToken: 'tok', refreshToken: 'r', expiresAt: Date.now() + 3600_000 },
+  });
+  const { refreshAllMemberships } = await loadTeamClient();
+
+  const result = await refreshAllMemberships({
+    fetchImpl: fakeFetch({
+      a: { role: 'member', canViewDashboard: true, name: '새 이름' },
+      b: { role: 'member', canViewDashboard: false },
+    }),
+  });
+
+  assert.equal(result.changed, true, '이름만 바뀌어도 저장해야 한다');
+  assert.equal(store[TEAMS_KEY][0].name, '새 이름');
+  assert.equal(store[TEAMS_KEY][1].name, 'B');
+});
+
 test('🔴 순서도 활성 팀도 바뀌지 않는다 — 갱신이 팀을 갈아치우면 안 된다', async () => {
   const store = installStorage({
     [TEAMS_KEY]: [

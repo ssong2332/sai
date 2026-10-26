@@ -314,6 +314,9 @@ export async function setMemberPermission(req, deps) {
  * 🔴 로컬(`chrome.storage`)의 값은 **참가 시점의 스냅샷**이라, 팀장이 나중에 권한을 바꿔도
  *    모른다. 대시보드를 열기 전에 서버에 다시 물어야 "권한이 없는데 열리는" 상태가 안 생긴다.
  */
+/** 팀 문서의 이름 — 없으면 null(클라이언트는 옛 이름을 유지한다). */
+const teamName = (team) => (team.exists && typeof team.get('name') === 'string' ? team.get('name') : null);
+
 export async function whoAmI(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
@@ -341,11 +344,13 @@ export async function whoAmI(req, deps) {
       { role: 'owner', canViewDashboard: true },
       { merge: true },
     );
-    return { role: 'owner', canViewDashboard: true, repaired: true };
+    return { role: 'owner', canViewDashboard: true, repaired: true, name: teamName(team) };
   }
 
   return {
     role,
+    // 🔴 2026-10-26 L18 4-7 — 팀장이 이름을 바꿔도 팀원 화면은 참가 때 이름 그대로였다. 패널을 열 때 부르는 이 응답에 싣는다.
+    name: teamName(team),
     // 팀장은 플래그와 무관하게 항상 본다 — 옛 문서에는 이 필드가 아예 없다.
     canViewDashboard: role === 'owner' || member.get('canViewDashboard') === true,
   };
