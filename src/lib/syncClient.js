@@ -248,7 +248,8 @@ export async function syncNow({ fetchImpl = globalThis.fetch } = {}) {
   );
   if (Object.keys(mergedOnboarding).length > 0) {
     await setLocal(STORAGE_KEYS.ONBOARDING, mergedOnboarding);
-    const fields = onboardingToFields(mergedOnboarding);
+    // 🔴 2026-10-26 L18 1-2 실측 — 감싸지 않은 `"ko"`를 보내 400 INVALID_ARGUMENT(08-20부터). 반드시 Firestore Value로 감싼다.
+    const fields = encodeFields(onboardingToFields(mergedOnboarding));
     const mask = Object.keys(fields)
       .map((key) => `updateMask.fieldPaths=${key}`)
       .join('&');
