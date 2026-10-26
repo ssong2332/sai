@@ -341,8 +341,11 @@ export async function mockRefine({
         request: 'Please share a changelog and give 24h notice before future spec changes.',
         concernLevel: '높음 — 반복된 변경에 대한 강한 피로감이 드러남',
       },
-      ticketBackTranslation:
-        '[문제점] API 스펙이 사전 공지 없이 변경됨 · [영향] 프론트 일정 약 3일 지연 · [요청] 변경 24시간 전 공지와 체인지로그 공유',
+      ticketBackTranslation: {
+        problem: 'API 스펙이 사전 공지 없이 변경됨',
+        impact: '프론트 일정이 약 3일 늦어질 수 있음',
+        request: '변경 로그를 공유하고, 앞으로 스펙 변경 24시간 전에 알려 주세요',
+      },
     },
     zh: {
       refined: isVenting
@@ -358,8 +361,11 @@ export async function mockRefine({
         request: '请提供变更日志，并在修改规范前提前 24 小时通知。',
         concernLevel: '높음 — 반복된 변경에 대한 강한 피로감이 드러남',
       },
-      ticketBackTranslation:
-        '[문제점] API 스펙이 사전 공지 없이 변경됨 · [영향] 프론트 일정 약 3일 지연 · [요청] 변경 24시간 전 공지와 체인지로그 공유',
+      ticketBackTranslation: {
+        problem: 'API 스펙이 사전 공지 없이 변경됨',
+        impact: '프론트 일정이 약 3일 늦어질 수 있음',
+        request: '변경 로그를 공유하고, 앞으로 스펙 변경 24시간 전에 알려 주세요',
+      },
     },
   };
 

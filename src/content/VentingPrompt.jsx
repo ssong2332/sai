@@ -26,7 +26,7 @@ export default function VentingPrompt({ result, onRefineOnly, onConvert, onClose
       <div className="sai-vent-body">
         <p className="sai-vent-title">감정이 담긴 메시지예요 — 티켓으로 변환할까요?</p>
         <p className="sai-vent-desc">
-          [문제점 / 영향 / 요청사항] 구조로 정리하고, 감정 톤은 &lsquo;우려 수준&rsquo;
+          [문제점 / 영향 / 다음 할 일] 구조로 정리하고, 감정 톤은 &lsquo;우려 수준&rsquo;
           메타데이터로 보존해요.
         </p>
 

@@ -1960,7 +1960,7 @@
   overflow-y: auto;
 }
 
-/* 티켓 — 3단(문제점/영향/요청사항) + 우려 수준(메타, 서술형만). */
+/* 티켓 — 3단(문제점/영향/다음 할 일) + 우려 수준(메타, 서술형만). */
 .sai-ticket {
   margin: 14px var(--gutter-popup) 12px;
   border: 0;
@@ -2001,6 +2001,14 @@
   font-size: var(--t-small);
   line-height: 1.55;
   color: var(--sub);
+}
+
+/* 칸별 역번역(내 언어) — 보내는 글 아래 한 단계 흐리게. */
+.sai-ticket-back {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--t-caption);
+  color: var(--mut);
 }
 
 .sai-concern {
