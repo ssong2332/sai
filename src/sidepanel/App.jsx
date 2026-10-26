@@ -194,6 +194,8 @@ export default function App() {
    *    (`src/settings/`, 「자세한 설정」)로 옮겼다. 저장 키·기본값은 그대로다 — 팝업은 전과 똑같이 읽는다.
    */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** 설정 시트를 열 때 바로 보여줄 묶음 — 'tone'이면 「보내는 글 기본값」으로 내려간다(2026-10-26 프로필 톤 링크). */
+  const [settingsFocus, setSettingsFocus] = useState(null);
   const [toast, setToast] = useState('');
 
   /**
@@ -529,7 +531,11 @@ export default function App() {
         )}
         {settingsOpen && (
           <SettingsTab
-            onClose={() => setSettingsOpen(false)}
+            onClose={() => {
+              setSettingsOpen(false);
+              setSettingsFocus(null);
+            }}
+            focus={settingsFocus}
             theme={theme}
             onToggleTheme={toggleTheme}
             onboarding={onboarding}
@@ -565,6 +571,10 @@ export default function App() {
             onCreateRecipient={createRecipient}
             onUpdateRecipient={editRecipient}
             onNotice={setToast}
+            onOpenToneSettings={() => {
+              setSettingsFocus('tone');
+              setSettingsOpen(true);
+            }}
           />
         )}
       </main>
@@ -1048,8 +1058,13 @@ function SheetChoice({ label, options, value, onPick, allowNone = false }) {
  * 🔴 「상대 지역」은 2026-08-16에 온보딩 질문에서 뺐던 값이다(값 하나로는 여러 나라와 일할 때 틀린다). 2026-10-25 사용자
  *    결정으로 시트에 다시 두되, 「사람마다 다르면 수신자에서 정한다」를 함께 적는다 — 저장값은 `languagePairFrom`의 기본값으로만 쓰인다.
  */
-function SettingsTab({ onClose, theme, onToggleTheme, onboarding, onChangeOnboarding, onNotice }) {
+function SettingsTab({ onClose, focus = null, theme, onToggleTheme, onboarding, onChangeOnboarding, onNotice }) {
   const pickList = (list) => list.map(({ id, label }) => ({ id, label }));
+  // 🔴 프로필 「기본 톤」 링크로 열렸으면 그 묶음으로 내려간다 — 맨 위 계정 카드에서 찾아 내려가게 하지 않는다.
+  const toneGroupRef = useRef(null);
+  useEffect(() => {
+    if (focus === 'tone') toneGroupRef.current?.scrollIntoView?.({ block: 'start' });
+  }, [focus]);
   return (
     <div className="settings-sheet" role="dialog" aria-label="설정">
       <div className="card-head card-head-bare">
@@ -1064,7 +1079,7 @@ function SettingsTab({ onClose, theme, onToggleTheme, onboarding, onChangeOnboar
        */}
       <AccountCard onNotice={onNotice} />
 
-      <div className="settings-group">
+      <div className="settings-group" ref={toneGroupRef}>
         <h3 className="group-title">보내는 글 기본값</h3>
         <p className="meta">바꾸면 다음 교정부터 적용돼요. 내 언어는 프로필 › 내 정보에 있어요.</p>
         <div className="card">
@@ -3611,6 +3626,7 @@ function ProfileTab({
   onCreateRecipient,
   onUpdateRecipient,
   onNotice,
+  onOpenToneSettings,
 }) {
   /**
    * 🔴 **말투는 「기본 톤」 하나다** (2026-10-25 사용자 결정 — 「협업 성향」을 「기본 톤」으로 합쳤다).
@@ -3742,8 +3758,13 @@ function ProfileTab({
           * 🔴 **「선호하는 말투」 칩을 뺐다** (2026-10-25 사용자 결정). 같은 축(`collabStyleId` = 온보딩 `tone`)이
           *    설정 시트 「기본 톤」에도 있어 두 자리에서 바꿀 수 있었다. 이제 말투는 「기본 톤」 하나로 정한다.
           */}
+        {/* 🔴 경로를 글로 설명하던 줄을 바로 가는 링크로 바꿨다(2026-10-26 사용자 요청). 값은 여기서 바꾸지 않는다 — 한 자리 원칙. */}
         <p className="meta">
-          말투는 설정(톱니) › 보내는 글 기본값의 「기본 톤」에서 정해요{toneLabel ? ` — 지금: ${toneLabel}` : ''}.
+          말투는{' '}
+          <button type="button" className="link-button link-inline" onClick={onOpenToneSettings}>
+            설정 › 기본 톤
+          </button>
+          에서 정해요{toneLabel ? ` — 지금: ${toneLabel}` : ''}.
         </p>
       </div>
 
