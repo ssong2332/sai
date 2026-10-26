@@ -320,6 +320,8 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
         const me = await callTeamApi('me', { teamId: team.teamId }, fetchImpl);
         return {
           ...team,
+          // 🔴 2026-10-26 L18 4-7 — 팀장이 바꾼 이름도 맞춘다. 서버가 이름을 안 주면(옛 서버·문서 없음) 옛 이름 유지.
+          name: typeof me.name === 'string' && me.name.trim() !== '' ? me.name : team.name,
           role: me.role ?? team.role,
           canViewDashboard: me.role === 'owner' || me.canViewDashboard === true,
         };
@@ -331,6 +333,7 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
 
   const changed = results.some(
     (next, index) =>
+      next.name !== teams[index].name ||
       next.role !== teams[index].role ||
       next.canViewDashboard !== teams[index].canViewDashboard,
   );

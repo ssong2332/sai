@@ -302,6 +302,7 @@ import {
   transferOwnership,
   regenerateInvite,
   renameTeam,
+  whoAmI,
 } from '../functions/teams.js';
 
 test('🔴 팀원이 팀원을 내보낼 수 없다', async () => {
@@ -406,6 +407,16 @@ test('🔴 팀원은 초대 코드를 재발급할 수 없다', async () => {
     () => regenerateInvite(req({ teamId: made.teamId }), deps(db, { uid: 'm' })),
     (e) => e.status === 403,
   );
+});
+
+test('🔴 이름을 바꾸면 팀원의 me 응답에 새 이름이 실린다 — 팀원 화면이 옛 이름에 머물지 않게 (L18 4-7)', async () => {
+  const db = fakeDb();
+  const made = await createTeam(req({ name: '옛 이름' }), deps(db, { uid: 'owner' }));
+  await joinTeam(req({ inviteCode: made.inviteCode }), deps(db, { uid: 'member' }));
+  await renameTeam(req({ teamId: made.teamId, name: '새 이름' }), deps(db, { uid: 'owner' }));
+  const me = await whoAmI(req({ teamId: made.teamId }), deps(db, { uid: 'member' }));
+  assert.equal(me.name, '새 이름');
+  assert.equal(me.role, 'member');
 });
 
 test('팀 이름을 바꾼다 · 빈 이름은 거절', async () => {

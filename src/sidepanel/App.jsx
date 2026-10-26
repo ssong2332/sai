@@ -1931,7 +1931,7 @@ function TeamMembersCard({ team, onToast, onChanged }) {
   const [note, setNote] = useState('');
   const [confirming, setConfirming] = useState(null); // {uid, kind:'kick'|'transfer'}
   const [freshCode, setFreshCode] = useState('');
-  const [nameDraft, setNameDraft] = useState('');
+  const [nameDraft, setNameDraft] = useState(null); // null = 손대지 않음(현재 이름을 보여 준다)
 
   const load = async () => {
     try {
@@ -1999,23 +1999,25 @@ function TeamMembersCard({ team, onToast, onChanged }) {
       </div>
       <p className="meta">팀장만 보이는 영역이에요. 대시보드를 볼 사람을 여기서 정해요.</p>
 
-      {/* 팀 이름 바꾸기 — 값이 바뀌었을 때만 저장 버튼을 낸다. */}
+      {/* 팀 이름 바꾸기 — 값이 바뀌었을 때만 저장 버튼을 낸다.
+          🔴 2026-10-26 L18 4-7: `nameDraft || team.name`이라 칸을 비우는 순간 원래 이름이 되살아나 지우고 다시 쓸 수 없었다.
+             null(손대지 않음)과 ''(비움)을 구분한다. */}
       <div className="github-suggest-form">
         <input
           className="form-input"
           placeholder="팀 이름"
           maxLength={40}
-          value={nameDraft || team.name}
+          value={nameDraft ?? team.name}
           onChange={(event) => setNameDraft(event.target.value)}
         />
         <button
           type="button"
           className="button"
-          disabled={nameDraft.trim() === '' || nameDraft === team.name}
+          disabled={nameDraft === null || nameDraft.trim() === '' || nameDraft.trim() === team.name}
           onClick={async () => {
             try {
-              await renameTeam(nameDraft);
-              setNameDraft('');
+              await renameTeam(nameDraft.trim());
+              setNameDraft(null);
               onToast('팀 이름을 바꿨어요');
               await onChanged?.();
             } catch (error) {
