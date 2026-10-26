@@ -1038,6 +1038,15 @@ export default function SaiOverlay({ autoButton = true }) {
       await setSelectedRecipientId(created.id);
       setPersonSuggestions([]);
       setToast(`${name} 님을 추가했어요 — 사이드패널에서 지역·언어를 정해 주세요`);
+      /**
+       * 🔴 받는 사람이 바뀌었으니 교정·예약 계산을 다시 돌린다 — `addRecipientInline`과 같은 규칙
+       *    (2026-10-26 L18 7-3 실측: 안 돌려서 앞 사람(Jenni)의 「퇴근 시간대 · 월 09:00」 배너가
+       *    새 사람 이름으로 그대로 남았다. 시계는 새 사람 기준 14:53인데 배너만 퇴근 시간대였다).
+       */
+      if (stage === 'refine') {
+        runRefine(result?.urgencySource === 'user' ? result.urgency : null);
+        runSchedule(created);
+      }
     } catch {
       setToast('추가하지 못했어요');
     }
