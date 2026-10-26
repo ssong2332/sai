@@ -299,7 +299,8 @@ export async function refreshMembership({ fetchImpl = globalThis.fetch } = {}) {
  *   ① 팀장이 나에게 팀장을 넘겼다 → 서버는 `owner`인데 내 화면은 계속 팀원이라 **팀 관리가
  *      영영 안 보인다.** (사용자가 겪은 증상이 이것이다.)
  *   ② 팀장이 대시보드 열람을 껐다 → 내 화면엔 아직 대시보드 버튼이 남아 있다.
- *   ③ 팀장이 나를 내보냈다 → 여기서는 다루지 않는다(아래 실패 정책).
+ *   ③ 팀장이 나를 내보냈다(또는 팀이 지워졌다) → 서버가 **`not-a-member`(403)로 확정**하면 목록에서 뺀다
+ *      (2026-10-26 L18 4-10 실측 — 내보내진 팀원 화면에 팀이 계속 남았다). 그 밖의 실패는 아래 정책대로 옛 값.
  *
  * 🔴 **`refreshMembership`으로는 안 됐다.** 그건 **활성 팀 하나**만 고치고, 게다가 `upsertTeam`이
  *    목록 순서를 바꾸고 그 팀을 활성으로 만들어 버린다 — 여러 팀에 반복하면 **활성 팀이 마지막
@@ -325,11 +326,24 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
           role: me.role ?? team.role,
           canViewDashboard: me.role === 'owner' || me.canViewDashboard === true,
         };
-      } catch {
+      } catch (error) {
+        // 🔴 서버가 「팀원이 아님」을 확정한 경우만 뺀다 — 네트워크·권한·알 수 없는 오류는 옛 값 유지.
+        if (error?.reason === TEAM_ERRORS.NOT_A_MEMBER) return null;
         return team; // 이 팀만 옛 값으로 남는다.
       }
     }),
   );
+
+  const removed = results.filter((team) => team === null).length;
+  if (removed > 0) {
+    const kept = results.filter(Boolean);
+    const active = await getLocal(STORAGE_KEYS.ACTIVE_TEAM, null);
+    await setLocal(STORAGE_KEYS.TEAMS, kept);
+    // 활성 팀이 빠졌을 때만 옮긴다(leaveTeam과 같은 규칙) — 남은 팀이 활성이면 그대로.
+    if (!kept.some((team) => team.teamId === active)) await setLocal(STORAGE_KEYS.ACTIVE_TEAM, kept[0]?.teamId ?? null);
+    if (kept.length === 0) await removeLocal(STORAGE_KEYS.TEAM);
+    return { teams: kept, changed: true, removed };
+  }
 
   const changed = results.some(
     (next, index) =>
