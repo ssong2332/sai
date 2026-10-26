@@ -586,6 +586,70 @@ button {
   background: var(--ink);
 }
 
+/**
+ * 작은 동작 버튼 (2026-10-27 사용자 지적 — 밑줄 글자 버튼이 나란히 붙어 구분이 안 됐다).
+ * 🔴 밑줄 글자(`link-button`)는 **혼자 있는 가벼운 이동**에만 쓴다. 나란히 놓이는 동작·지우는 동작은 이 칩이다.
+ *    `chip-danger` = 되돌리기 어려운 동작(내보내기·전체 삭제) — 실패·차단 색(--fault)의 옅은 바탕.
+ */
+.chip-action,
+.tag-row .chip.chip-action {
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.chip-action:hover {
+  background: color-mix(in oklab, var(--sunken) 86%, var(--ink));
+}
+
+.chip-action.chip-danger,
+.tag-row .chip.chip-action.chip-danger {
+  color: var(--fault-deep);
+  background: var(--fault-tint);
+  box-shadow: none;
+}
+
+.chip-action.chip-danger:hover {
+  background: color-mix(in oklab, var(--fault-tint) 80%, var(--fault));
+}
+
+/* 확인 단계의 실행 칩(지우기) — 채움 */
+.tag-row .chip.chip-danger-solid,
+.chip-danger-solid {
+  cursor: pointer;
+  color: var(--on-ink);
+  background: var(--fault-deep);
+  font-weight: 700;
+}
+
+/**
+ * 접고 펴는 목록 줄 (2026-10-27 E) — 「목록 보기 (N명)」. 밑줄 링크였을 때 머리줄 「＋ 추가/취소」와 위아래로
+ * 붙어 헷갈렸다. 줄 전체가 눌리는 모양 + 오른쪽 화살표로 「펼침」임을 보인다.
+ */
+.list-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 8px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--sunken);
+  color: var(--sub);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.list-toggle:hover,
+.list-toggle:focus-visible {
+  color: var(--ink);
+}
+
 .chip-outline {
   color: var(--sub);
   background: transparent;

@@ -737,7 +737,8 @@ a {
   text-align: right;
   white-space: nowrap;
 }
-.gl-row-actions .link-button + .link-button {
+.gl-row-actions .link-button + .link-button,
+.gl-row-actions > .btn + .btn {
   margin-left: 8px;
 }
 .gl-editing td {

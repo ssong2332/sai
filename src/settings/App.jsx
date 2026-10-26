@@ -724,7 +724,7 @@ function GlossaryPanel({ data, act }) {
                           <span>삭제할까요?</span>
                           <button
                             type="button"
-                            className="btn sm danger press"
+                            className="btn sm danger-solid press"
                             onClick={async () => {
                               await act(() => removePersonalGlossaryEntry(item.id), '용어를 삭제했어요');
                               setConfirming(null);
@@ -738,10 +738,11 @@ function GlossaryPanel({ data, act }) {
                         </span>
                       ) : (
                         <>
-                          <button type="button" className="link-button" onClick={() => setEditing(item.id)}>
+                          {/* 🔴 작은 버튼 (2026-10-27 사용자 승인 C) — 밑줄 글자 둘이 나란히 붙어 구분이 안 됐다. 삭제는 경고색. */}
+                          <button type="button" className="btn sm press" onClick={() => setEditing(item.id)}>
                             수정
                           </button>
-                          <button type="button" className="link-button" onClick={() => setConfirming(item.id)}>
+                          <button type="button" className="btn sm danger press" onClick={() => setConfirming(item.id)}>
                             삭제
                           </button>
                         </>

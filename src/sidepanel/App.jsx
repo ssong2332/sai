@@ -1691,20 +1691,22 @@ function MeetingCard({ onAwarded, onToast }) {
                   *    구글/아웃룩의 「일정 만들기」 화면을 값만 채워 열고, 저장은 사용자가 그쪽에서
                   *    직접 누른다. 우리가 남의 달력에 조용히 쓰는 권한을 갖지 않는다.
                   * 🔴 두 버튼을 나란히 두지 않고 **한 줄 링크**로 줄였다(①) — 주 동작은 초안 복사다.
+                  * 🔴 2026-10-27 — 밑줄 글자는 문장 속 글자처럼 보여 버튼인지 몰랐다(사용자 승인 D). 작은 칩으로 —
+                  *    여전히 주 동작(초안 복사)보다 가볍다.
                   */}
                 <button
                   type="button"
-                  className="link-button link-inline"
+                  className="chip chip-action"
                   onClick={() => window.open(calLinks.google, '_blank', 'noopener')}
                 >
-                  구글 캘린더
+                  ＋ 구글 캘린더
                 </button>
                 <button
                   type="button"
-                  className="link-button link-inline"
+                  className="chip chip-action"
                   onClick={() => window.open(calLinks.outlook, '_blank', 'noopener')}
                 >
-                  아웃룩
+                  ＋ 아웃룩
                 </button>
                 <button type="button" className="button button-quiet" onClick={() => setChosen(null)}>
                   닫기
@@ -2173,17 +2175,18 @@ function TeamMembersCard({ team, onToast, onChanged }) {
                       </div>
                     </div>
                   ) : (
+                    // 🔴 칩 버튼 (2026-10-27) — 밑줄 글자 둘이 나란히 붙어 있어 무엇을 누르는지 헷갈렸다. 내보내기는 경고색.
                     <div className="member-actions">
                       <button
                         type="button"
-                        className="link-button link-inline"
+                        className="chip chip-action"
                         onClick={() => setConfirming({ uid: person.uid, kind: 'transfer' })}
                       >
                         팀장 넘기기
                       </button>
                       <button
                         type="button"
-                        className="link-button link-inline"
+                        className="chip chip-action chip-danger"
                         onClick={() => setConfirming({ uid: person.uid, kind: 'kick' })}
                       >
                         내보내기
@@ -3661,6 +3664,7 @@ function ProfileTab({
   }, []);
   const meChosen = !!identity.displayName && !!toneLabel;
   const [meOpen, setMeOpen] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   return (
     <>
@@ -3791,10 +3795,36 @@ function ProfileTab({
       <div className="profile-block">
       <div className="card-head card-head-bare">
         <h3 className="card-label">2순위 — AI가 학습한 내 수정 패턴</h3>
-        <button type="button" className="link-button" onClick={onClear}>
-          전체 삭제
-        </button>
+        {/* 🔴 **확인을 거친다** (2026-10-27 사용자 승인 A). 예전엔 밑줄 글자 한 번에 학습 내역 전부와 서버 기록이
+            지워졌다 — 되돌릴 수 없는데 확인 단계가 없었다. */}
+        {!confirmingClear && (
+          <button type="button" className="chip chip-action chip-danger" onClick={() => setConfirmingClear(true)}>
+            전체 삭제
+          </button>
+        )}
       </div>
+      {confirmingClear && (
+        <div className="member-confirm" role="alertdialog">
+          <p className="meta">
+            학습한 수정 패턴 {items.length}개를 모두 지워요. 서버에 있는 기록도 함께 지워지고 되돌릴 수 없어요.
+          </p>
+          <div className="tag-row">
+            <button type="button" className="chip chip-action" onClick={() => setConfirmingClear(false)}>
+              취소
+            </button>
+            <button
+              type="button"
+              className="chip chip-danger-solid"
+              onClick={async () => {
+                setConfirmingClear(false);
+                await onClear();
+              }}
+            >
+              전체 삭제
+            </button>
+          </div>
+        </div>
+      )}
 
       {(
         items.map((item) => (
@@ -4418,9 +4448,17 @@ function RecipientSection({
         *    가끔 고칠 것**이다. 몇 명인지만 보이면 평소에는 충분하다.
         * 🔴 등록된 사람이 없을 때는 접는 버튼을 내지 않는다 — 열어 봐야 빈 화면이다.
         */}
+      {/* 🔴 2026-10-27(사용자 승인 E) — 밑줄 링크였을 때 머리줄 「＋ 추가/취소」와 위아래로 붙어 헷갈렸다.
+          줄 전체가 눌리는 접기 줄로 바꿨다(`.list-toggle`). */}
       {recipients.length > 0 && (
-        <button type="button" className="link-button" onClick={() => setListOpen((v) => !v)}>
-          {listOpen ? '목록 접기' : `목록 보기 (${recipients.length}명)`}
+        <button
+          type="button"
+          className="list-toggle"
+          aria-expanded={listOpen}
+          onClick={() => setListOpen((v) => !v)}
+        >
+          <span>{listOpen ? '목록 접기' : `목록 보기 (${recipients.length}명)`}</span>
+          <span aria-hidden="true">{listOpen ? '▴' : '▾'}</span>
         </button>
       )}
 
