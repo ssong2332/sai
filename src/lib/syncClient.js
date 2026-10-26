@@ -167,11 +167,15 @@ const REMOTE_FIELD = { language: 'language', tone: 'tone', partnerRegion: 'partn
  * | 이 기기에서 **처음** 동기화 · 원격에 값 있음 | 원격 |
  * | 처음 동기화 · 원격에 값 없음 | 로컬 |
  * | 동기화한 적 있음 · 그 뒤 **이 기기에서 바꾼 칸** | 로컬 (`null`이면 원격 칸을 지운다) |
- * | 동기화한 적 있음 · 이 기기에서 안 바꾼 칸 | 원격 (없으면 로컬) |
+ * | 동기화한 적 있음 · 이 기기에서 안 바꾼 칸 | 원격 — 원격에 **없으면 비운다** |
  * | 두 기기에서 같은 칸을 각각 바꿈 | 나중에 동기화한 쪽 (알려진 한계) |
  *
  * 🔴 예전 규칙은 「로컬이 항상 이김」이라, 온보딩을 마친 새 기기(세 칸이 `null`까지 저장됨)가
  *    원격 값을 하나도 받아 오지 못하고 오히려 자기 기본값으로 서버를 덮었다(L18 1-3 실측).
+ *
+ * 🔴 4행의 「없으면 비운다」(2026-10-26 L18 1-3 2차 실측): 동기화한 기기는 지난번에 자기 값을 올렸으므로,
+ *    원격에 그 칸이 없다면 **다른 기기가 「선택 안 함」으로 비운 것**이다. 예전엔 로컬 값을 남겨
+ *    한 기기에서 비운 칸이 다른 기기로 퍼지지 않았다.
  *
  * @returns {{merged: object, pulled: string[], cleared: string[]}}
  *   `pulled`: 원격 값으로 바뀐 칸 · `cleared`: 원격에서 지워야 할 칸(로컬에서 비운 칸)
@@ -187,9 +191,9 @@ export function mergeOnboarding(local, remote, state) {
       if ((merged[key] ?? null) === null && remote?.[key] !== undefined) cleared.push(key);
       continue;
     }
-    const value = remote?.[key];
+    const value = remote?.[key] ?? (synced ? null : undefined);
     if (value === undefined) continue;
-    if (merged[key] !== value) pulled.push(key);
+    if ((merged[key] ?? null) !== value) pulled.push(key);
     merged[key] = value;
   }
   return { merged, pulled, cleared };
@@ -282,7 +286,16 @@ export async function syncNow({ fetchImpl = globalThis.fetch } = {}) {
   const remoteOnboarding = fieldsToOnboarding(remoteUser?.fields);
   const localOnboarding = (await getLocal(STORAGE_KEYS.ONBOARDING, null)) ?? {};
   const syncState = await getLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: false, dirty: [] });
-  const { merged: mergedOnboarding, pulled, cleared } = mergeOnboarding(localOnboarding, remoteOnboarding, syncState);
+  /**
+   * 🔴 원격 문서 자체가 없으면(404·필드 없음 — 계정 삭제 뒤 등) 「다른 기기가 비웠다」로 읽지 않는다.
+   *    처음 동기화처럼 다뤄 로컬 값을 지키고 다시 올린다(판정표 2행).
+   */
+  const remoteExists = Boolean(remoteUser?.fields);
+  const { merged: mergedOnboarding, pulled, cleared } = mergeOnboarding(
+    localOnboarding,
+    remoteOnboarding,
+    remoteExists ? syncState : { synced: false, dirty: [] },
+  );
   const pulledOnboarding = pulled.length > 0;
   if (pulledOnboarding) {
     await setLocal(STORAGE_KEYS.ONBOARDING, mergedOnboarding);

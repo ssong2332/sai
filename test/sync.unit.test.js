@@ -427,6 +427,18 @@ test('판정표 4행 — 동기화한 적 있고 안 바꾼 칸 → 원격 (다�
   assert.deepEqual(pulled, ['tone']);
 });
 
+test('🔴 판정표 4행 — 다른 기기가 「선택 안 함」으로 비운 칸(원격에 없음)은 이 기기에서도 비운다 (L18 1-3 2차 실측)', () => {
+  const { merged, pulled } = mergeOnboarding(
+    { partnerRegion: 'english', tone: 'conclusion' },
+    { tone: 'conclusion' },
+    { synced: true, dirty: [] },
+  );
+  assert.equal(merged.partnerRegion, null);
+  assert.deepEqual(pulled, ['partnerRegion']);
+  // 처음 동기화하는 기기는 원격에 없는 칸을 비우지 않는다(2행).
+  assert.equal(mergeOnboarding({ partnerRegion: 'english' }, {}, { synced: false, dirty: [] }).merged.partnerRegion, 'english');
+});
+
 test('🔴 L18 1-3 실측 재현 — 온보딩을 마친 새 기기가 원격 톤·지역을 받고, 프로필 말투도 맞춘다', async () => {
   await signedIn();
   await setLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: false, dirty: [] });
