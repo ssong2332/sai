@@ -1070,6 +1070,8 @@ export default function SaiOverlay({ autoButton = true }) {
     setRecipients(list);
     setRecipient(created);
     await setSelectedRecipientId(created.id);
+    // 감지 후보를 폼에서 지역과 함께 추가했으면 그 제안 줄도 걷는다(2026-10-26).
+    setPersonSuggestions((names) => names.filter((n) => n.trim().toLowerCase() !== created.name.trim().toLowerCase()));
     setToast(`${created.name} 님을 추가했어요`);
     if (stage === 'refine') {
       runRefine(result?.urgencySource === 'user' ? result.urgency : null);
