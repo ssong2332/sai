@@ -1808,6 +1808,12 @@ button {
   scrollbar-gutter: stable;
 }
 
+/* 수정 중 — 상한을 풀어 폼 전체(취소·저장 포함)가 상자 안 스크롤 없이 보이게 (2026-10-27). */
+.glossary-list.glossary-list-editing {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .glossary-list::-webkit-scrollbar {
   width: 8px;
 }
