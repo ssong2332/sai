@@ -78,21 +78,29 @@ export default function RegionPicker({ timeZone, onPick }) {
 
   return (
     <div className="region-picker">
-      <input
-        className="form-input"
-        placeholder="검색하거나 직접 입력 — 베를린 / berlin / DE / Europe/Lisbon"
-        value={query}
-        autoFocus
-        onChange={(event) => setQuery(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-          if (event.key !== 'Enter') return;
-          // 🔴 목록에 있으면 목록이 이긴다 — 친 값이 우연히 타임존 모양이어도 사용자는 보통 목록을 원한다.
-          if (matches[0]) choose(matches[0]);
-          else if (typedIsValidZone) choose({ timeZone: query.trim(), countryCode: null });
-        }}
-        aria-label="지역 검색 또는 직접 입력"
-      />
+      {/* 🔴 「닫기」는 **검색칸 옆(위)**에 둔다 (2026-10-27 사용자 지적). 예전엔 목록 아래 「목록에 없어요 — 직접
+          입력할게요」 바로 밑에 같은 글자 링크로 붙어 있어, 둘이 한 묶음처럼 보이고 잘못 누르기 쉬웠다.
+          닫기 = 콤보박스를 접는 동작이라 여는 자리(위)에, 직접 입력 = 목록의 대안이라 목록 아래에 둔다. */}
+      <div className="region-search-row">
+        <input
+          className="form-input"
+          placeholder="검색하거나 직접 입력 — 베를린 / berlin / DE / Europe/Lisbon"
+          value={query}
+          autoFocus
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setOpen(false);
+            if (event.key !== 'Enter') return;
+            // 🔴 목록에 있으면 목록이 이긴다 — 친 값이 우연히 타임존 모양이어도 사용자는 보통 목록을 원한다.
+            if (matches[0]) choose(matches[0]);
+            else if (typedIsValidZone) choose({ timeZone: query.trim(), countryCode: null });
+          }}
+          aria-label="지역 검색 또는 직접 입력"
+        />
+        <button type="button" className="button region-close" onClick={() => setOpen(false)}>
+          닫기
+        </button>
+      </div>
 
       <div className="region-list" role="listbox">
         {matches.map((region) => (
@@ -144,10 +152,10 @@ export default function RegionPicker({ timeZone, onPick }) {
       {manual === null ? (
         <button
           type="button"
-          className="link-button"
+          className="region-manual-open"
           onClick={() => setManual({ timeZone: typedIsValidZone ? query.trim() : '', countryCode: '' })}
         >
-          목록에 없어요 — 직접 입력할게요
+          ＋ 목록에 없는 지역 직접 입력
         </button>
       ) : (
         <div className="region-manual">
@@ -199,10 +207,6 @@ export default function RegionPicker({ timeZone, onPick }) {
           </div>
         </div>
       )}
-
-      <button type="button" className="link-button" onClick={() => setOpen(false)}>
-        닫기
-      </button>
     </div>
   );
 }
