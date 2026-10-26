@@ -157,6 +157,28 @@ test('🔴 PATCH에 updateMask가 반드시 붙는다 — 없으면 다른 필�
   }
 });
 
+test('🔴 PATCH 본문의 값은 전부 Firestore Value 모양이다 — 맨 문자열이면 400 (2026-10-26 L18 실측)', async () => {
+  await signedIn();
+  await setLocal(STORAGE_KEYS.ONBOARDING, { language: 'ko', tone: 'brief', partnerRegion: 'eu', completedAt: 'x' });
+  await setLocal(STORAGE_KEYS.LEARNED_PATTERNS, { 'fewer-apologies': 2 });
+
+  const impl = fakeFetch(() => ({ body: {} }));
+  await syncNow({ fetchImpl: impl });
+
+  const patches = impl.calls.filter((c) => c.init.method === 'PATCH');
+  const user = patches.find((c) => !c.url.includes('learnedPatterns'));
+  assert.deepEqual(user.body.fields, {
+    language: { stringValue: 'ko' },
+    tone: { stringValue: 'brief' },
+    partnerRegions: { arrayValue: { values: [{ stringValue: 'eu' }] } },
+  });
+  for (const call of patches) {
+    for (const [key, value] of Object.entries(call.body.fields)) {
+      assert.ok(value && typeof value === 'object' && ['stringValue', 'integerValue', 'arrayValue'].some((k) => k in value), `감싸지 않은 값: ${key}`);
+    }
+  }
+});
+
 test('원격이 앞서면 로컬 학습 횟수가 올라간다', async () => {
   await signedIn();
   await setLocal(STORAGE_KEYS.ONBOARDING, { language: 'ko' });
