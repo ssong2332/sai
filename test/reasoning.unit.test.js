@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildReasoning, occursIn, PRESERVED_LABELS } from '../src/core/refine/reasoning.js';
+import { buildReasoning, occursIn, PRESERVED_LABELS, isPersonAddress } from '../src/core/refine/reasoning.js';
 
 const SOURCE = '금요일까지 초안 3건 보내주시면 좋겠습니다. 확인 부탁드려요 팀장님.';
 const REFINED =
@@ -103,6 +103,28 @@ test('미등록 경어는 실제로 있는 것만, 중복 없이', () => {
     SOURCE,
   );
   assert.deepEqual(out.honorifics, ['팀장님']);
+});
+
+test('🔴 존대 어미·인사는 「용어집에 없는 호칭」이 아니다 (2026-10-27 실확장 「드릴게요」·「안녕하세요.」)', () => {
+  const source = '금요일까지 다시 공유드릴게요. 안녕하세요. 김 대리님께도 전해 주세요.';
+  const out = buildReasoning(
+    base({ refined: 'x', unregisteredHonorifics: ['드릴게요', '안녕하세요.', '김 대리님'] }),
+    source,
+  );
+  assert.deepEqual(out.honorifics, ['김 대리님']);
+});
+
+test('사람 호칭 판정 — 직함·님·씨·영어·중국어 호칭은 보이고, 어미는 버린다', () => {
+  for (const word of ['팀장님', '민수 씨', '박 과장', 'Mr. Kim', 'Dr. Lee', '王先生', '李经理']) {
+    assert.equal(isPersonAddress(word), true, word);
+  }
+  for (const word of ['드릴게요', '안녕하세요.', '감사합니다', '부탁드립니다', 'Thanks']) {
+    assert.equal(isPersonAddress(word), false, word);
+  }
+});
+
+test('🔴 보존 라벨 action은 「할 일」 — 약속에도 「요청 유지」가 붙지 않게 (2026-10-27)', () => {
+  assert.equal(PRESERVED_LABELS.action, '할 일');
 });
 
 /* ── ② 볼 게 없으면 0 ────────────────────────────────────────────────── */
