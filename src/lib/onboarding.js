@@ -56,6 +56,22 @@ export const DEFAULT_TONES = [
 
 const EMPTY = { language: null, partnerRegion: null, tone: null, completedAt: null };
 
+/** 기기 간 동기화 대상 칸 — `syncClient.js` 판정표와 같은 목록. */
+export const SYNCED_ONBOARDING_FIELDS = ['language', 'partnerRegion', 'tone'];
+
+/**
+ * 저장 전후를 비교해 **바뀐 칸 이름**을 동기화 대기 목록(`dirty`)에 더한다 (2026-10-26 L18 1-3).
+ * 🔴 값은 담지 않는다. 🔴 이 파일의 모든 저장 경로가 부른다 — 하나라도 빠지면 그 경로로 바꾼 값이
+ *    다음 동기화에서 원격 값으로 되돌아간다(`syncClient.js` 판정표 3행).
+ */
+async function markSyncDirty(prev, next) {
+  const changed = SYNCED_ONBOARDING_FIELDS.filter((key) => (prev?.[key] ?? null) !== (next?.[key] ?? null));
+  if (changed.length === 0) return;
+  const state = await getLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: false, dirty: [] });
+  const dirty = Array.from(new Set([...(state?.dirty ?? []), ...changed]));
+  await setLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: state?.synced === true, dirty });
+}
+
 export async function getOnboarding() {
   return getLocal(STORAGE_KEYS.ONBOARDING, EMPTY);
 }
@@ -79,7 +95,9 @@ export async function saveOnboarding({ language, partnerRegion, tone }) {
     tone: tone ?? null,
     completedAt: new Date().toISOString(),
   };
+  const prev = await getOnboarding();
   await setLocal(STORAGE_KEYS.ONBOARDING, next);
+  await markSyncDirty(prev, next);
 
   if (tone) {
     // 순환 import를 피하려고 지연 로드한다(profile.js는 storage.js만 의존).
@@ -105,6 +123,7 @@ export async function setMyLanguage(language) {
     language: MY_LANGUAGES.some((item) => item.id === language) ? language : null,
   };
   await setLocal(STORAGE_KEYS.ONBOARDING, next);
+  await markSyncDirty(current, next);
   return next;
 }
 
@@ -126,6 +145,7 @@ export async function setOnboardingFields(patch) {
   if (patch?.partnerRegion !== undefined) next.partnerRegion = pick(PARTNER_REGIONS, patch.partnerRegion);
   if (patch?.tone !== undefined) next.tone = pick(DEFAULT_TONES, patch.tone);
   await setLocal(STORAGE_KEYS.ONBOARDING, next);
+  await markSyncDirty(current, next);
 
   if (patch?.tone !== undefined && next.tone) {
     const { setProfile } = await import('./profile.js');
@@ -160,7 +180,9 @@ export async function setProfileSyncingTone(patch) {
 
 /** 다시 하기 — 저장값을 지워 질문이 다시 뜨게 한다. */
 export async function resetOnboarding() {
+  const prev = await getOnboarding();
   await setLocal(STORAGE_KEYS.ONBOARDING, EMPTY);
+  await markSyncDirty(prev, EMPTY);
 }
 
 /**

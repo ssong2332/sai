@@ -102,6 +102,12 @@ export const STORAGE_KEYS = {
    */
   ONBOARDING: 'sai.onboarding',
   /**
+   * {synced: boolean, dirty: string[]} — 온보딩 동기화 상태 (2026-10-26 L18 1-3). `syncClient.js` 판정표가 쓴다.
+   * `synced`는 이 기기가 동기화를 끝낸 적 있는지, `dirty`는 마지막 동기화 뒤 이 기기에서 바꾼 칸
+   * (`language`·`partnerRegion`·`tone`). 🔴 값이 아니라 **칸 이름만** 담는다.
+   */
+  ONBOARDING_SYNC: 'sai.onboarding.sync',
+  /**
    * 승인 문장 스니펫 (Spec 권장 10 F-16). S20이 쓴다.
    * 🔴 **여기에만 교정문이 영속된다.** 사용자가 버튼을 눌러 직접 저장한 것만 들어가며, 서버·
    *    Firestore·`chrome.storage.sync` 어디로도 나가지 않는다 — 근거와 조건은
