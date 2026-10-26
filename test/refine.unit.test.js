@@ -181,6 +181,56 @@ test('venting이면 4개 섹션이 모두 채워진 ticket을 반환하고 빈 �
   });
 });
 
+/* ── 티켓 번역 (2026-10-27 A안) — 상대 언어 티켓 + 칸별 역번역 + 「다음 할 일」 ─────── */
+
+test('티켓 지시: 세 칸은 상대 언어, 우려 수준과 역번역은 원문 언어로 쓰라고 한다', () => {
+  const { instruction } = buildRefinePayload(BASE_REQUEST);
+  assert.match(instruction, /Write "problem", "impact" and "request" in English/);
+  assert.match(instruction, /Write "concernLevel" in Korean/);
+  assert.match(instruction, /"ticketBackTranslation"[^.]*into Korean/);
+  // 「다음 할 일」 — 작성자의 약속을 상대에게 하는 요청으로 바꾸지 않는다.
+  assert.match(instruction, /never turn the author's own commitment into a request to the recipient/);
+  assert.match(instruction, /"ticketBackTranslation": \{"problem"/);
+});
+
+test('티켓 지시는 언어쌍을 따라간다 — 중국어 상대면 세 칸이 Chinese', () => {
+  const { instruction } = buildRefinePayload({ ...BASE_REQUEST, targetLanguage: 'zh' });
+  assert.match(instruction, /Write "problem", "impact" and "request" in Chinese/);
+});
+
+test('venting이면 칸별 역번역을 정규화해 돌려준다(빈 칸은 「없음」)', async () => {
+  const raw = goodRaw({
+    detectedIntent: 'venting',
+    intentEvidence: '지칩니다',
+    ticket: { problem: 'The schedule slipped again.', impact: '없음', request: 'I will re-share the plan by Friday.', concernLevel: '피로감' },
+    ticketBackTranslation: { problem: '일정이 또 밀렸다.', impact: '', request: '금요일까지 계획을 다시 공유하겠다.' },
+  });
+  const result = await refine(BASE_REQUEST, deps(stubFetch(raw)));
+  assert.deepEqual(result.ticketBackTranslation, {
+    problem: '일정이 또 밀렸다.',
+    impact: '없음',
+    request: '금요일까지 계획을 다시 공유하겠다.',
+  });
+});
+
+test('티켓 역번역이 없어도 티켓은 버리지 않는다 — 역번역만 null + 사유 코드', () => {
+  const raw = goodRaw({
+    detectedIntent: 'venting',
+    ticket: { problem: 'p', impact: 'i', request: 'r', concernLevel: 'c' },
+  });
+  const { result, issues } = normalizeRefineResponse(raw);
+  assert.ok(result.ticket);
+  assert.equal(result.ticketBackTranslation, null);
+  assert.ok(issues.includes('ticketBackTranslation:missing'));
+});
+
+test('티켓이 없으면 역번역이 와도 null이다', () => {
+  const raw = goodRaw({ ticketBackTranslation: { problem: 'x', impact: 'y', request: 'z' } });
+  const { result } = normalizeRefineResponse(raw);
+  assert.equal(result.ticket, null);
+  assert.equal(result.ticketBackTranslation, null);
+});
+
 /* ── 판정표 7·8행: 캐시 + 바이패스 (Lessons #6) ────────────────────────── */
 
 test('동일 입력 재호출은 캐시에서 나오고 LLM을 다시 부르지 않는다', async () => {

@@ -58,6 +58,22 @@ function normalizeTicket(raw) {
   return ticket;
 }
 
+/** 티켓 역번역의 세 칸 — `concernLevel`은 원래 원문 언어라 역번역하지 않는다(prompt.js `intentAndTicketRule`). */
+const TICKET_BACK_KEYS = ['problem', 'impact', 'request'];
+
+/**
+ * 티켓 역번역 (2026-10-27 A안). 티켓이 없으면 null. 🔴 못 받으면 null로 두고 화면이 역번역 줄만 생략한다 —
+ *    티켓 자체를 버리지 않는다(다듬기의 `backTranslation` 누락과 같은 처리).
+ */
+function normalizeTicketBack(raw, ticket) {
+  if (ticket === null) return null;
+  if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const back = {};
+  for (const key of TICKET_BACK_KEYS) back[key] = asString(raw[key], NO_BASIS);
+  if (TICKET_BACK_KEYS.every((key) => back[key] === NO_BASIS)) return null;
+  return back;
+}
+
 /**
  * LLM 원시 응답을 계약 형태로 정규화한다. **던지지 않는다** — 살릴 수 있는 필드는 살리고,
  * 살릴 수 없으면 호출자가 폴백을 결정하도록 `refined: null`로 표시해 돌려준다.
@@ -104,6 +120,8 @@ export function normalizeRefineResponse(raw, { userUrgency = null } = {}) {
   const detectedIntent = raw.detectedIntent === 'venting' ? 'venting' : 'normal';
   const ticket = detectedIntent === 'venting' ? normalizeTicket(raw.ticket) : null;
   if (detectedIntent === 'venting' && ticket === null) issues.push('ticket:missing');
+  const ticketBackTranslation = normalizeTicketBack(raw.ticketBackTranslation, ticket);
+  if (ticket !== null && ticketBackTranslation === null) issues.push('ticketBackTranslation:missing');
 
   const result = {
     urgency,
@@ -135,6 +153,7 @@ export function normalizeRefineResponse(raw, { userUrgency = null } = {}) {
     detectedIntent,
     intentEvidence: detectedIntent === 'venting' ? asString(raw.intentEvidence, '') || null : null,
     ticket,
+    ticketBackTranslation,
 
     appliedGlossary: asList(raw.appliedGlossary, (item) => {
       if (!item || !isNonEmptyString(item.sourceText)) return null;

@@ -115,6 +115,7 @@ export function buildFallbackResponse(
     detectedIntent: 'normal',
     intentEvidence: null,
     ticket: null,
+    ticketBackTranslation: null,
 
     appliedGlossary: [],
     unregisteredHonorifics: [],

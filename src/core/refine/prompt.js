@@ -53,7 +53,12 @@ import { conventionRules } from './conventions.js';
  *   모델이 동명이인을 걱정해 「일치 안 함」으로 처리했다(Claude 반복 측정 매회 실패, Gemini는 통과).
  *   인용 대조(S36·S43)와 같은 원칙 — 판단을 모델에 맡기지 않고 코드가 대조해 `matchedInOriginal`로 넘긴다.
  */
-export const REFINE_PROMPT_VERSION = 'refine-v22';
+/**
+ * v23 (2026-10-27, 사용자 결정 A안) — **티켓을 상대 언어로 만들고 칸별 역번역을 함께 받는다**
+ *   (`ticketBackTranslation`). 예전엔 언어 지시가 없어 한국어 티켓이 그대로 상대에게 갔다.
+ *   세 번째 칸은 「요청사항」→「다음 할 일」 — 작성자의 약속을 상대에게 하는 요청으로 바꾸지 않는다.
+ */
+export const REFINE_PROMPT_VERSION = 'refine-v23';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];
@@ -582,7 +587,19 @@ function backTranslationRule(sourceLanguage) {
 
 /* ── c6 이식: 하소연 → 티켓 (Spec 필수 4) ──────────────────────────────── */
 
-const INTENT_AND_TICKET_RULE =
+/**
+ * 🔴 **티켓은 상대에게 보내는 글이다** (2026-10-27 사용자 결정 A안). 예전에는 언어 지시가 없어 티켓이 원문
+ *    언어(한국어)로 나왔고, 「티켓으로 적용」하면 해외 상대에게 한국어가 갔다.
+ *    | 필드 | 언어 | 이유 |
+ *    |---|---|---|
+ *    | `ticket.problem`·`impact`·`request` | 교정문과 같은 상대 언어 | 입력창에 들어가 상대에게 간다 |
+ *    | `ticket.concernLevel` | 원문 언어 | 작성자에게만 보이는 메타 |
+ *    | `ticketBackTranslation` 세 칸 | 원문 언어 | 다듬기 역번역과 같은 「보내기 전 확인」(Spec 필수 3) |
+ * 🔴 **`request` 칸은 「다음 할 일」이다** (2026-10-27 사용자 결정). 원문이 작성자 자신의 약속(「~드릴게요」)이면
+ *    작성자의 행동으로 쓴다 — 예전엔 「요청사항」이라 「금요일까지 다시 공유드릴게요」가 [Request]로 들어갔다(L28 계열).
+ *    키 이름은 `request` 그대로 둔다 — 배포된 Worker와 확장 버전이 엇갈려도 서로 읽을 수 있게.
+ */
+const intentAndTicketRule = (sourceLanguage, targetLanguage) =>
   // 🔴 v2 — 판정 기준은 감정의 **존재**가 아니라 메시지의 **주목적**이다. 이전 문구는 감정 신호만
   //    보고 판정해서, 마감·요청이 분명한 긴급 요청까지 venting으로 몰았다(3개 모델 전부, 실측).
   'Separately, judge the PRIMARY PURPOSE of the ORIGINAL text. Set "detectedIntent" to "venting" ' +
@@ -598,13 +615,24 @@ const INTENT_AND_TICKET_RULE =
   '"normal". ' +
   'If and only if "detectedIntent" is "venting", also produce "ticket" as an object with exactly ' +
   'these keys: "problem" (문제점 — what the concrete problem is), "impact" (영향 — the stated or ' +
-  'clearly implied consequence/risk), "request" (요청사항 — the concrete action being asked for), ' +
+  'clearly implied consequence/risk), "request" (다음 할 일 — the concrete NEXT STEP and WHO does ' +
+  'it: if the original asks the recipient to do something, state that ask; if the author commits to ' +
+  'doing something themselves (e.g. "~하겠습니다", "~드릴게요"), state it as the author\'s own action ' +
+  'in the first person — never turn the author\'s own commitment into a request to the recipient), ' +
   'and "concernLevel" (우려 수준 — a description that PRESERVES, not deletes, the emotional ' +
-  'intensity of the original wording, kept as metadata). All four keys must be non-empty strings; ' +
+  'intensity of the original wording, kept as metadata). ' +
+  `Write "problem", "impact" and "request" in ${languageLabel(targetLanguage)} — the same language ` +
+  'as "refined" — because they are sent to the recipient. ' +
+  `Write "concernLevel" in ${languageLabel(sourceLanguage)}, because only the author sees it. ` +
+  'All four keys must be non-empty strings; ' +
   'if the text gives no real basis for one of them, set that key to the exact string "없음" instead ' +
   'of inventing content. Repeated-occurrence facts ("저번에도 ~ 또") are facts and must be preserved ' +
   'in "problem" even while the blaming tone is dropped. ' +
-  'If "detectedIntent" is "normal", set "ticket" to null.';
+  'Also produce "ticketBackTranslation" as an object with exactly the keys "problem", "impact" and ' +
+  `"request": a literal back-translation of those three ticket fields into ` +
+  `${languageLabel(sourceLanguage)}, so the author can check them before sending (keep "없음" as ` +
+  '"없음"). ' +
+  'If "detectedIntent" is "normal", set both "ticket" and "ticketBackTranslation" to null.';
 
 /**
  * 핵심 업무 정보 누락 경고 (2026-08-14 사용자 제안 ② / Manyfast F-2·F-3 계열).
@@ -696,12 +724,14 @@ const responseFormatRule = () =>
   '\\"refined\\" into the input language>", "detectedIntent": "venting" | "normal", ' +
   '"intentEvidence": "<the quoted wording that made you choose \\"venting\\">" | null, "ticket": ' +
   '{"problem": "<string>", "impact": "<string>", "request": "<string>", "concernLevel": "<string>"} ' +
-  '| null, "appliedGlossary": [{"id": "<glossary entry id>", "sourceText": "<phrase in the ' +
+  '| null, "ticketBackTranslation": {"problem": "<string>", "impact": "<string>", "request": ' +
+  '"<string>"} | null, "appliedGlossary": [{"id": "<glossary entry id>", "sourceText": "<phrase in the ' +
   'ORIGINAL>", "appliedText": "<phrase in \\"refined\\">"}], "unregisteredHonorifics": ["<exact ' +
   'phrase from the ORIGINAL you kept unchanged>"], "missingElements": [{"element": "deadline" | ' +
   '"impact", "requestQuote": "<exact wording from the ORIGINAL that constitutes the ask>", ' +
   '"suggestion": "<one short sentence in the input language>"}]}. ' +
-  'Return [] for any list with no items and null for "ticket"/"intentEvidence" when they do not ' +
+  'Return [] for any list with no items and null for "ticket"/"ticketBackTranslation"/"intentEvidence" when ' +
+  'they do not ' +
   'apply — never omit a key. Do not add any text outside the JSON object.';
 
 /**
@@ -792,7 +822,7 @@ export function buildRefinePayload({
     dateNumberRules(referenceYear, targetLanguage),
     backTranslationRule(sourceLanguage),
     PLACEHOLDER_RULE,
-    INTENT_AND_TICKET_RULE,
+    intentAndTicketRule(sourceLanguage, targetLanguage),
     MISSING_ELEMENTS_RULE,
     responseFormatRule(),
   ]
