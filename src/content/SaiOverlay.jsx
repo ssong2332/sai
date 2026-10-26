@@ -1092,11 +1092,17 @@ export default function SaiOverlay({ autoButton = true }) {
    *    다르면 같은 한 번의 교정이 갈려서, 팀장이 보는 협업 상황이 실제와 어긋난다.
    * 🔴 「개인」이면 어느 팀에도 올리지 않는다 — 주인이 없는 카운트다.
    */
-  const frictionTeamId = () => {
+  /**
+   * 🔴 **ref로 읽는다** (2026-10-26 L18 5-1 실측). `runRefine`·`runDecode`는 `useCallback(…, [])`이라
+   *    첫 렌더의 클로저를 계속 쓴다 — 그때는 받는 사람도 활성 팀도 아직 안 읽혀서, 팀을 골라도 교정·해독
+   *    카운트가 전부 `__none__`(개인)에 쌓였다(08-20부터). 매 렌더 최신 값을 ref에 두고 호출 시점에 읽는다.
+   */
+  const frictionTeamRef = useRef(NO_TEAM_BUCKET);
+  {
     const chosen = recipient?.teamId ?? activeTeamId ?? null;
-    if (chosen === null || chosen === PERSONAL_TEAM_ID) return NO_TEAM_BUCKET;
-    return chosen;
-  };
+    frictionTeamRef.current = chosen === null || chosen === PERSONAL_TEAM_ID ? NO_TEAM_BUCKET : chosen;
+  }
+  const frictionTeamId = () => frictionTeamRef.current;
 
   /**
    * **이 사람과는 어느 팀 일을 하는가** (2026-08-19 사용자 요청 ③) — 문체(`rememberRegister`)와
