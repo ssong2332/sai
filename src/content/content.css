@@ -5,7 +5,7 @@
  *   - 이 파일은 Shadow DOM 안에만 들어간다. 호스트 페이지로 새는 선택자(`html`·`body`·`*` 전역)를 쓰지 않는다.
  *   - 클래스 이름은 JSX·테스트가 쓰는 API다. 바꾸지 않는다.
  *   - 아래 크기는 **JS가 같은 값으로 계산한다** — 바꾸면 `SaiOverlay.jsx` 상수도 같이 바꾼다:
- *       `.sai-popup` 폭 `clamp(360px, 40vw, 560px)` ↔ `popupWidth()`
+ *       `.sai-popup` 폭 `clamp(360px, 36vw, 480px)` ↔ `popupWidth()`
  *       `.sai-popup-narrow` 430px ↔ `DECODE_PANEL_WIDTH`/`REPLY_PANEL_WIDTH`
  *       레이어 `gap: 10px` ↔ `PANEL_GAP` · `.sai-fab` 42px ↔ `BUTTON_SIZE` · 버튼 알약 폭 ↔ `FAB_EXPANDED_WIDTH`(130)
  *   - 팝업 글자는 사이드패널보다 작다(2026-08-18 사용자 확인) — 남의 화면을 덜 가리려는 것이다.
@@ -293,7 +293,7 @@
 
 .sai-popup {
   position: relative;
-  width: clamp(360px, 40vw, 560px); /* 🔴 = popupWidth() */
+  width: clamp(360px, 36vw, 480px); /* 🔴 = popupWidth() — 2026-10-26 560 → 480 (사용자 요청) */
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 88px);
   overflow-y: auto;
