@@ -57,7 +57,6 @@ import { readConfig } from './config.js';
 import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
-import { handleTeam } from './teamRoute.js';
 import { googleClientsFromEnv } from './google/clients.js';
 
 /**
@@ -214,6 +213,8 @@ export function createHandler(deps = {}) {
         logger.error(`[team] 설정 누락: ${config.missing.join(',')}`);
         return json(500, { error: 'server misconfigured' });
       }
+      // 🔴 2026-10-26 — 팀 코드(functions/teams·account)는 교정 요청에서 평가하지 않는다(콜드 CPU, 무료 한도 10ms).
+      const { handleTeam } = await import('./teamRoute.js');
       return handleTeam(request, { config, google: safeGoogle(google, env, logger), json, logger, jwks, now });
     }
 
