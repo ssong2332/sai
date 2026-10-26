@@ -1157,11 +1157,11 @@ function ScheduleTab({ items, onDelete }) {
               </span>
               <button
                 type="button"
-                className="icon-button"
+                className="icon-button icon-button-danger"
                 onClick={() => onDelete(item.id)}
                 aria-label="예약 삭제"
               >
-                🗑
+                <TrashIcon />
               </button>
             </div>
             <p className="snippet-text">{item.text}</p>
@@ -2824,7 +2824,7 @@ function TeamGlossaryScope({ onToast }) {
                 </button>
                 <button
                   type="button"
-                  className="icon-button"
+                  className="icon-button icon-button-danger"
                   aria-label={`팀 용어 삭제: ${entry.sourceText}`}
                   onClick={() =>
                     run(async () => {
@@ -2834,7 +2834,7 @@ function TeamGlossaryScope({ onToast }) {
                     })
                   }
                 >
-                  🗑
+                  <TrashIcon />
                 </button>
               </div>
             </div>
@@ -3327,7 +3327,9 @@ function GlossaryTab({ scope, onScopeChange, onToast }) {
             *    용어를 많이 만든 사람일수록 더 못 만드는 상태였다.
             *    상자에 높이 상한을 주면 **목록은 안에서 스크롤되고 추가 버튼은 늘 제자리**다.
             */}
-          <div className="glossary-list">
+          {/* 🔴 수정 중에는 목록의 높이 상한을 푼다 (2026-10-27 사용자 지적) — 폼이 목록 상자(46vh) 안에서 잘려
+              「취소·저장」을 보려면 상자 안을 스크롤해야 했다. 수정은 한 항목에만 열리므로 상한을 풀어도 짧다. */}
+          <div className={formMode !== null && !adding ? 'glossary-list glossary-list-editing' : 'glossary-list'}>
           {adding ? null : entries.map((entry) =>
             formMode === entry.id ? (
               <GlossaryForm
@@ -3382,11 +3384,11 @@ function GlossaryTab({ scope, onScopeChange, onToast }) {
                 </button>
                 <button
                   type="button"
-                  className="icon-button"
+                  className="icon-button icon-button-danger"
                   onClick={() => deleteEntry(entry)}
                   aria-label={`용어 삭제: ${entry.sourceText}`}
                 >
-                  🗑
+                  <TrashIcon />
                 </button>
                 </div>
               </div>
@@ -3419,8 +3421,13 @@ function GlossaryTab({ scope, onScopeChange, onToast }) {
 
 /** 용어 추가/수정 인라인 폼. */
 function GlossaryForm({ draft, onChange, onSubmit, onCancel, error, submitLabel, title }) {
+  const formRef = useRef(null);
+  // 🔴 열리면 폼 끝(「취소·저장」)까지 화면에 들어오게 한다 (2026-10-27) — 아래쪽 항목을 고칠 때 버튼이 패널 밖에 있었다.
+  useEffect(() => {
+    formRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, []);
   return (
-    <div className="card glossary-form">
+    <div className="card glossary-form" ref={formRef}>
       {/* 🔴 추가 중에는 목록이 감춰지므로, **지금 무엇을 하는 중인지** 폼이 스스로 말해야 한다.
           수정은 목록 안에서 자리를 바꾸는 방식이라 제목이 필요 없다(`title` 없음). */}
       {title && <h3 className="card-label">{title}</h3>}
@@ -3598,11 +3605,11 @@ function SnippetsTab({ items, onUse, onDelete }) {
                 </button>
                 <button
                   type="button"
-                  className="icon-button"
+                  className="icon-button icon-button-danger"
                   onClick={() => onDelete(snippet.id)}
                   aria-label="저장 문구 삭제"
                 >
-                  🗑
+                  <TrashIcon />
                 </button>
               </span>
             </div>
@@ -3838,11 +3845,11 @@ function ProfileTab({
             </span>
             <button
               type="button"
-              className="icon-button"
+              className="icon-button icon-button-danger"
               onClick={() => onDelete(item.id)}
               aria-label={`학습 내역 삭제: ${item.text}`}
             >
-              🗑
+              <TrashIcon />
             </button>
           </div>
         ))
