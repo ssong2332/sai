@@ -9,6 +9,7 @@
     "bench:cold": "node scripts/cold-bench.mjs",
     "build:dry": "wrangler deploy --dry-run --outdir .wrangler/dry",
     "check:bundle": "npm run build:dry && node scripts/check-bundle.mjs",
+    "report": "node scripts/report.mjs",
     "dev:mock": "wrangler dev --config wrangler.dev.toml --local --port 8790 --ip 127.0.0.1"
   },
   "dependencies": {

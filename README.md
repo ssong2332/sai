@@ -86,6 +86,7 @@ npm run dev
 | `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖(2026-10-23) — 명시 요청만. (옛 Functions의 임시 기본이었으나 Functions는 10-28 중단) |
 | `ANTHROPIC_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **기본 provider**(2026-10-23, Claude Haiku 5.5, 사고 끔 — `SAI_ANTHROPIC_THINKING=adaptive`로만 켬). 폴오버 1단계 |
 | `GROQ_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **폴오버 예비**(2026-10-23, `openai/gpt-oss-120b`). 폴오버 2단계 |
+| `SAI_SERVICE_ACCOUNT_FILE` | 실행하는 셸(또는 로컬 `.env`) — **키 파일 경로**, 키 파일은 저장소 밖 | Worker 주간 점검 `npm --prefix workers/refine run report`(2026-10-27, M2) — 최근 7일 `betaMetrics` + `/health`, 경고 있으면 종료 코드 1 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
 | `SAI_CACHE_TTL_MS` | 로컬 `.env` | 프록시 캐시 수명(기본 10분 · 상한 6시간). 시연 촬영 때 호출을 줄이는 용도 |
 | `SAI_SITE_DEV` | 빌드 시점 — `npm run build:sitedev`가 켠다 (🔴 `.env`에서 읽지 않는다) | `1`이면 manifest `externally_connectable`에 `http://localhost:5180/*`가 붙고 설정에 「자세한 설정 — 웹에서 열기」가 뜬다(`docs/WebSplit.md` C). 🔴 이 빌드는 배포하지 않는다 |
@@ -128,6 +129,16 @@ https://sai-refine.aiisgod.workers.dev/v1/team     # 팀·계정 삭제·지표
 - 표는 **한 파일에만** 있다([failover.js](src/core/refine/failover.js)). 프록시·Functions·Worker가
   같은 파일을 임포트하므로 어긋날 수 없다.
 - 어느 쪽이 답했는지는 응답의 `providerUsed`·`modelUsed`에 남는다.
+
+### 모니터링 (2026-10-27 결정 — M1 + M2)
+
+| 무엇을 잡나 | 방법 | 누가 |
+|---|---|---|
+| **멈춤** | 외부 가동 감시(UptimeRobot 등 무료)가 5분마다 `https://sai-refine.aiisgod.workers.dev/health`를 확인 → 실패 시 메일 | 👤 사용자(가입·등록) |
+| **품질 저하** | 주 1회 `SAI_SERVICE_ACCOUNT_FILE=<키 경로> npm --prefix workers/refine run report` — 최근 7일 요청·실패율·응답 시간·사용자 + `/health`. 경고 판정표는 [reportCore.mjs](workers/refine/scripts/reportCore.mjs) | 실행하는 사람 |
+| 실시간 원인 | `wrangler tail` + 숫자만 거르는 필터(CLAUDE.md) · Cloudflare 대시보드 관측 | 필요할 때 |
+
+🔴 실사용자가 생기면 M3(Worker Cron으로 매일 자동 점검 + 메일)를 검토한다.
 
 ### 로컬 프록시 (오프라인 개발용)
 
