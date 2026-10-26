@@ -17,6 +17,7 @@ import {
   onboardingToFields,
   fieldsToOnboarding,
   mergeCounts,
+  mergeOnboarding,
   syncNow,
   syncErrorMessage,
   SYNC_ERRORS,
@@ -197,12 +198,14 @@ test('원격이 앞서면 로컬 학습 횟수가 올라간다', async () => {
   assert.equal((await getLocal(STORAGE_KEYS.LEARNED_PATTERNS, {}))['fewer-apologies'], 9);
 });
 
-test('🔴 로컬 설정이 원격보다 우선한다 — 방금 바꾼 설정이 되돌아가지 않는다', async () => {
+test('🔴 동기화한 기기에서 방금 바꾼 칸은 로컬이 이긴다 — 바꾼 설정이 되돌아가지 않는다', async () => {
   await signedIn();
   await setLocal(STORAGE_KEYS.ONBOARDING, { language: 'ko', tone: 'casual' });
+  // 2026-10-26 판정표 3행 — 예전엔 조건 없이 「로컬이 항상 이김」이었다(새 기기가 원격 값을 못 받던 원인).
+  await setLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: true, dirty: ['language', 'tone'] });
 
   const impl = fakeFetch((url, init) =>
-    !init.method && url.includes('/users/uid-1') && !url.includes('learnedPatterns')
+    (init.method ?? 'GET') === 'GET' && url.includes('/users/uid-1') && !url.includes('learnedPatterns')
       ? { body: { fields: encodeFields({ language: 'en', tone: 'polite' }) } }
       : { body: {} },
   );
@@ -371,4 +374,106 @@ test('L22 대기 목록이 비었으면 flush는 요청을 보내지 않는다',
   const impl = fakeFetch(() => ({ body: {} }));
   assert.deepEqual(await flushLearnedDeletions({ fetchImpl: impl }), { deleted: 0 });
   assert.equal(impl.calls.length, 0);
+});
+
+/* ── 온보딩 병합 판정표 (2026-10-26 L18 1-3) ────────────────────────── */
+
+import { saveOnboarding, setOnboardingFields } from '../src/lib/onboarding.js';
+import { getProfile } from '../src/lib/profile.js';
+
+const remoteUserFetch = (remoteFields) =>
+  fakeFetch((url, init) =>
+    (init.method ?? 'GET') === 'GET' && url.includes('/users/uid-1') && !url.includes('learnedPatterns')
+      ? { body: { fields: encodeFields(remoteFields) } }
+      : { body: {} },
+  );
+
+test('판정표 1행 — 처음 동기화하는 기기는 원격 값을 받는다 (null로 저장된 칸 포함)', () => {
+  const local = { language: 'ko', partnerRegion: null, tone: 'brief', completedAt: 'x' };
+  const remote = { language: 'ko', partnerRegion: 'chinese', tone: 'direct' };
+  const { merged, pulled } = mergeOnboarding(local, remote, { synced: false, dirty: ['tone', 'partnerRegion'] });
+  assert.equal(merged.partnerRegion, 'chinese');
+  assert.equal(merged.tone, 'direct');
+  assert.equal(merged.completedAt, 'x', '동기화 대상이 아닌 칸은 건드리지 않는다');
+  assert.deepEqual(pulled.sort(), ['partnerRegion', 'tone']);
+});
+
+test('판정표 2행 — 처음 동기화 · 원격에 값 없음 → 로컬 유지', () => {
+  const { merged, pulled } = mergeOnboarding({ tone: 'brief' }, {}, { synced: false, dirty: [] });
+  assert.equal(merged.tone, 'brief');
+  assert.deepEqual(pulled, []);
+});
+
+test('판정표 3행 — 동기화한 적 있고 이 기기에서 바꾼 칸 → 로컬, 비운 칸은 원격에서 지운다', () => {
+  const { merged, pulled, cleared } = mergeOnboarding(
+    { tone: 'warm', partnerRegion: null },
+    { tone: 'direct', partnerRegion: 'chinese' },
+    { synced: true, dirty: ['tone', 'partnerRegion'] },
+  );
+  assert.equal(merged.tone, 'warm');
+  assert.equal(merged.partnerRegion, null);
+  assert.deepEqual(pulled, []);
+  assert.deepEqual(cleared, ['partnerRegion']);
+});
+
+test('판정표 4행 — 동기화한 적 있고 안 바꾼 칸 → 원격 (다른 기기에서 바꾼 것)', () => {
+  const { merged, pulled } = mergeOnboarding(
+    { tone: 'brief', language: 'ko' },
+    { tone: 'direct', language: 'en' },
+    { synced: true, dirty: ['language'] },
+  );
+  assert.equal(merged.tone, 'direct');
+  assert.equal(merged.language, 'ko');
+  assert.deepEqual(pulled, ['tone']);
+});
+
+test('🔴 L18 1-3 실측 재현 — 온보딩을 마친 새 기기가 원격 톤·지역을 받고, 프로필 말투도 맞춘다', async () => {
+  await signedIn();
+  await setLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: false, dirty: [] });
+  await setLocal(STORAGE_KEYS.ONBOARDING, {});
+  await saveOnboarding({ language: 'ko', partnerRegion: null, tone: 'brief' });
+
+  const impl = remoteUserFetch({ language: 'ko', partnerRegions: ['chinese'], tone: 'direct' });
+  const result = await syncNow({ fetchImpl: impl });
+
+  const stored = await getLocal(STORAGE_KEYS.ONBOARDING, {});
+  assert.equal(stored.partnerRegion, 'chinese');
+  assert.equal(stored.tone, 'direct');
+  assert.ok(stored.completedAt, '온보딩 완료 표시는 그대로');
+  assert.equal(result.pulledOnboarding, true);
+  assert.equal((await getProfile()).collabStyleId, 'direct');
+  const user = impl.calls.find((c) => c.init.method === 'PATCH' && !c.url.includes('learnedPatterns'));
+  assert.deepEqual(user.body.fields.tone, { stringValue: 'direct' }, '자기 기본값으로 서버를 덮지 않는다');
+  assert.deepEqual(await getLocal(STORAGE_KEYS.ONBOARDING_SYNC, null), { synced: true, dirty: [] });
+});
+
+test('🔴 동기화 뒤 이 기기에서 바꾼 칸만 대기 목록에 오르고, 다음 동기화에서 올라간 뒤 비워진다', async () => {
+  await signedIn();
+  await setLocal(STORAGE_KEYS.ONBOARDING, { language: 'ko', partnerRegion: 'chinese', tone: 'direct', completedAt: 'x' });
+  await setLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: true, dirty: [] });
+
+  await setOnboardingFields({ tone: 'warm' });
+  await setOnboardingFields({ language: 'ko' }); // 같은 값 — 오르지 않는다
+  assert.deepEqual((await getLocal(STORAGE_KEYS.ONBOARDING_SYNC, null)).dirty, ['tone']);
+
+  const impl = remoteUserFetch({ language: 'ko', partnerRegions: ['chinese'], tone: 'direct' });
+  await syncNow({ fetchImpl: impl });
+  assert.equal((await getLocal(STORAGE_KEYS.ONBOARDING, {})).tone, 'warm');
+  const user = impl.calls.find((c) => c.init.method === 'PATCH' && !c.url.includes('learnedPatterns'));
+  assert.deepEqual(user.body.fields.tone, { stringValue: 'warm' });
+  assert.deepEqual((await getLocal(STORAGE_KEYS.ONBOARDING_SYNC, null)).dirty, []);
+});
+
+test('🔴 로컬에서 「선택 안 함」으로 비운 칸은 updateMask로 원격에서도 지운다 — 안 그러면 다음 동기화에 되살아난다', async () => {
+  await signedIn();
+  await setLocal(STORAGE_KEYS.ONBOARDING, { language: 'ko', partnerRegion: 'chinese', tone: 'direct', completedAt: 'x' });
+  await setLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: true, dirty: [] });
+  await setOnboardingFields({ partnerRegion: null });
+
+  const impl = remoteUserFetch({ language: 'ko', partnerRegions: ['chinese'], tone: 'direct' });
+  await syncNow({ fetchImpl: impl });
+  const user = impl.calls.find((c) => c.init.method === 'PATCH' && !c.url.includes('learnedPatterns'));
+  assert.match(user.url, /updateMask.fieldPaths=partnerRegions/);
+  assert.equal('partnerRegions' in user.body.fields, false);
+  assert.equal((await getLocal(STORAGE_KEYS.ONBOARDING, {})).partnerRegion, null);
 });

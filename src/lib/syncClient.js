@@ -18,7 +18,8 @@
 import { FIREBASE_PROJECT_ID } from '../config.js';
 import { getIdToken } from './authClient.js';
 import { getLocal, setLocal, STORAGE_KEYS } from './storage.js';
-import { getLearnedDeletions } from './profile.js';
+import { getLearnedDeletions, setProfile } from './profile.js';
+import { SYNCED_ONBOARDING_FIELDS } from './onboarding.js';
 
 const ROOT = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
@@ -155,6 +156,45 @@ export function fieldsToOnboarding(fields) {
   return out;
 }
 
+/** 로컬 온보딩 칸 → Firestore 필드 이름 (`onboardingToFields`와 같은 대응). */
+const REMOTE_FIELD = { language: 'language', tone: 'tone', partnerRegion: 'partnerRegions' };
+
+/**
+ * 온보딩 병합 — 칸마다 어느 쪽 값을 쓸지 정한다 (2026-10-26 L18 1-3 사용자 승인 판정표).
+ *
+ * | 상황 | 이 칸의 값 |
+ * |---|---|
+ * | 이 기기에서 **처음** 동기화 · 원격에 값 있음 | 원격 |
+ * | 처음 동기화 · 원격에 값 없음 | 로컬 |
+ * | 동기화한 적 있음 · 그 뒤 **이 기기에서 바꾼 칸** | 로컬 (`null`이면 원격 칸을 지운다) |
+ * | 동기화한 적 있음 · 이 기기에서 안 바꾼 칸 | 원격 (없으면 로컬) |
+ * | 두 기기에서 같은 칸을 각각 바꿈 | 나중에 동기화한 쪽 (알려진 한계) |
+ *
+ * 🔴 예전 규칙은 「로컬이 항상 이김」이라, 온보딩을 마친 새 기기(세 칸이 `null`까지 저장됨)가
+ *    원격 값을 하나도 받아 오지 못하고 오히려 자기 기본값으로 서버를 덮었다(L18 1-3 실측).
+ *
+ * @returns {{merged: object, pulled: string[], cleared: string[]}}
+ *   `pulled`: 원격 값으로 바뀐 칸 · `cleared`: 원격에서 지워야 할 칸(로컬에서 비운 칸)
+ */
+export function mergeOnboarding(local, remote, state) {
+  const merged = { ...(local ?? {}) };
+  const synced = state?.synced === true;
+  const dirty = new Set(synced ? state?.dirty ?? [] : []);
+  const pulled = [];
+  const cleared = [];
+  for (const key of SYNCED_ONBOARDING_FIELDS) {
+    if (dirty.has(key)) {
+      if ((merged[key] ?? null) === null && remote?.[key] !== undefined) cleared.push(key);
+      continue;
+    }
+    const value = remote?.[key];
+    if (value === undefined) continue;
+    if (merged[key] !== value) pulled.push(key);
+    merged[key] = value;
+  }
+  return { merged, pulled, cleared };
+}
+
 /**
  * 학습 횟수 병합 — 🔴 **큰 쪽을 남긴다.**
  * 두 기기에서 각각 쌓였을 때 어느 쪽도 버리지 않으면서, 더하면 같은 학습이 두 번 세어진다
@@ -237,25 +277,33 @@ export async function syncNow({ fetchImpl = globalThis.fetch } = {}) {
    */
   await flushLearnedDeletions({ fetchImpl });
 
-  /* 1) 온보딩 — 원격을 먼저 읽고, 로컬에 없는 값만 채운 뒤 합쳐서 올린다. */
+  /* 1) 온보딩 — 원격을 먼저 읽고, 칸마다 `mergeOnboarding` 판정표로 고른 뒤 올린다. */
   const remoteUser = await request(`/users/${uid}`, { token, fetchImpl });
   const remoteOnboarding = fieldsToOnboarding(remoteUser?.fields);
   const localOnboarding = (await getLocal(STORAGE_KEYS.ONBOARDING, null)) ?? {};
-  // 🔴 로컬이 이긴다 — 방금 이 기기에서 바꾼 설정을 원격 값으로 되돌리면 "왜 원래대로 돌아가지"가 된다.
-  const mergedOnboarding = { ...remoteOnboarding, ...localOnboarding };
-  const pulledOnboarding = Object.keys(remoteOnboarding).some(
-    (key) => localOnboarding[key] === undefined,
-  );
-  if (Object.keys(mergedOnboarding).length > 0) {
+  const syncState = await getLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: false, dirty: [] });
+  const { merged: mergedOnboarding, pulled, cleared } = mergeOnboarding(localOnboarding, remoteOnboarding, syncState);
+  const pulledOnboarding = pulled.length > 0;
+  if (pulledOnboarding) {
     await setLocal(STORAGE_KEYS.ONBOARDING, mergedOnboarding);
-    // 🔴 2026-10-26 L18 1-2 실측 — 감싸지 않은 `"ko"`를 보내 400 INVALID_ARGUMENT(08-20부터). 반드시 Firestore Value로 감싼다.
-    const fields = encodeFields(onboardingToFields(mergedOnboarding));
-    const mask = Object.keys(fields)
-      .map((key) => `updateMask.fieldPaths=${key}`)
-      .join('&');
-    // 🔴 updateMask를 주지 않으면 문서의 다른 필드가 지워진다.
+    // 🔴 기본 톤과 프로필 「선호하는 말투」는 한 축이다(`onboarding.js` `saveOnboarding`) — 받아 온 톤도 맞춘다.
+    if (pulled.includes('tone') && mergedOnboarding.tone) await setProfile({ collabStyleId: mergedOnboarding.tone });
+  }
+  // 🔴 2026-10-26 L18 1-2 실측 — 감싸지 않은 `"ko"`를 보내 400 INVALID_ARGUMENT(08-20부터). 반드시 Firestore Value로 감싼다.
+  const fields = encodeFields(onboardingToFields(mergedOnboarding));
+  // 🔴 updateMask를 주지 않으면 문서의 다른 필드가 지워진다. 마스크에 있고 본문에 없는 칸은 지워진다 — 로컬에서 비운 칸만 그렇게 넣는다.
+  const maskKeys = [...Object.keys(fields), ...cleared.map((key) => REMOTE_FIELD[key])];
+  if (maskKeys.length > 0) {
+    const mask = maskKeys.map((key) => `updateMask.fieldPaths=${key}`).join('&');
     await request(`/users/${uid}?${mask}`, { method: 'PATCH', body: { fields }, token, fetchImpl });
   }
+  // 🔴 이번에 처리한 칸만 대기 목록에서 뺀다 — 동기화하는 사이 새로 바꾼 칸은 남긴다.
+  const handled = new Set(syncState?.synced === true ? syncState.dirty ?? [] : SYNCED_ONBOARDING_FIELDS);
+  const latestState = await getLocal(STORAGE_KEYS.ONBOARDING_SYNC, { synced: false, dirty: [] });
+  await setLocal(STORAGE_KEYS.ONBOARDING_SYNC, {
+    synced: true,
+    dirty: (latestState?.dirty ?? []).filter((key) => !handled.has(key)),
+  });
 
   /* 2) 학습 패턴 — 수치만. */
   const remoteList = await request(`/users/${uid}/learnedPatterns`, { token, fetchImpl });
