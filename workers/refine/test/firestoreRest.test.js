@@ -231,3 +231,15 @@ test('🔴 functions/betaMetrics.js 그대로 — 요청 지표 증가 · 재방
   assert.equal(users.active.integerValue, '2');
   assert.equal(users.returning.integerValue, '1');
 });
+
+test('🔴 fetch는 this 없이 부른다 — Workers의 전역 fetch는 메서드로 부르면 Illegal invocation (2026-10-26 운영 500)', async () => {
+  const fake = createFakeFirestore();
+  // workerd처럼: this가 전역·undefined가 아니면 TypeError
+  function strictFetch(url, init) {
+    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+    return fake.fetch(url, init);
+  }
+  const strict = new RestFirestore({ projectId: 'sai-global-msg-2026', token: async () => 'test-token', fetchImpl: strictFetch });
+  await strict.doc('users/u1').set({ a: 1 });
+  assert.equal((await strict.doc('users/u1').get()).data().a, 1);
+});

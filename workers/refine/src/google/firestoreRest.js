@@ -331,7 +331,9 @@ export class RestFirestore {
     this.projectId = projectId;
     this.root = `projects/${projectId}/databases/(default)/documents`;
     this._token = token;
-    this._fetch = fetchImpl;
+    // 🔴 메서드로 붙여 `this._fetch(...)`로 부르면 Workers에서 `TypeError: Illegal invocation`(2026-10-26 운영 실측 —
+    //    팀 API 전부 500). 전역 fetch는 this 없이 불려야 한다 — 함수로 감싼다.
+    this._fetch = (...args) => fetchImpl(...args);
   }
 
   collection(path) {
