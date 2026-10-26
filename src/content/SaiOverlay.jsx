@@ -73,14 +73,14 @@ const BUTTON_SIZE = 42; // .sai-fab 실제 크기와 맞춘다(클램프 계산�
  *  🔴 접힘 상태가 없어졌으므로(2026-08-14) 이 값이 **항상**의 폭이다. */
 const FAB_EXPANDED_WIDTH = 130;
 /**
- * 팝업 폭 — 🔴 CSS의 `clamp(360px, 36vw, 480px)`와 **같은 식**을 쓴다(`content.css`).
+ * 팝업 폭 — 🔴 CSS의 `width: 430px; max-width: calc(100vw - 24px)`와 **같은 식**을 쓴다(`content.css`).
  *    이 값은 화면 밖으로 나가지 않게 좌표를 clamp하는 데만 쓰이므로, 실제 폭과 어긋나면
  *    오른쪽 끝에서 팝업이 잘리거나 쓸데없이 안쪽으로 밀린다.
- * 2026-10-26 사용자 요청 — 넓은 창에서 560px가 커 보인다 → 최대 480px(40vw → 36vw).
+ * 2026-10-26 사용자 요청 — 넓은 창에서 560px가 커 보인다 → 480px → **430px 고정**(뜻 풀기 패널과 같은 폭).
  */
 function popupWidth() {
-  if (typeof window === 'undefined') return 480;
-  return Math.min(480, Math.max(360, window.innerWidth * 0.36));
+  if (typeof window === 'undefined') return 430;
+  return Math.min(430, window.innerWidth - 24);
 }
 const EDGE_GAP = 12;
 
