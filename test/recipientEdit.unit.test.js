@@ -183,6 +183,31 @@ test('🔴 팀장이 바꾼 이름이 팀원 목록에도 반영된다 · 이름
   assert.equal(store[TEAMS_KEY][1].name, 'B');
 });
 
+test('🔴 내보내진 팀(서버 not-a-member 403)은 목록에서 빠진다 · 네트워크 실패 팀은 남는다 (L18 4-10)', async () => {
+  const store = installStorage({
+    [TEAMS_KEY]: [
+      { teamId: 'kicked', name: 'K', role: 'member', canViewDashboard: false },
+      { teamId: 'offline', name: 'O', role: 'member', canViewDashboard: false },
+      { teamId: 'ok', name: 'OK', role: 'member', canViewDashboard: false },
+    ],
+    [ACTIVE_KEY]: 'kicked',
+    'sai.auth': { idToken: 'tok', refreshToken: 'r', expiresAt: Date.now() + 3600_000 },
+  });
+  const { refreshAllMemberships } = await loadTeamClient();
+
+  const fetchImpl = async (_url, init) => {
+    const { teamId } = JSON.parse(init.body);
+    if (teamId === 'kicked') return { ok: false, status: 403, json: async () => ({ error: 'not-a-member' }) };
+    if (teamId === 'offline') throw new Error('offline');
+    return { ok: true, json: async () => ({ role: 'member', canViewDashboard: false }) };
+  };
+  const result = await refreshAllMemberships({ fetchImpl });
+
+  assert.equal(result.changed, true);
+  assert.deepEqual(store[TEAMS_KEY].map((t) => t.teamId), ['offline', 'ok'], '내보내진 팀만 빠져야 한다');
+  assert.equal(store[ACTIVE_KEY], 'offline', '활성 팀이 빠지면 남은 첫 팀으로');
+});
+
 test('🔴 순서도 활성 팀도 바뀌지 않는다 — 갱신이 팀을 갈아치우면 안 된다', async () => {
   const store = installStorage({
     [TEAMS_KEY]: [
