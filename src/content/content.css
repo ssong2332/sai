@@ -5,7 +5,7 @@
  *   - 이 파일은 Shadow DOM 안에만 들어간다. 호스트 페이지로 새는 선택자(`html`·`body`·`*` 전역)를 쓰지 않는다.
  *   - 클래스 이름은 JSX·테스트가 쓰는 API다. 바꾸지 않는다.
  *   - 아래 크기는 **JS가 같은 값으로 계산한다** — 바꾸면 `SaiOverlay.jsx` 상수도 같이 바꾼다:
- *       `.sai-popup` 폭 `clamp(360px, 40vw, 560px)` ↔ `popupWidth()`
+ *       `.sai-popup` 폭 `430px`(max-width `100vw - 24px`) ↔ `popupWidth()` · 압축 기준 `COMPACT_WIDTH`(RefinePopup.jsx)
  *       `.sai-popup-narrow` 430px ↔ `DECODE_PANEL_WIDTH`/`REPLY_PANEL_WIDTH`
  *       레이어 `gap: 10px` ↔ `PANEL_GAP` · `.sai-fab` 42px ↔ `BUTTON_SIZE` · 버튼 알약 폭 ↔ `FAB_EXPANDED_WIDTH`(130)
  *   - 팝업 글자는 사이드패널보다 작다(2026-08-18 사용자 확인) — 남의 화면을 덜 가리려는 것이다.
@@ -293,7 +293,7 @@
 
 .sai-popup {
   position: relative;
-  width: clamp(360px, 40vw, 560px); /* 🔴 = popupWidth() */
+  width: 430px; /* 🔴 = popupWidth() — 2026-10-26 clamp(…560px) → 430px 고정 (사용자 요청) */
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 88px);
   overflow-y: auto;
@@ -312,6 +312,43 @@
 
 .sai-popup-narrow {
   width: 430px; /* 🔴 = DECODE_PANEL_WIDTH / REPLY_PANEL_WIDTH */
+}
+
+/* 다듬기 팝업 여백 축소 (2026-10-26 사용자 요청 「폭 430 + 여백 축소」). 뜻 풀기·답장(.sai-popup-narrow)은 그대로.
+   🔴 선택자가 (0,3,0)이라 아래 개별 규칙(0,1,0)·압축 모드(0,2,0)보다 우선한다 — 값만 줄이고 구조는 건드리지 않는다. */
+.sai-popup:not(.sai-popup-narrow) {
+  --gutter-popup: 16px;
+}
+.sai-popup:not(.sai-popup-narrow) > .sai-popup-head {
+  padding-top: 14px;
+  row-gap: 10px;
+}
+.sai-popup:not(.sai-popup-narrow) > .sai-recipient {
+  padding-top: 10px;
+}
+.sai-popup:not(.sai-popup-narrow) > .sai-ainote {
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+.sai-popup:not(.sai-popup-narrow) > .sai-ainote:has(+ .sai-refined) {
+  padding-bottom: 26px;
+}
+.sai-popup:not(.sai-popup-narrow) .sai-panel,
+.sai-popup:not(.sai-popup-narrow) .sai-back {
+  margin-bottom: 8px;
+  padding: 10px 14px;
+}
+.sai-popup:not(.sai-popup-narrow) > .sai-fairy {
+  margin-bottom: 10px;
+  padding: 10px 14px;
+}
+.sai-popup:not(.sai-popup-narrow) > .sai-popup-foot {
+  gap: 8px;
+  padding-top: 10px;
+  padding-bottom: 14px;
+}
+.sai-popup:not(.sai-popup-narrow) .sai-foot-actions .sai-button {
+  min-height: 40px;
 }
 
 /* 순차 등장 — 블록마다 40ms. 합계 상한 240ms(7번째 이후는 동시). 결과·경고는 아래에서 자기 모션을 쓴다. */

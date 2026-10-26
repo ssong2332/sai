@@ -40,7 +40,7 @@ test('🔴 보내는 본문은 action·kind뿐이다', async () => {
   const fetchImpl = recorder();
   assert.deepEqual(await sendClientMetric(METRIC_KINDS.UNDONE, { fetchImpl }), { sent: true });
   assert.deepEqual(fetchImpl.calls[0].body, { action: 'metric', kind: 'undone' });
-  assert.match(fetchImpl.calls[0].url, /teamV1$/);
+  assert.match(fetchImpl.calls[0].url, /\/v1\/team$/, '팀 API (2026-10-26부터 Worker /v1/team)');
 });
 
 test('서버 오류·네트워크 실패는 조용히 sent:false', async () => {

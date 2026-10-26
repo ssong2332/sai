@@ -9,17 +9,19 @@
  *    오프라인 개발용으로 계속 쓸 수 있다 — 아래 상수만 바꾸면 된다.
  * 🔴 이 주소를 바꾸면 `src/manifest.js`의 `host_permissions`도 함께 바꿔야 한다 —
  *    MV3 서비스 워커는 권한 없는 오리진으로 fetch할 수 없다.
+ * 🔴 2026-10-26 (L33 2단계 U5) — Cloudflare Worker로 전환했다. Functions는 2026-10-28 GCP 체험판 종료로 멈춘다.
+ *    배포 확인: `GET /health` → `usageStore:"firestore"` · `team:"ready"`, 무토큰 `/v1/refine`·`/v1/team` → 401.
  */
-export const DEPLOYED_ENDPOINT =
-  'https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/refineV1';
+export const WORKER_ORIGIN = 'https://sai-refine.aiisgod.workers.dev';
+
+export const DEPLOYED_ENDPOINT = `${WORKER_ORIGIN}/v1/refine`;
 
 /**
  * 팀 생성·참가·마찰 카운트 (Spec §3, 2026-08-15).
- * 🔴 `refineV1`과 **다른 함수**다 — 저건 LLM 시크릿이 붙어 있고 이건 Firestore·Auth를 쓴다.
- *    같은 오리진이라 `host_permissions`는 이미 덮고 있다(추가 권한 불필요).
+ * 🔴 2026-10-26 — Worker `/v1/team`(Functions `teamV1` 이식, 판정 코드는 `functions/teams.js` 그대로).
+ *    교정과 같은 오리진이라 `host_permissions`는 이미 덮고 있다(추가 권한 불필요).
  */
-export const TEAM_ENDPOINT =
-  'https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/teamV1';
+export const TEAM_ENDPOINT = `${WORKER_ORIGIN}/v1/team`;
 
 /** 오프라인 로컬 개발용. `npm run proxy`가 이 주소로 뜬다. */
 export const LOCAL_PROXY_ENDPOINT = 'http://127.0.0.1:8787/v1/refine';
