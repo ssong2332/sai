@@ -125,30 +125,20 @@ export const INTEGRATIONS = [
 const INTEGRATION_IDS = INTEGRATIONS.map((item) => item.id);
 
 /**
- * AI 채팅 사이트 (2026-10-28 사용자 승인 B안). 이 주소에서는 **대화 상대 자동 감지만** 끈다 —
- * 후보 칩도, 등록된 사람 자동 선택도 하지 않는다. 다듬기·뜻 풀기·직접 선택은 그대로다.
- * 🔴 왜: AI 답변은 「이유:」·「판정:」 같은 `라벨: 설명` 꼴이 많아 `이름: 내용` 발화자와 글자만으로는
- *    구분되지 않는다(Gemini 실측 — 「이유」·「팀 역량 적합성」이 후보로 떴다). 사람 상대가 없는 곳이다.
- * 🔴 넣기 전에 주소를 확인한 것만 둔다(10-28 curl). `chat.deepseek.com`(응답 없음)·`clova-x.naver.com`(DNS 없음)은 뺐다.
- * 비교는 `hostMatches`(하위 도메인 포함).
+ * 대화 상대 자동 감지를 하는 통합 — **대화형 8곳만** (2026-10-28 사용자 승인). 그 밖의 모든 사이트에서는
+ * 후보 칩도, 등록된 사람 자동 선택도 하지 않는다. 다듬기·뜻 풀기·직접 선택은 어디서나 그대로다.
+ * 🔴 왜 허용 목록인가: 페이지 글의 `라벨: 설명`(「이유: …」)은 `이름: 내용` 발화자와 글자만으로 구분되지
+ *    않는다(Gemini 실측 — 「이유」·「팀 역량 적합성」이 후보로 떴다). AI 사이트를 막는 목록(0.1.49)은
+ *    목록 밖의 새 AI·문서 사이트를 못 막아서 이것으로 바꿨다. 못 찾으면 빈손이 낫다.
+ * 🔴 문서형 통합(notion·atlassian·github)은 뺐다 — 문서의 「배경:」·「이유:」가 같은 오탐을 낸다(추정).
+ * 🔴 통합 토글과 무관하다 — 토글은 사이 버튼 표시만 정하고, 단축키로 연 팝업도 같은 판정을 받는다.
  */
-export const AI_CHAT_HOSTS = [
-  'gemini.google.com',
-  'chatgpt.com',
-  'chat.openai.com',
-  'claude.ai',
-  'copilot.microsoft.com',
-  'perplexity.ai',
-  'aistudio.google.com',
-  'notebooklm.google.com',
-  'grok.com',
-  'chat.mistral.ai',
-  'wrtn.ai',
-];
+const PERSON_DETECT_INTEGRATION_IDS = ['slack', 'gmail', 'outlook', 'teams', 'google-chat', 'linkedin', 'discord', 'whatsapp'];
 
-/** 페이지 호스트가 AI 채팅 사이트인가. */
-export function isAiChatHost(pageHost) {
-  return AI_CHAT_HOSTS.some((rule) => hostMatches(pageHost, rule));
+/** 페이지 호스트에서 대화 상대 자동 감지를 하는가. */
+export function isPersonDetectHost(pageHost) {
+  const integration = findIntegration(pageHost);
+  return Boolean(integration && PERSON_DETECT_INTEGRATION_IDS.includes(integration.id));
 }
 
 /** 정규화 실패 사유 — 화면 문구는 `hostErrorMessage`. */

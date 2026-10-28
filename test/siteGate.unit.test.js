@@ -28,8 +28,7 @@ import {
   removeBlockedHost,
   setIntegrationEnabled,
   getSiteGateSettings,
-  isAiChatHost,
-  AI_CHAT_HOSTS,
+  isPersonDetectHost,
 } from '../src/lib/siteGate.js';
 import { clearAllLocal, getLocal, STORAGE_KEYS } from '../src/lib/storage.js';
 
@@ -194,23 +193,27 @@ test('🔴 꺼진 사이트 — 오버레이는 늘 마운트하고 자동 버�
   assert.ok(overlay.includes('{open && ('));
 });
 
-/* ── AI 채팅 사이트 — 대화 상대 감지 끄기 (2026-10-28 B안) ──────────────── */
+/* ── 대화 상대 자동 감지 — 대화형 통합 8곳만 (2026-10-28) ──────────────── */
 
-test('AI 채팅 사이트 — 목록 주소와 www·하위 도메인은 맞는다', () => {
-  for (const host of ['gemini.google.com', 'chatgpt.com', 'www.chatgpt.com', 'chat.openai.com', 'claude.ai', 'www.perplexity.ai', 'wrtn.ai']) {
-    assert.equal(isAiChatHost(host), true, host);
+test('대화형 통합 8곳(하위 도메인 포함)에서는 감지한다', () => {
+  for (const host of ['app.slack.com', 'mail.google.com', 'outlook.office.com', 'teams.microsoft.com', 'chat.google.com', 'www.linkedin.com', 'discord.com', 'web.whatsapp.com']) {
+    assert.equal(isPersonDetectHost(host), true, host);
   }
 });
 
-test('🔴 AI 채팅 사이트 — 같은 회사의 업무 사이트는 맞지 않는다', () => {
-  for (const host of ['mail.google.com', 'chat.google.com', 'teams.microsoft.com', 'outlook.office.com', 'openai.com', 'notgrok.com', '', undefined]) {
-    assert.equal(isAiChatHost(host), false, String(host));
+test('🔴 문서형 통합(Notion·Jira·GitHub)에서는 감지하지 않는다 — 「배경:」·「이유:」 라벨이 이름으로 잡힌다', () => {
+  for (const host of ['www.notion.so', 'acme.atlassian.net', 'github.com']) {
+    assert.equal(isPersonDetectHost(host), false, host);
   }
 });
 
-test('🔴 AI 채팅 사이트 목록은 정규화된 호스트이고 통합 사이트와 겹치지 않는다', () => {
-  for (const host of AI_CHAT_HOSTS) {
-    assert.deepEqual(normalizeHost(host), { ok: true, host });
-    assert.equal(findIntegration(host), null, host);
+test('🔴 통합 밖(AI 채팅·그 밖)에서는 감지하지 않는다 — Gemini 실측', () => {
+  for (const host of ['gemini.google.com', 'chatgpt.com', 'claude.ai', 'news.naver.com', 'example.com', '', undefined]) {
+    assert.equal(isPersonDetectHost(host), false, String(host));
   }
+});
+
+test('🔴 통합 토글을 꺼도 감지 대상 판정은 바뀌지 않는다 — 단축키로 연 팝업도 같은 판정', () => {
+  assert.equal(findIntegration('app.slack.com')?.id, 'slack');
+  assert.equal(isPersonDetectHost('app.slack.com'), true);
 });
