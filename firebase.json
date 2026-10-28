@@ -3,15 +3,6 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "runtime": "nodejs22",
-      "ignore": ["node_modules", ".git", "*.local"],
-      "predeploy": ["node scripts/sync-core.mjs"]
-    }
-  ],
   "hosting": {
     "public": "hosting-dist",
     "predeploy": ["node scripts/build-hosting.mjs"],
@@ -32,7 +23,6 @@
     ]
   },
   "emulators": {
-    "functions": { "port": 5001 },
     "firestore": { "port": 8080 },
     "auth": { "port": 9099 },
     "ui": { "enabled": true, "port": 4000 },
