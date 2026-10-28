@@ -28,6 +28,8 @@ import {
   removeBlockedHost,
   setIntegrationEnabled,
   getSiteGateSettings,
+  isAiChatHost,
+  AI_CHAT_HOSTS,
 } from '../src/lib/siteGate.js';
 import { clearAllLocal, getLocal, STORAGE_KEYS } from '../src/lib/storage.js';
 
@@ -190,4 +192,25 @@ test('🔴 꺼진 사이트 — 오버레이는 늘 마운트하고 자동 버�
   assert.equal(onMessage.includes('autoButton'), false, '단축키가 버튼 숨김 설정에 묶였다');
   // 열린 팝업(`open`)도 autoButton과 무관하다.
   assert.ok(overlay.includes('{open && ('));
+});
+
+/* ── AI 채팅 사이트 — 대화 상대 감지 끄기 (2026-10-28 B안) ──────────────── */
+
+test('AI 채팅 사이트 — 목록 주소와 www·하위 도메인은 맞는다', () => {
+  for (const host of ['gemini.google.com', 'chatgpt.com', 'www.chatgpt.com', 'chat.openai.com', 'claude.ai', 'www.perplexity.ai', 'wrtn.ai']) {
+    assert.equal(isAiChatHost(host), true, host);
+  }
+});
+
+test('🔴 AI 채팅 사이트 — 같은 회사의 업무 사이트는 맞지 않는다', () => {
+  for (const host of ['mail.google.com', 'chat.google.com', 'teams.microsoft.com', 'outlook.office.com', 'openai.com', 'notgrok.com', '', undefined]) {
+    assert.equal(isAiChatHost(host), false, String(host));
+  }
+});
+
+test('🔴 AI 채팅 사이트 목록은 정규화된 호스트이고 통합 사이트와 겹치지 않는다', () => {
+  for (const host of AI_CHAT_HOSTS) {
+    assert.deepEqual(normalizeHost(host), { ok: true, host });
+    assert.equal(findIntegration(host), null, host);
+  }
 });

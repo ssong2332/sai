@@ -124,6 +124,33 @@ export const INTEGRATIONS = [
 
 const INTEGRATION_IDS = INTEGRATIONS.map((item) => item.id);
 
+/**
+ * AI 채팅 사이트 (2026-10-28 사용자 승인 B안). 이 주소에서는 **대화 상대 자동 감지만** 끈다 —
+ * 후보 칩도, 등록된 사람 자동 선택도 하지 않는다. 다듬기·뜻 풀기·직접 선택은 그대로다.
+ * 🔴 왜: AI 답변은 「이유:」·「판정:」 같은 `라벨: 설명` 꼴이 많아 `이름: 내용` 발화자와 글자만으로는
+ *    구분되지 않는다(Gemini 실측 — 「이유」·「팀 역량 적합성」이 후보로 떴다). 사람 상대가 없는 곳이다.
+ * 🔴 넣기 전에 주소를 확인한 것만 둔다(10-28 curl). `chat.deepseek.com`(응답 없음)·`clova-x.naver.com`(DNS 없음)은 뺐다.
+ * 비교는 `hostMatches`(하위 도메인 포함).
+ */
+export const AI_CHAT_HOSTS = [
+  'gemini.google.com',
+  'chatgpt.com',
+  'chat.openai.com',
+  'claude.ai',
+  'copilot.microsoft.com',
+  'perplexity.ai',
+  'aistudio.google.com',
+  'notebooklm.google.com',
+  'grok.com',
+  'chat.mistral.ai',
+  'wrtn.ai',
+];
+
+/** 페이지 호스트가 AI 채팅 사이트인가. */
+export function isAiChatHost(pageHost) {
+  return AI_CHAT_HOSTS.some((rule) => hostMatches(pageHost, rule));
+}
+
 /** 정규화 실패 사유 — 화면 문구는 `hostErrorMessage`. */
 export const HOST_ERRORS = {
   EMPTY: 'empty',
