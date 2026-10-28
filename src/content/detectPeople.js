@@ -19,8 +19,21 @@
 /** `이름: 내용` — 채팅·회의록·메일 인용에서 가장 흔한 꼴. */
 const SPEAKER_PATTERN = /^\s*([^\s:：][^:：\n]{0,29})\s*[:：]\s*\S/;
 
-/** `Sarah <sarah@acme.com>` · `Sarah (Acme)` — 메일 헤더 렌더링. */
-const NAME_BEFORE_BRACKET = /^\s*([^\s<(][^<(\n]{0,29})\s*[<(]/;
+/**
+ * 괄호·꺾쇠 꼴 판정표 (2026-10-28 사용자 승인 — Gemini 답변의 `동일한 6대 평가 기준(5점…) 결과입니다.`가
+ * 대화 상대 후보로 떴다). 예전에는 「글귀 + `<`/`(`」면 전부 이름이었다.
+ * | # | 조건 | 판정 |
+ * |---|---|---|
+ * | B1 | 글귀 + `<메일 주소>` | 이름 |
+ * | B3 | 그 밖의 `<`·`(` (괄호 꼴 전부) | 이름 아님 — 구조로 판정했으니 「별도 줄」로도 흘리지 않는다 |
+ * 🔴 B2(「글귀 + (괄호) + 줄 끝」은 이름)는 넣었다가 뺐다(2026-10-28 실확장): 표 제목
+ *    「팀 역량 적합성 (Team Fit)」이 후보로 떴다. 「용어 (영문)」은 한국어 문서에 흔한 꼴이다.
+ *    `Sarah (Acme)`만 보이는 화면은 손으로 추가한다.
+ */
+/** B1 — `Sarah Kim <sarah@acme.com>` (메일 헤더 렌더링). */
+const MAIL_HEADER = /^\s*([^\s<][^<\n]{0,29}?)\s*<[^<>\s@]+@[^<>\s]+>/;
+/** B3 — B1이 아닌 괄호·꺾쇠 꼴. */
+const BRACKET_SHAPE = /^\s*[^\s<(][^<(\n]{0,29}\s*[<(]/;
 
 /**
  * 이름으로 보기 어려운 것들.
@@ -37,6 +50,9 @@ const REJECT = [
   //    (2026-08-16 테스트가 잡은 실수: 「그래서 말인데…」가 이름으로 통과했다).
   /…|\.{2,}/,
   /[?!]/, // 물음표·느낌표가 든 것은 문장이지 이름이 아니다
+  // N1 — 목록·경로·수식 기호. 「산업·통상 > 공정거래」·「[1안]·[2안]의 점수 체계」는 이름이 아니다
+  //    (2026-10-28 사용자 승인). `·`가 든 이름(Marie·Claire)은 손으로 추가한다.
+  /[>[\]{}|/=·]/,
 ];
 
 /** 이름 한 개의 최소 조건. */
@@ -86,7 +102,7 @@ export function detectSpeakerNames(lines, limit = 3) {
      */
     let structural = false;
     let matched = false;
-    for (const pattern of [SPEAKER_PATTERN, NAME_BEFORE_BRACKET]) {
+    for (const pattern of [SPEAKER_PATTERN, MAIL_HEADER]) {
       const match = pattern.exec(line);
       if (!match) continue;
       structural = true;
@@ -96,7 +112,7 @@ export function detectSpeakerNames(lines, limit = 3) {
       matched = true;
       break; // 한 줄에서 한 번만 센다.
     }
-    if (matched || structural) continue;
+    if (matched || structural || BRACKET_SHAPE.test(line)) continue;
 
     /**
      * 🔴 **이름이 자기 줄에 따로 있는 구조** (2026-08-16 실측이 잡은 누락). Slack·Teams를 비롯한

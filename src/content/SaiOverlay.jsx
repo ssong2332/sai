@@ -39,6 +39,7 @@ import {
 } from '../lib/friction.js';
 // 🔴 대화 상대 **후보만** 뽑는다 — 등록은 사용자가 누를 때만(`detectPeople.js` 헤더).
 import { detectSpeakerNames, matchRecipient } from './detectPeople.js';
+import { isAiChatHost } from '../lib/siteGate.js';
 import {
   collectThreadContext,
   collectDecisionThread,
@@ -1286,8 +1287,9 @@ export default function SaiOverlay({ autoButton = true }) {
        *    ① 등록된 사람과 일치하면 **자동 선택**(고르는 수고만 줄인다 — 새 판단이 아니다)
        *    ② 등록 안 된 이름이면 **제안만** 한다(등록은 사용자가 누를 때).
        * 🔴 후보가 없으면 조용히 기존 선택을 유지한다 — 못 찾았다는 사실을 화면에 늘어놓지 않는다.
+       * 🔴 AI 채팅 사이트에서는 감지하지 않는다(2026-10-28 B안) — 빈 후보라 칩도 자동 선택도 없고 기존 선택이 남는다.
        */
-      const names = detectSpeakerNames(collected.messages);
+      const names = isAiChatHost(location.hostname) ? [] : detectSpeakerNames(collected.messages);
       const { matchedId, suggestions } = matchRecipient(names, list);
       setPersonSuggestions(suggestions ?? []);
       if (matchedId && matchedId !== selected?.id) {
