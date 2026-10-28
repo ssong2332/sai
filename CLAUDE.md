@@ -17,7 +17,7 @@
 ## Project Overview
 - Name: 사이 (Sai) — 글로벌 업무 메시지 AI 교정 크롬 확장
 - 🔴 **상태: 해커톤(2026-08-12 ~ 08-21) 종료 후, 실제 서비스 출시를 목표로 계속 개발 중 (2026-09-30~, 1인 개발).** 결정·우선순위는 `docs/Spec.md` §0, 태스크는 `docs/Tasks.md` 「출시 v1.0」(L01~). 판단 기준은 「시연이 되는가」가 아니라 **「누구나·매일·안전하게 쓸 수 있는가」**.
-- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore · Functions는 2026-10-28 중단 예정) / Cloudflare Workers(교정·팀 서버, 확장 0.1.30부터 전환 완료) / **Anthropic Claude API** (`claude-haiku-5-5`, 사고 끔 · 단일 통합 호출 `POST /v1/refine`) — 2026-10-23 사용자 결정으로 기본, 폴오버 예비는 Groq(Spec §0). Gemini(2026-09-30~10-22 기본)·OpenAI는 명시 요청으로만 남는다. 아래 명령 절의 옛 provider 기록(2026-08-17 OpenAI, 10-01 Gemini)보다 이 줄이 우선한다
+- Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore·Hosting · Functions는 2026-10-28 삭제 — GCP 결제 연결 후 사용자 승인) / Cloudflare Workers(교정·팀 서버, 확장 0.1.30부터 전환 완료) / **Anthropic Claude API** (`claude-haiku-5-5`, 사고 끔 · 단일 통합 호출 `POST /v1/refine`) — 2026-10-23 사용자 결정으로 기본, 폴오버 예비는 Groq(Spec §0). Gemini(2026-09-30~10-22 기본)·OpenAI는 명시 요청으로만 남는다. 아래 명령 절의 옛 provider 기록(2026-08-17 OpenAI, 10-01 Gemini)보다 이 줄이 우선한다
 - 범위 밖(출시 v1.0): 캘린더 빈 시간(`calendar.readonly`) · 유료화. 팀 기능은 무료 공개
 - 해커톤 기간 기록: 2026-08-12 ~ 08-21 (컷 규칙은 `docs/Tasks.md`의 「컷 규칙 (해커톤)」)
 
@@ -34,12 +34,12 @@
 | 로컬 refine 프록시 | `npm run proxy` | 2026-08-13 |
 | 프록시 상태 확인 | `curl http://127.0.0.1:8787/health` | 2026-08-13 |
 | Firestore 규칙 배포 | `firebase deploy --only firestore:rules` | 2026-08-13 |
-| refineV1 인증 확인 (무인증이 막히는지) | `curl -s -o /dev/null -w "%{http_code}" -X POST .../refineV1 -H "Content-Type: application/json" -d "{}"` → **401** | 2026-08-17 |
-| 코어 → functions 동기화 | `node scripts/sync-core.mjs` | 2026-08-13 |
-| Functions 배포 | `firebase deploy --only functions` (동시 다건 실패 시 `firebase deploy --only functions:<이름>`으로 개별 재시도) | 2026-08-13 |
-| Functions 배포 — 분석 타임아웃 시 | `FUNCTIONS_DISCOVERY_TIMEOUT=120 firebase deploy --only functions` | 2026-08-14 |
-| 배포 확인 | `curl https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/health` | 2026-08-13 |
-| 수신 해독 실측(운영) | `curl -X POST .../refineV1 -d '{"mode":"decode","text":"...","sourceLanguage":"en","targetLanguage":"ko"}'` | 2026-08-13 |
+| 🔴 폐기(2026-10-28 Functions 삭제) — refineV1 인증 확인 (무인증이 막히는지) | `curl -s -o /dev/null -w "%{http_code}" -X POST .../refineV1 -H "Content-Type: application/json" -d "{}"` → **401** | 2026-08-17 |
+| 🔴 폐기(2026-10-28 Functions 삭제) — 코어 → functions 동기화 | `node scripts/sync-core.mjs` | 2026-08-13 |
+| 🔴 폐기(2026-10-28 Functions 삭제, `firebase.json`에 설정 없음 #102) — Functions 배포 | `firebase deploy --only functions` (동시 다건 실패 시 `firebase deploy --only functions:<이름>`으로 개별 재시도) | 2026-08-13 |
+| 🔴 폐기(2026-10-28 Functions 삭제) — Functions 배포 — 분석 타임아웃 시 | `FUNCTIONS_DISCOVERY_TIMEOUT=120 firebase deploy --only functions` | 2026-08-14 |
+| 🔴 폐기(2026-10-28 Functions 삭제 — 지금은 404) — 배포 확인 | `curl https://asia-northeast3-sai-global-msg-2026.cloudfunctions.net/health` | 2026-08-13 |
+| 🔴 폐기(2026-10-28 Functions 삭제) — 수신 해독 실측(운영) | `curl -X POST .../refineV1 -d '{"mode":"decode","text":"...","sourceLanguage":"en","targetLanguage":"ko"}'` | 2026-08-13 |
 | Functions 의존성 설치 (worktree에 `functions/node_modules`가 없을 때) | `functions/` 안에서 `npm ci` — 🔴 `npm --prefix functions install`은 쓰지 않는다: `functions/package.json`에 `"sai": "file:.."` 의존성을 몰래 추가한다(2026-10-23 실측) | 2026-10-23 |
 | 대시보드 설치 | `dashboard/` 안에서 `npm ci` — 🔴 `npm --prefix dashboard install`은 쓰지 않는다: `dashboard/package.json`에 `"sai": "file:.."`를 몰래 넣는다(2026-10-25 실측) | 2026-10-25 |
 | 대시보드 빌드 | `npm --prefix dashboard run build` | 2026-08-13 |
@@ -75,9 +75,8 @@
 > 로컬 프록시·회귀 러너·Functions·Worker 넷 다 `failover.js` `pickDefaultProvider` **한 함수**로 고른다 —
 > `ANTHROPIC_API_KEY`가 있으면 anthropic, 없으면 `GROQ_API_KEY`의 groq, 둘 다 없으면 **사슬 밖으로 내려가지 않는다**
 > (gemini·openai는 `--provider`/`provider`로 명시할 때만). 폴오버 사슬은 anthropic → groq.
-> 🔴 **예외 하나 — 운영 Functions**: ANTHROPIC·GROQ 시크릿이 Secret Manager에 **미등록**이라 등록 전에는
-> `INTERIM_DEFAULT_PROVIDER`(gemini)로 돈다(배포 즉시 전면 500을 막으려는 임시 조치 — `functions/index.js` 표).
-> 시크릿 등록 + 주석 해제 + 배포 후 이 예외를 지운다. 🔴 미등록 시크릿을 `defineSecret`하면 배포가 죽는다(아래 08-14·08-17 기록).
+> (옛 예외 — 운영 Functions의 `INTERIM_DEFAULT_PROVIDER`(gemini) 임시 기본은 2026-10-28 Functions 삭제로 해소됐다.
+> 🔴 미등록 시크릿을 `defineSecret`하면 배포가 죽는다는 기록(아래 08-14·08-17)은 Functions를 다시 쓸 때를 위해 남긴다.)
 > 이력: 2026-10-01 L03 gemini → openai → openai/gpt-4.1 · 2026-08-17~09-30 openai 먼저.
 > 확장은 provider를 요청에 싣지 않는다 — 실으면 폴오버가 꺼진다.
 > **셋의 기본값 순서는 항상 같아야 한다**(지금은 넷) — 하나만 바꾸면 "로컬에선 되는데 배포하면 다르다"가 시작된다.

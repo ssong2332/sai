@@ -24,7 +24,7 @@
 | 인원·기간 | **1인 개발**, 기한 없음 — 단계별 진입·졸업 조건으로 관리(`docs/Tasks.md` 「출시 v1.0」) | 2026-09-30 |
 | 타깃 | **해외 동료와 일하는 한국 개발 조직의 개인 사용자** | 기획안 유지 |
 | AI | **Anthropic Claude** (`claude-haiku-5-5`, 사고 끔) — 한도·키 오류 때만 예비 **Groq** (`openai/gpt-oss-120b`). 근거: L30 실측(건당 $0.00070·중앙값 2.4~2.5초), 두 회사 모두 API 입력을 학습에 쓰지 않음. Gemini·OpenAI는 개발용 명시 요청으로만 남는다 | 2026-10-23 |
-| 교정 서버 | **Cloudflare Workers** (`sai-refine.aiisgod.workers.dev`) — Firebase ID 토큰만 검증한다. **전환 완료(확장 0.1.30~, 2026-10-26)**: 교정(`/v1/refine`)·팀(`/v1/team`) 모두 Worker를 부른다. Functions(`refineV1`·`teamV1`)는 2026-10-28 GCP 체험 종료로 멈추는 것을 감수한다(L27). 비공개 베타는 Worker 버전으로 시작한다(L02) | 2026-10-23~25 |
+| 교정 서버 | **Cloudflare Workers** (`sai-refine.aiisgod.workers.dev`) — Firebase ID 토큰만 검증한다. **전환 완료(확장 0.1.30~, 2026-10-26)**: 교정(`/v1/refine`)·팀(`/v1/team`) 모두 Worker를 부른다. Functions(`refineV1`·`teamV1`)는 2026-10-28 삭제했다(L27). 비공개 베타는 Worker 버전으로 시작한다(L02) | 2026-10-23~25 |
 | 로그인·저장 | **Firebase Auth**(구글 로그인) · **Firestore**(서울) 유지 | 2026-10-24 |
 | 웹 | Firebase Hosting 한 곳: `/` 소개 사이트(`site/`) · `/dashboard/` 팀 대시보드 · `/privacy.html`·`/terms.html` 처리방침·약관 | 2026-10-25 |
 | 수익화 | **유료화는 나중.** 개인·팀 기능 모두 무료. 포인트는 꺼 둔다(사용처가 없다) | 2026-09-30 |
@@ -79,7 +79,7 @@
 초대 코드로 팀 만들기·참가(여러 팀) · 명부(표시 이름·직급) · 팀원 내보내기·팀장 넘기기·초대 코드 다시 만들기·이름 바꾸기 · 대시보드 보기 권한 · 팀 용어집 · 팀 단위 마찰 카운트 업로드(본문 없음) · 팀 나가기 · 계정 삭제.
 올라가는 카운트(날짜별 정수뿐, 키 목록은 `src/lib/friction.js` 판정표가 계약): 마찰(`misread`·`venting`·`forceOffHours`·`urgencyGap`·`missing`) · 긍정(`clear`·`schedule`=예약 알림 저장·`sensitiveBlocked`) · 분모(`refined`) · **맥락**(L34 — `decoded`·`decodeUrgencyGap`·`urgencyCritical`/`urgencyNormal`/`urgencyLow`·`teamGlossaryApplied`, 건강도 지수에 넣지 않는다).
 **협업 건강도**(F-10/F-26): `건강도 = 100 − 정규화된 마찰 카운트`(하소연 감지·업무 외 시간 강행 등 합계). 개인 점수는 만들지 않는다(「금지 2」).
-서버는 Worker `/v1/team`(확장 0.1.30~, 판정 코드는 `functions/teams.js`·`account.js`를 그대로 번들 — L33 2단계). Functions `teamV1`은 10-28 이후 멈춤 감수.
+서버는 Worker `/v1/team`(확장 0.1.30~, 판정 코드는 `functions/teams.js`·`account.js`를 그대로 번들 — L33 2단계). Functions `teamV1`은 2026-10-28 삭제했다.
 
 ### 권장 기능
 
@@ -155,7 +155,7 @@
 * **순차 호출 금지, 1회 호출로 구조화 JSON.** 모드 4개: 다듬기 · 뜻 풀기 · 결정 · 회신
 * provider 선택은 `src/core/refine/failover.js` `pickDefaultProvider` **한 곳** — ANTHROPIC 키 → anthropic, 없으면 GROQ. 폴오버는 사유가 `quota`·`auth`이고 요청이 provider를 명시하지 않았을 때만. 확장은 provider를 싣지 않는다
 * 다듬기 반환(주요 필드): `refined` · `refinedReason` · `backTranslation` · `urgency`(+`urgencySource`·`urgencyNotice`) · `detectedIntent` · `ticket` · `ticketBackTranslation`(v23) · `appliedGlossary` · `preserved` · `misreadRisks` · `missingElements` · `fallback`/`fallbackReason`. 정의: `src/core/refine/schema.js`
-* 코어 단일 출처 `src/core/` — Functions는 `scripts/sync-core.mjs`로 복사해 쓰고, Worker는 직접 번들한다
+* 코어 단일 출처 `src/core/` — Worker는 직접 번들한다(Functions는 2026-10-28 삭제, `scripts/sync-core.mjs`는 더 쓰지 않는다)
 
 ---
 
