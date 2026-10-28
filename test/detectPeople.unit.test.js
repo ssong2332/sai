@@ -130,3 +130,42 @@ test('🔴 숫자로 끝나는 조각은 이름이 아니다 — Slack 「이름
   assert.deepEqual(detectSpeakerNames(slack.map((text) => ({ text }))), ['이준호']);
   assert.deepEqual(detectSpeakerNames(['Sarah 10: see you']), []);
 });
+
+/* ── 괄호·꺾쇠 판정표 B1~B3 · 기호 N1 (2026-10-28 Gemini 답변 화면 실측) ──── */
+
+test('B2 — `이름 (소속)`으로 끝나는 줄은 이름이다', () => {
+  assert.deepEqual(detectSpeakerNames(['Sarah (Acme)']), ['Sarah']);
+  assert.deepEqual(detectSpeakerNames(['김민수 (마케팅팀)']), ['김민수']);
+});
+
+test('🔴 B3 — 괄호 뒤에 문장이 이어지면 이름이 아니다 (실측 문단 그대로)', () => {
+  const gemini = [
+    '동일한 6대 평가 기준(5점 만점 및 100점 환산) 결과입니다.',
+    '신규 [1안]·[2안]의 점수 체계(5점 만점 가중평균)를 기존 17개와 같은 기준으로 재검증했습니다.',
+    'Sarah (Acme) wrote yesterday',
+  ];
+  assert.deepEqual(detectSpeakerNames(gemini.map((text) => ({ text }))), []);
+});
+
+test('🔴 B3 — `<` 안이 메일 주소가 아니면 이름이 아니다', () => {
+  assert.deepEqual(detectSpeakerNames(['공지 <중요> 서버 점검']), []);
+});
+
+test('🔴 B3 — 짧은 괄호 줄도 「별도 줄 이름」으로 흘리지 않는다', () => {
+  assert.deepEqual(detectSpeakerNames(['Sarah (Acme) hi', '오늘 배포 일정 다시 공유드립니다 확인 부탁드려요']), []);
+});
+
+test('🔴 N1 — 목록·경로 기호가 든 조각은 이름이 아니다', () => {
+  assert.deepEqual(detectSpeakerNames(['산업·통상·중소기업 > 공정거래 (연관 분야): 신규 안 비교']), []);
+  assert.deepEqual(detectSpeakerNames(['[공지]: 서버 점검', 'a/b: 경로']), []);
+});
+
+test('🔴 가짜 후보가 사라지면 진짜 발화자가 3개 한도에서 밀려나지 않는다', () => {
+  const lines = [
+    '동일한 6대 평가 기준(5점 만점 및 100점 환산) 결과입니다.',
+    '산업·통상·중소기업 > 공정거래 (연관 분야) 쪽에서 신규 안을 비교하면 다음과 같습니다.',
+    '신규 [1안]·[2안]의 점수 체계(5점 만점 가중평균)를 재검증했습니다.',
+    '이준호: 내일 회의 자료 공유드릴게요',
+  ];
+  assert.deepEqual(detectSpeakerNames(lines.map((text) => ({ text }))), ['이준호']);
+});
