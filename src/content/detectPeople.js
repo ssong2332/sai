@@ -25,14 +25,14 @@ const SPEAKER_PATTERN = /^\s*([^\s:：][^:：\n]{0,29})\s*[:：]\s*\S/;
  * | # | 조건 | 판정 |
  * |---|---|---|
  * | B1 | 글귀 + `<메일 주소>` | 이름 |
- * | B2 | 글귀 + `(짧은 괄호)` + 줄 끝 | 이름 |
- * | B3 | 그 밖의 `<`·`(` | 이름 아님 — 구조로 판정했으니 「별도 줄」로도 흘리지 않는다 |
+ * | B3 | 그 밖의 `<`·`(` (괄호 꼴 전부) | 이름 아님 — 구조로 판정했으니 「별도 줄」로도 흘리지 않는다 |
+ * 🔴 B2(「글귀 + (괄호) + 줄 끝」은 이름)는 넣었다가 뺐다(2026-10-28 실확장): 표 제목
+ *    「팀 역량 적합성 (Team Fit)」이 후보로 떴다. 「용어 (영문)」은 한국어 문서에 흔한 꼴이다.
+ *    `Sarah (Acme)`만 보이는 화면은 손으로 추가한다.
  */
 /** B1 — `Sarah Kim <sarah@acme.com>` (메일 헤더 렌더링). */
 const MAIL_HEADER = /^\s*([^\s<][^<\n]{0,29}?)\s*<[^<>\s@]+@[^<>\s]+>/;
-/** B2 — `Sarah (Acme)` · `김민수 (마케팅팀)`. 🔴 괄호 뒤에 글이 이어지면 문장이다. */
-const NAME_PAREN = /^\s*([^\s(][^(\n]{0,29}?)\s*\([^()\n]{1,40}\)\s*$/;
-/** B3 — B1·B2가 아닌 괄호·꺾쇠 꼴. */
+/** B3 — B1이 아닌 괄호·꺾쇠 꼴. */
 const BRACKET_SHAPE = /^\s*[^\s<(][^<(\n]{0,29}\s*[<(]/;
 
 /**
@@ -102,7 +102,7 @@ export function detectSpeakerNames(lines, limit = 3) {
      */
     let structural = false;
     let matched = false;
-    for (const pattern of [SPEAKER_PATTERN, MAIL_HEADER, NAME_PAREN]) {
+    for (const pattern of [SPEAKER_PATTERN, MAIL_HEADER]) {
       const match = pattern.exec(line);
       if (!match) continue;
       structural = true;

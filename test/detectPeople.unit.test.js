@@ -131,11 +131,13 @@ test('🔴 숫자로 끝나는 조각은 이름이 아니다 — Slack 「이름
   assert.deepEqual(detectSpeakerNames(['Sarah 10: see you']), []);
 });
 
-/* ── 괄호·꺾쇠 판정표 B1~B3 · 기호 N1 (2026-10-28 Gemini 답변 화면 실측) ──── */
+/* ── 괄호·꺾쇠 판정표 B1·B3 · 기호 N1 (2026-10-28 Gemini 답변 화면 실측) ──── */
 
-test('B2 — `이름 (소속)`으로 끝나는 줄은 이름이다', () => {
-  assert.deepEqual(detectSpeakerNames(['Sarah (Acme)']), ['Sarah']);
-  assert.deepEqual(detectSpeakerNames(['김민수 (마케팅팀)']), ['김민수']);
+test('🔴 B2 삭제 — `용어 (영문)` 표 제목은 이름이 아니다 (0.1.47 실확장에서 뜬 조각 그대로)', () => {
+  assert.deepEqual(detectSpeakerNames(['팀 역량 적합성 (Team Fit)']), []);
+  assert.deepEqual(detectSpeakerNames(['데이터 개방성 (P5)']), []);
+  // 대가: `이름 (소속)`만 보이는 화면은 손으로 추가한다.
+  assert.deepEqual(detectSpeakerNames(['Sarah (Acme)']), []);
 });
 
 test('🔴 B3 — 괄호 뒤에 문장이 이어지면 이름이 아니다 (실측 문단 그대로)', () => {
