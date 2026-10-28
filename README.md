@@ -21,7 +21,7 @@
 | 항목 | 값 |
 |---|---|
 | 확장 버전 | **v0.1.44** (2026-10-27 — `package.json`과 `src/manifest.js`를 같은 값으로, 확장 동작이 바뀌는 PR마다 올린다) |
-| 서버 | **Cloudflare Workers** `sai-refine.aiisgod.workers.dev` — 교정 `/v1/refine`·팀 `/v1/team` (확장 0.1.30~). Cloud Functions는 2026-10-28 GCP 체험 종료로 중단(감수) |
+| 서버 | **Cloudflare Workers** `sai-refine.aiisgod.workers.dev` — 교정 `/v1/refine`·팀 `/v1/team` (확장 0.1.30~). Cloud Functions는 2026-10-28 삭제 — 서버는 Worker뿐 |
 | 주 provider | Anthropic Claude `claude-haiku-5-5` (사고 끔, 2026-10-23 — Spec §0) · 프롬프트 `refine-v23` |
 | 한도 폴오버 | **anthropic → groq** ([src/core/refine/failover.js](src/core/refine/failover.js)) — Gemini·OpenAI는 명시 요청만 |
 | 단위 테스트 | 확장 1127건 · Worker 97건 |
@@ -83,7 +83,7 @@ npm run dev
 | 변수 | 위치 | 설명 |
 |---|---|---|
 | `OPENAI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖 — 명시 요청만(키 무효 2026-09-28~). 서버 전용, 클라이언트 번들 포함 금지 |
-| `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖(2026-10-23) — 명시 요청만. (옛 Functions의 임시 기본이었으나 Functions는 10-28 중단) |
+| `GEMINI_API_KEY` | Secret Manager + 로컬 `.env` | 사슬 밖(2026-10-23) — 명시 요청만. (옛 Functions의 임시 기본이었으나 2026-10-28 Functions 삭제로 쓰는 곳 없음) |
 | `ANTHROPIC_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **기본 provider**(2026-10-23, Claude Haiku 5.5, 사고 끔 — `SAI_ANTHROPIC_THINKING=adaptive`로만 켬). 폴오버 1단계 |
 | `GROQ_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **폴오버 예비**(2026-10-23, `openai/gpt-oss-120b`). 폴오버 2단계 |
 | `SAI_SERVICE_ACCOUNT_FILE` | 실행하는 셸(또는 로컬 `.env`) — **키 파일 경로**, 키 파일은 저장소 밖 | Worker 주간 점검 `npm --prefix workers/refine run report`(2026-10-27, M2) — 최근 7일 `betaMetrics` + `/health`, 경고 있으면 종료 코드 1 |
@@ -112,7 +112,7 @@ https://sai-refine.aiisgod.workers.dev/v1/team     # 팀·계정 삭제·지표
 - 🔴 **로그인하지 않으면 401이다.** Firebase ID 토큰을 `jose`로 검증한다. 하루 교정 상한도 서버가 센다.
 - 🔴 **CORS는 확장 오리진만** 허용한다(다른 오리진 403).
 - 배포: `workers/refine/` 안에서 `npx wrangler deploy` (🔴 사용자 실행) · 확인: `curl https://sai-refine.aiisgod.workers.dev/health`
-- 옛 Cloud Functions(`refineV1`·`teamV1`, `functions/index.js`)는 2026-10-28 GCP 체험 종료로 멈춘다(Tasks L27 — 감수).
+- 옛 Cloud Functions(`refineV1`·`teamV1`·`health`)는 2026-10-28 삭제했다(Tasks L27). `firebase.json`에도 Functions 설정이 없다(#102). `functions/` 소스는 Worker가 판정 코드를 가져다 쓰므로 남아 있다.
   `functions/`의 팀·계정 코드는 Worker가 그대로 쓰므로 지우지 않는다.
 
 ### 한도 폴오버
