@@ -39,7 +39,8 @@ import {
 } from '../lib/friction.js';
 // 🔴 대화 상대 **후보만** 뽑는다 — 등록은 사용자가 누를 때만(`detectPeople.js` 헤더).
 import { detectSpeakerNames, matchRecipient } from './detectPeople.js';
-import { isPersonDetectHost } from '../lib/siteGate.js';
+import { findIntegration, isPersonDetectHost } from '../lib/siteGate.js';
+import { collectGmailPeople } from './gmailPeople.js';
 import {
   collectThreadContext,
   collectDecisionThread,
@@ -1289,8 +1290,15 @@ export default function SaiOverlay({ autoButton = true }) {
        * 🔴 후보가 없으면 조용히 기존 선택을 유지한다 — 못 찾았다는 사실을 화면에 늘어놓지 않는다.
        * 🔴 대화형 통합 8곳에서만 감지한다(2026-10-28, `isPersonDetectHost`) — 그 밖은 빈 후보라
        *    칩도 자동 선택도 없고 기존 선택이 남는다.
+       * 🔴 Gmail은 줄 단위 규칙 대신 받는사람 칩·보낸사람 머리줄만 읽는다(`gmailPeople.js`, 2026-10-28).
        */
-      const names = isPersonDetectHost(location.hostname) ? detectSpeakerNames(collected.messages) : [];
+      const host = location.hostname;
+      const names =
+        findIntegration(host)?.id === 'gmail'
+          ? collectGmailPeople(targetRef.current)
+          : isPersonDetectHost(host)
+            ? detectSpeakerNames(collected.messages)
+            : [];
       const { matchedId, suggestions } = matchRecipient(names, list);
       setPersonSuggestions(suggestions ?? []);
       if (matchedId && matchedId !== selected?.id) {
