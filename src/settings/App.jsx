@@ -199,9 +199,9 @@ function TextRow({ label, hint, value, onSave, placeholder, maxLength }) {
 
 /** 다듬기 품질 모드 — 이름만 고른다. 모델은 서버가 정한다(`core/refine/quality.js`, 2026-10-30). */
 const QUALITY_OPTIONS = [
-  { id: 'fast', label: QUALITY_LABELS.fast, hint: '가장 빨리 돌아와요. 짧은 메시지에 좋아요.' },
-  { id: 'standard', label: QUALITY_LABELS.standard, hint: '속도와 꼼꼼함의 균형이에요.' },
-  { id: 'deep', label: QUALITY_LABELS.deep, hint: '조금 더 기다리는 대신 가장 꼼꼼하게 다듬어요.' },
+  { id: 'fast', label: QUALITY_LABELS.fast, hint: '보통 3초 안에 돌아와요. 짧은 메시지에 좋아요.' },
+  { id: 'standard', label: QUALITY_LABELS.standard, hint: '보통 4초 안팎이에요. 속도와 꼼꼼함의 균형이에요.' },
+  { id: 'deep', label: QUALITY_LABELS.deep, hint: '보통 10초쯤 걸리는 대신 가장 꼼꼼하게 다듬어요.' },
 ];
 
 function GeneralPanel({ data, act }) {
