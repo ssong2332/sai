@@ -907,6 +907,13 @@ a {
   letter-spacing: -0.02em;
 }
 
+/* ── 요금제 ── */
+.plan-link {
+  justify-self: start;
+  margin-top: 12px;
+  text-decoration: none;
+}
+
 /* ── 불러오기 실패 ── */
 .nc {
   padding: 32px;
