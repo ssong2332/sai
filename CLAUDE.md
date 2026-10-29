@@ -57,6 +57,7 @@
 | 디자인 하네스 — 사이드패널·결정 화면(가짜 `chrome.*` 목업 저장소, 네트워크 차단) | 같은 서버에서 `http://127.0.0.1:5199/sidepanel.html` · `/decisions.html` (`?theme=dark`, 사이드패널 `?onboarding=new`). 창 폭 ~400px로 본다 | 2026-10-24 |
 | 디자인 하네스 — 팀 대시보드(확장 페이지 `src/dashboard/`, 가짜 `chrome.*` + 가짜 Firestore·합성 데이터, 읽은 문서 수는 `window.__harnessReads`) | 같은 서버에서 `http://127.0.0.1:5199/dashboard.html` (`?theme=dark` · `?team=sg` · `?state=login\|noteam\|noview\|error`) | 2026-10-25 |
 | 디자인 하네스 — 확장 설정 페이지 | 같은 서버에서 `http://127.0.0.1:5199/settings.html#general` (패널은 해시: `#activation` `#integrations` `#blocked` `#data` …) | 2026-10-25 |
+| 스토어 프로모션 타일 PNG(440×280, 크롬 headless) | `docs/store/README.md`의 PowerShell 한 줄 그대로 (🔴 `--force-device-scale-factor=1`·`--allow-file-access-from-files` 빼지 않는다) | 2026-10-29 |
 | Worker 로컬 workerd(가짜 키·가짜 Claude, 🔴 배포 금지 설정) | `npm --prefix workers/refine run dev:mock` → `http://127.0.0.1:8790` (`/__dev/token`으로 시험 토큰) | 2026-10-23 |
 | 소개·설정 웹사이트(`site/`) 설치 | `site/` 안에서 `npm install` — 🔴 `npm --prefix site install`은 쓰지 않는다: `site/package.json`에 `"sai": "file:.."`를 몰래 넣는다(2026-10-24 실측) | 2026-10-24 |
 | 웹사이트 빌드 | `npm --prefix site run build` | 2026-10-24 |
