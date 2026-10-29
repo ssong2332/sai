@@ -56,7 +56,7 @@
 | `sidePanel` | 용어집·저장 문구·팀·프로필을 보여 주는 사이드 패널을 연다 | `src/background/index.js` |
 | `storage` | 설정·용어집·저장 문구·예약 알림을 이 기기에 저장한다 | `src/background/index.js`·`src/content/index.jsx` |
 | ~~`activeTab`~~ | 뺀다(2026-10-29 사용자 결정 — 쓰는 호출 0건). 아래 참고 | — |
-| `clipboardWrite` | 다듬은 문장·회신 초안을 클립보드로 복사한다 | `src/content/applyText.js`·`src/sidepanel/App.jsx` |
+| `clipboardWrite` | 다듬은 문장을 입력창에 넣지 못한 사이트에서는 클립보드에 복사해 붙여넣게 한다. 사이드 패널의 저장 문구·팀 초대 코드를 눌러 복사한다 | `src/content/applyText.js:243-260` `fallbackToClipboard` · `src/sidepanel/App.jsx:276`(저장 문구)·`:2066`(초대 코드) |
 | `alarms` | 이용자가 예약한 「나중에 보내기」 알림 시각을 맞춘다 | `src/background/index.js:294-340` |
 | `notifications` | 예약 시각에 알림을 띄운다 | `src/background/index.js:347` |
 | `identity` | 구글 로그인(`launchWebAuthFlow`) | `src/lib/authClient.js` |
