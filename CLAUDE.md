@@ -58,6 +58,7 @@
 | 디자인 하네스 — 팀 대시보드(확장 페이지 `src/dashboard/`, 가짜 `chrome.*` + 가짜 Firestore·합성 데이터, 읽은 문서 수는 `window.__harnessReads`) | 같은 서버에서 `http://127.0.0.1:5199/dashboard.html` (`?theme=dark` · `?team=sg` · `?state=login\|noteam\|noview\|error`) | 2026-10-25 |
 | 디자인 하네스 — 확장 설정 페이지 | 같은 서버에서 `http://127.0.0.1:5199/settings.html#general` (패널은 해시: `#activation` `#integrations` `#blocked` `#data` …) | 2026-10-25 |
 | 스토어 프로모션 타일 PNG(440×280, 크롬 headless) | `docs/store/README.md`의 PowerShell 한 줄 그대로 (🔴 `--force-device-scale-factor=1`·`--allow-file-access-from-files` 빼지 않는다) | 2026-10-29 |
+| 스토어 업로드 zip(`key` 뺌 · `npm run build` 포함 · 루트 `sai-extension-<버전>.zip`) | `npm run pack:store` (🔴 `dist/`를 그대로 묶지 않는다 — 스토어가 `key`를 거절한다. `dist/`의 `key`는 unpacked ID용으로 남긴다) | 2026-10-29 |
 | Worker 로컬 workerd(가짜 키·가짜 Claude, 🔴 배포 금지 설정) | `npm --prefix workers/refine run dev:mock` → `http://127.0.0.1:8790` (`/__dev/token`으로 시험 토큰) | 2026-10-23 |
 | 소개·설정 웹사이트(`site/`) 설치 | `site/` 안에서 `npm install` — 🔴 `npm --prefix site install`은 쓰지 않는다: `site/package.json`에 `"sai": "file:.."`를 몰래 넣는다(2026-10-24 실측) | 2026-10-24 |
 | 웹사이트 빌드 | `npm --prefix site run build` | 2026-10-24 |

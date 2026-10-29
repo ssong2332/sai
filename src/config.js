@@ -97,7 +97,7 @@ export const GITHUB_EVENT_PAGES = 3;
  *      🔴 2026-09-30부터 `FEATURES.calendar=false`라 공개 빌드 manifest에는 이 블록이 없다(L10).
  *    - 여기: 유형 **웹 애플리케이션** — `launchWebAuthFlow`(로그인, 크롬·엣지 둘 다)
  *    같은 값을 넣으면 조용히 실패한다. 리디렉션 URI로
- *    `https://ogbcccaaojphhgobeeidpafokjieckdf.chromiumapp.org/`가 등록돼 있어야 한다.
+ *    `https://gdipbmakeghjecpenebjlfhgcajbikkg.chromiumapp.org/`가 등록돼 있어야 한다.
  * 🔴 값이 비어 있으면 `isAuthConfigured()`가 false를 주고 **버튼 자체가 안내 문구로 바뀐다** —
  *    플레이스홀더로 눌러 놓고 실패하게 두지 않는다.
  */

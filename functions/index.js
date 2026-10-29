@@ -67,7 +67,7 @@ initializeApp();
  * 🔴 **비밀이 아니다.** 확장 번들에서 누구나 읽을 수 있고, 이 값으로 막히는 것은
  *    "다른 웹사이트의 JS"뿐이다. 진짜 방어선은 토큰 검증이다.
  */
-const EXTENSION_ID = 'ogbcccaaojphhgobeeidpafokjieckdf';
+const EXTENSION_ID = 'gdipbmakeghjecpenebjlfhgcajbikkg';
 
 /** 🔴 `teamV1`과 같은 deps를 쓴다 — verifyIdToken 구현이 갈리면 안 된다. */
 const teamDeps = defaultDeps();

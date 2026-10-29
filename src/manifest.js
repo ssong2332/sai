@@ -11,15 +11,19 @@ export default defineManifest({
    * ID에 묶여 있으므로 그 순간 구글·GitHub 연동이 통째로 깨진다. 이 `key`를 넣으면 경로와
    * 무관하게 ID가 고정된다.
    *
-   * 고정된 ID: **ogbcccaaojphhgobeeidpafokjieckdf**
+   * 고정된 ID: **gdipbmakeghjecpenebjlfhgcajbikkg** — 크롬 웹 스토어 항목 ID와 같다(2026-10-29 L21).
+   *
+   * 🔴 **2026-10-29 ID를 바꿨다** (옛 ID `ogbcccaaojphhgobeeidpafokjieckdf`). 스토어는 `key`가 든 zip을 거절하고
+   *    (「key 입력란은 매니페스트에 허용되지 않습니다」 실측) 자기 키로 ID를 정한다. 옛 개인키는 잃어버려
+   *    CRX로 옛 ID를 지킬 수 없었다. 그래서 **스토어 항목의 공개 키**(대시보드 「패키지」 → 「공개 키 보기」)를
+   *    여기 넣었다 — 개발용 unpacked도 스토어와 같은 ID가 된다.
+   * 🔴 **스토어에 올리는 zip에는 이 `key`를 빼야 한다** — `npm run pack:store`(`scripts/pack-store.mjs`)가 뺀다.
    *
    * 🔴 이 값은 **공개키다 — 비밀이 아니다.** 커밋해도 되고, 오히려 커밋해야 팀·다른 PC에서
-   *    같은 ID가 나온다. 짝이 되는 **개인키는 저장소 밖**(`C:\sai-secrets\sai-extension-key.pem`)에
-   *    있다. 개인키는 `.crx`를 직접 서명해 배포할 때만 필요하며, 웹스토어 업로드에는 필요 없다.
-   *    잃어버려도 이 `key`가 manifest에 있는 한 ID는 유지된다.
+   *    같은 ID가 나온다. 짝이 되는 개인키는 스토어(구글)가 갖고 있다 — 우리에게는 없다.
    * 🔴 **이 값을 바꾸면 ID가 바뀐다** — 등록해 둔 OAuth 클라이언트가 전부 무효가 된다.
    */
-  key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzXBg0vYEbD7p/OVzWPrMtmNSESszVdML3yuFDRqAUpPAg18SoKsw9uhnCeo9+AC33rjM42y8aCymeYxUlI35HCYDoDs0yRbtf5XnzRFSyvL1sOCm7bDQmCpPy0bF+5+dMFQQMWoKmeRv6y9OErWk6CTcBI5dAPPMSOAXneL0sAKRatCxRtXLwPF1wFLPIfO4k2/I3dcRtgwI5xnLJiIqpXqM9ZIsXN3/rLIcj+NC7LbdvStx+iuIB3SYV1NEjiSAMrstuuo6tP3UT8VnsSrHy9nQ/QzMjfdTVwl4yx+ob6iECUtO5bdWvJLUrsLuYdkUbKVC0UpbFBALPkUtPpyuPQIDAQAB',
+  key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqAwh7K1z83jL8C8CTG5s2LOKvNChI8OaJ3qy7gvRRPn3jepVe+zv0P/l3kkJZKMddsM2gc7WzAVC6P70VcVO29+/HWdXaSD+NnLZaBqPuDmLAb2V0J9rJaSrxucZX9KpAu4qXTyX31NzSFm8qOrdGPvmNPlP0U4aGCQJ2X8SpsCdOa7LnDGKQ7Vy+dLlzcZ1BNx+lskNUa4TqQvqcD0LqWatbrnmY5siQrpOyP/zDFO/+6rMdmCBVZVHAQy9SWWIFpUVs9xsF3tDqQdT5I1JcFfqvvBzJBcIiT+EF56UlbGqUyjjkR/aaNQm6HhZpvO5rrCPSn3nCeF6wDyIunsbnwIDAQAB',
   /**
    * 🔴 **이름은 「무엇을 하는지」까지 말한다** (2026-08-19). 확장 목록·설치 화면에서는 이 한 줄이
    *    판단 근거인데, 「사이 (Sai)」만으로는 무슨 도구인지 알 수 없었다.
@@ -36,7 +40,7 @@ export default defineManifest({
    *    L28 안전망·경고 상자가 들어갔는데 숫자가 그대로라 「다시 로드」가 됐는지 화면으로 알 수 없었다.
    *    `package.json`과 같은 값이어야 한다(`test/version.unit.test.js`).
    */
-  version: '0.1.54',
+  version: '0.1.55',
   /**
    * 🔴 **동작을 먼저, 은유는 빼고.** 예전 문구("사람과 사람, 언어와 언어 사이를 매끄럽게 잇는")는
    *    첫 줄이 은유라 무엇을 하는 도구인지 읽는 데 시간이 걸렸다.
@@ -142,8 +146,8 @@ export default defineManifest({
    * 🔴 **`client_id`는 비밀이 아니다.** 확장 번들은 누구나 뜯어보므로 애초에 숨길 수 없는 값이고,
    *    Chrome 확장 유형 OAuth 클라이언트는 **시크릿을 발급하지 않는다** — 크롬이 확장 ID로 신원을
    *    증명한다. 그래서 `key`(위)를 고정한 것이 보안의 핵심이다.
-   * 🔴 이 클라이언트는 **확장 ID `ogbcccaaojphhgobeeidpafokjieckdf`에 묶여 있다.** 위 `key`를
-   *    바꾸면 여기도 함께 다시 만들어야 한다.
+   * 🔴 이 클라이언트는 **옛 확장 ID `ogbcccaaojphhgobeeidpafokjieckdf`에 묶여 있다.** 2026-10-29 ID를
+   *    바꿨으므로 캘린더를 다시 켜려면 이 클라이언트를 새 ID(`gdipbmakeghjecpenebjlfhgcajbikkg`)로 다시 만들어야 한다.
    * 🔴 **읽기 전용 범위만 요청한다.** 캘린더에 일정을 쓰지 않는다 — 우리가 하는 일은 빈 시간을
    *    읽는 것뿐이다(Spec 권장 12).
    */

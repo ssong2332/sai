@@ -1,12 +1,13 @@
 {
   "name": "sai",
   "private": true,
-  "version": "0.1.54",
+  "version": "0.1.55",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:sitedev": "node scripts/build-sitedev.mjs",
+    "pack:store": "node scripts/pack-store.mjs",
     "preview": "vite preview",
     "proxy": "node --env-file-if-exists=.env server/refine-proxy.js",
     "lint": "eslint .",
