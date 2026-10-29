@@ -23,11 +23,15 @@
 
 /* ── 결제 주기 (월 / 연) ── */
 .pr-billing {
-  display: flex;
-  margin-top: clamp(28px, 4vw, 40px);
+  margin-top: 16px;
 }
-.pr-billing .seg {
-  min-width: 260px;
+.pr-billing button {
+  padding: 0 8px;
+  white-space: nowrap;
+}
+/* .seg 높이(버튼 34 + 안쪽 여백 8) + 위 여백 16 */
+.pr-billing-spacer {
+  height: 58px;
 }
 .pr-save {
   margin-left: 6px;
@@ -44,7 +48,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-top: clamp(20px, 3vw, 28px);
+  margin-top: clamp(32px, 5vw, 56px);
 }
 .pr-card {
   position: relative;
@@ -269,6 +273,9 @@
 @media (max-width: 860px) {
   .pr-plans {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .pr-billing-spacer {
+    display: none;
   }
   .pr-card.featured {
     margin-top: 8px;
