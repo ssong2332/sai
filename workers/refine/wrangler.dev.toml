@@ -15,6 +15,6 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 FIREBASE_PROJECT_ID = "sai-global-msg-2026"
-EXTENSION_ID = "ogbcccaaojphhgobeeidpafokjieckdf"
+EXTENSION_ID = "gdipbmakeghjecpenebjlfhgcajbikkg"
 ANTHROPIC_API_KEY = "dev-fake-key-not-real"
 # 🔴 GROQ_API_KEY는 넣지 않는다 — 가짜 fetch는 Anthropic만 흉내 내므로, 넣으면 폴오버가 실제 api.groq.com을 부른다.

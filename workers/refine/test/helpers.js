@@ -6,7 +6,7 @@
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose';
 
 export const PROJECT_ID = 'sai-global-msg-2026';
-export const EXTENSION_ID = 'ogbcccaaojphhgobeeidpafokjieckdf';
+export const EXTENSION_ID = 'gdipbmakeghjecpenebjlfhgcajbikkg';
 export const EXT_ORIGIN = `chrome-extension://${EXTENSION_ID}`;
 
 /** 테스트용 env — 키는 지어낸 문자열(실제 키 아님). */

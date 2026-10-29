@@ -11,7 +11,7 @@
  *   응답: `{ok:true, ...}` / `{ok:false, error:'forbidden_origin'|'bad_request'|'unknown_type'|'failed'}`
  */
 
-export const EXT_ID = 'ogbcccaaojphhgobeeidpafokjieckdf';
+export const EXT_ID = 'gdipbmakeghjecpenebjlfhgcajbikkg';
 export const PROTOCOL = 1;
 export const TIMEOUT_MS = 3000;
 
