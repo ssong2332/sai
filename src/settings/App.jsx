@@ -48,6 +48,7 @@ const PANELS = [
   { id: 'glossary', label: '용어집', sub: '' },
   { id: 'learned', label: '학습 내역', sub: '' },
   { id: 'data', label: '데이터', sub: '이 컴퓨터에 저장된 것' },
+  { id: 'plan', label: '요금제', sub: '지금 플랜 · 하루 횟수' },
 ];
 
 function readPanel() {
@@ -951,6 +952,45 @@ function DataPanel({ data, toast }) {
   );
 }
 
+/* ── 요금제 ───────────────────────────────────────────── */
+
+/**
+ * 요금제 (L36, 2026-10-29 사용자 결정 — Spec §0 수익화). 표·비교는 소개 사이트 `/pricing`에만 두고 여기는 지금 상태와 링크만.
+ * 🔴 숫자를 두 곳에 늘리지 않는다 — 하루 100회는 `functions/refineQuota.js` DAILY_REFINE_LIMIT(서울 날짜 경계).
+ * 🔴 오늘 쓴 횟수는 보여 주지 않는다(2026-10-29 사용자 결정).
+ * 🔴 `PRODUCTION_SITE_URL`(src/config.js)은 externally_connectable을 정하므로 여기서 쓰지 않는다 — 링크 주소만 따로 둔다.
+ */
+const PRICING_URL = 'https://sai-global-msg-2026.web.app/pricing';
+
+function PlanPanel() {
+  return (
+    <>
+      <Group title="지금 플랜" note="출시 기간에는 개인 기능과 팀 기능을 모두 무료로 써요. 결제 수단을 등록하는 곳도 없어요.">
+        <dl className="conn">
+          <div>
+            <dt>플랜</dt>
+            <dd>무료 · 출시 기간</dd>
+          </div>
+          <div>
+            <dt>하루 횟수</dt>
+            <dd className="num">100회</dd>
+          </div>
+        </dl>
+        <p className="group-note">
+          하루 횟수는 다듬기 · 뜻 풀기 · 회신 초안을 합쳐 세요. 다 쓰면 다음 날(한국 시간 자정) 다시 채워지고, 저장 문구 ·
+          용어집 · 예약 알림은 그대로 쓸 수 있어요.
+        </p>
+      </Group>
+
+      <Group title="유료 플랜" note="개인 Pro(월 $4 예정)와 팀 플랜을 준비하고 있어요. 유료 플랜이 나와도 무료 플랜은 남아요.">
+        <a className="btn press plan-link" href={PRICING_URL} target="_blank" rel="noopener noreferrer">
+          요금제 자세히 보기
+        </a>
+      </Group>
+    </>
+  );
+}
+
 /* ── 페이지 ────────────────────────────────────────────── */
 
 export default function App() {
@@ -1064,6 +1104,7 @@ export default function App() {
               {panel === 'glossary' && <GlossaryPanel {...props} />}
               {panel === 'learned' && <LearnedPanel {...props} />}
               {panel === 'data' && <DataPanel {...props} />}
+              {panel === 'plan' && <PlanPanel />}
             </div>
           </main>
         </div>
