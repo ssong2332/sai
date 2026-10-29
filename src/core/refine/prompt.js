@@ -83,13 +83,20 @@ function languageLabel(code) {
 
 /* ── c1 이식: 긴급도 분류 ───────────────────────────────────────────────── */
 
+/**
+ * 🔴 2026-10-29 — 한국어 「AI 판정 근거」에 영어 단어 `routine`이 섞여 나왔다(실확장 화면).
+ *    정의 문장의 `routine deadline`을 모델이 근거에 그대로 옮긴 것으로 본다(추정 — 그 응답 원문은
+ *    남아 있지 않다). 근거는 화면에 그대로 나가므로 지시문 단어를 옮기지 말라고 못박는다.
+ */
 const URGENCY_RULE =
   'Classify the urgency of the ORIGINAL message given in "text" as exactly one of "CRITICAL", ' +
   '"NORMAL", or "LOW". "CRITICAL" means immediate action is required and any delay would cause ' +
   'serious harm (e.g. production outage, safety issue, a deadline within hours). "NORMAL" means an ' +
   'ordinary work request with a routine deadline. "LOW" means there is no meaningful time pressure ' +
   '(FYI, non-urgent question). Also give "urgencyReason": one sentence, in the same language as the ' +
-  'input, explaining why that level was chosen.';
+  'input, explaining why that level was chosen. Write that sentence entirely in the input language — ' +
+  'do not carry English words from these instructions (such as "routine", "FYI", "deadline") into ' +
+  'it; only names or terms quoted from the original text may stay as written.';
 
 /**
  * Spec 필수 1 — 사용자가 긴급도를 사전 선택한 경우.
