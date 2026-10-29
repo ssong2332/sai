@@ -24,6 +24,7 @@ import { REFINE_CASES, judgeCase } from '../test/refine.cases.js';
 // L30 — Claude 실제 사용 토큰(숫자만). 다른 provider는 집계하지 않는다.
 import { anthropicUsage } from '../src/core/refine/providers/anthropic.js';
 import { DEFAULT_PROVIDER_ORDER, pickDefaultProvider } from '../src/core/refine/failover.js';
+import { QUALITY_MODES } from '../src/core/refine/quality.js';
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -32,7 +33,18 @@ const flag = (name) => {
 };
 
 const bypassCache = args.includes('--bypass-cache');
-const model = flag('--model');
+// 2026-10-30 품질 모드 — `--quality <fast|standard|deep>`은 서버와 같은 표(`quality.js`)를 쓴다.
+//    후보 탐색용 `--model`·`--thinking`·`--effort`가 있으면 표 값보다 이긴다.
+const qualityName = flag('--quality');
+if (qualityName && !QUALITY_MODES[qualityName]) {
+  console.error(`알 수 없는 품질 모드: ${qualityName} (가능: ${Object.keys(QUALITY_MODES).join(', ')})`);
+  process.exit(2);
+}
+const qualityConfig = qualityName ? QUALITY_MODES[qualityName] : {};
+const model = flag('--model') ?? qualityConfig.model;
+const thinking = flag('--thinking') ?? qualityConfig.thinking;
+const effort = flag('--effort') ?? qualityConfig.effort;
+const timeoutMs = qualityConfig.timeoutMs;
 const delayMs = Number(flag('--delay') ?? 0);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // 🔴 2026-10-23 — 키가 있는 사슬 첫 provider(배포본·프록시·Worker와 같은 함수, `test/providerDefaults.unit.test.js`).
@@ -74,7 +86,7 @@ for (const testCase of REFINE_CASES) {
   try {
     result = await refine(
       { ...testCase.request, bypassCache },
-      { apiKey, provider: providerName, model, cache },
+      { apiKey, provider: providerName, model, cache, thinking, effort, timeoutMs },
     );
   } catch (error) {
     rows.push({ id: testCase.id, field: testCase.field, result: 'ERROR', detail: error.message, ms: Date.now() - startedAt });

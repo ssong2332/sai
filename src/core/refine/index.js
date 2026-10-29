@@ -140,6 +140,7 @@ function normalizeThreadContext(value) {
  * @param {number} [deps.timeoutMs]
  * @param {string} [deps.thinking] anthropic 사고 스위치(`providers/anthropic.js` 판정표). 생략하면 provider가
  *   `process.env.SAI_ANTHROPIC_THINKING`을 읽는다(Node 경로). Worker는 항상 넘긴다 — `process`를 건드리지 않게.
+ * @param {string} [deps.effort] anthropic effort(`providers/anthropic.js` 판정표). 생략하면 `low`.
  * @param {(event: object) => void} [deps.logger] 🔴 본문 없는 메타데이터만 받는다.
  * @param {() => number} [deps.now]
  */
@@ -152,6 +153,7 @@ export async function refine(request, deps = {}) {
     fetchImpl,
     timeoutMs,
     thinking,
+    effort,
     logger = () => {},
     now = () => Date.now(),
   } = deps;
@@ -162,8 +164,9 @@ export async function refine(request, deps = {}) {
   const payload = buildRefinePayload(input);
   // 🔴 provider도 캐시 키에 들어간다 — 같은 모델명을 쓰는 다른 provider의 응답이 섞이면
   //    회귀 비교가 조용히 망가진다.
+  // 🔴 2026-10-30 품질 모드 — 사고·effort도 키에 넣는다. 빠른 모드 결과가 심층 모드 요청에 캐시로 돌아가면 안 된다.
   const cacheKey = computeCacheKey({
-    model: `${providerName}:${model}`,
+    model: `${providerName}:${model}:${thinking ?? 'env'}:${effort ?? 'low'}`,
     promptVersion: REFINE_PROMPT_VERSION,
     payload,
   });
@@ -187,6 +190,7 @@ export async function refine(request, deps = {}) {
       fetchImpl,
       // 🔴 `undefined`는 그대로 넘긴다 — provider가 「안 넘김」으로 보고 process.env를 읽는다(Node 경로 불변).
       thinking,
+      effort,
       errors: { RefineCallError, classifyHttpFailure, parseJsonContent },
     });
   } catch (error) {

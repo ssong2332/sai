@@ -9,6 +9,7 @@ import { checkNamesPreserved, nameWarningText } from '../core/refine/names.js';
 import { checkNumbersPreserved, numberWarningText } from '../core/refine/numberCheck.js';
 import { checkGlossaryApplied, glossaryWarningText } from '../core/refine/glossaryCheck.js';
 import { checkIntentDrift, intentDriftWarningText } from '../core/refine/intentDrift.js';
+import { QUALITY_LABELS } from '../core/refine/quality.js';
 // L32 — 등록되지 않은 사람의 직급을 지어냈는지(「박 과장님」→ "Manager Park").
 import { checkInventedTitles, inventedTitleWarningText } from '../core/refine/titleCheck.js';
 import {
@@ -1559,6 +1560,10 @@ export default function RefinePopup({
             줄바꿈이 생겨 버튼 글자가 세로로 쪼개진다(실측) — 그래서 윗줄로 뺐다. */}
         <span className="sai-foot-note">
           Zero Retention — 본문은 저장되지 않아요
+          {/* 2026-10-30 — 서버가 실제로 쓴 품질 모드(응답 `quality`). 모델명은 오지 않는다. */}
+          {result?.quality && QUALITY_LABELS[result.quality] && (
+            <span className="sai-quality-tag"> · {QUALITY_LABELS[result.quality]} 모드</span>
+          )}
           {/* S26 / Spec 부가 5 — 의도 검증 피드백(👍/👎) + 포인트. 🔴 저장되는 것은 집계 수치
               두 개뿐이고, "무엇이 별로였는지" 같은 자유 서술은 받지 않는다(`lib/feedback.js`).
               🔴 한 결과에 한 번만 받는다 — 연타로 포인트를 쌓는 경로를 만들지 않는다. */}

@@ -19,6 +19,7 @@ import {
 } from '../lib/recipients.js';
 import { buildCasualToneBlock } from '../core/meme/index.js';
 import { getLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
+import { resolveQuality } from '../core/refine/quality.js';
 import { getOnboarding, languagePairFrom } from '../lib/onboarding.js';
 import { detectLanguage } from '../lib/detectLanguage.js';
 import { hasAppliedTeamGlossary } from '../lib/friction.js';
@@ -131,10 +132,14 @@ export async function requestRefine(request) {
     ? request.threadContext ?? []
     : [];
 
+  // 2026-10-30 품질 모드 — 이름만 싣는다(모델은 서버 표). 호출자가 넘기면(「심층으로 다시」) 그 값이 이긴다.
+  const quality = resolveQuality(await getLocal(STORAGE_KEYS.QUALITY, null));
+
   const payload = {
     sourceLanguage: pair.sourceLanguage,
     targetLanguage,
     referenceDate: new Date().toISOString().slice(0, 10),
+    quality,
     ...request,
     glossary,
     profile,

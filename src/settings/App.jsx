@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 import { writeDisplaySetting } from '../lib/displaySettings.js';
+import { QUALITY_LABELS } from '../core/refine/quality.js';
 import { setOnboardingFields, setProfileSyncingTone, MY_LANGUAGES, PARTNER_REGIONS, DEFAULT_TONES } from '../lib/onboarding.js';
 import { removeLearnedPattern, clearLearnedPatterns, SITUATION_TEMPLATES } from '../lib/profile.js';
 import { setIdentity, MAX_IDENTITY_FIELD } from '../lib/identity.js';
@@ -196,6 +197,13 @@ function TextRow({ label, hint, value, onSave, placeholder, maxLength }) {
 
 /* ── 일반 ─────────────────────────────────────────────── */
 
+/** 다듬기 품질 모드 — 이름만 고른다. 모델은 서버가 정한다(`core/refine/quality.js`, 2026-10-30). */
+const QUALITY_OPTIONS = [
+  { id: 'fast', label: QUALITY_LABELS.fast, hint: '보통 3초 안에 돌아와요. 짧은 메시지에 좋아요.' },
+  { id: 'standard', label: QUALITY_LABELS.standard, hint: '보통 4초 안팎이에요. 속도와 꼼꼼함의 균형이에요.' },
+  { id: 'deep', label: QUALITY_LABELS.deep, hint: '보통 10초쯤 걸리는 대신 가장 꼼꼼하게 다듬어요.' },
+];
+
 function GeneralPanel({ data, act }) {
   const d = data.display;
   const toggle = (field) => (next) => act(() => writeDisplaySetting(field, next));
@@ -211,6 +219,15 @@ function GeneralPanel({ data, act }) {
           checked={d.threadContext}
           onChange={toggle('threadContext')}
         />
+      </Group>
+
+      <Group
+        title="다듬기 품질"
+        note="빠를수록 기다림이 짧고, 심층일수록 숫자·용어·말투를 더 꼼꼼히 지켜요. 다듬을 때마다 이 모드를 써요."
+      >
+        <span className="sr-only" id="quality-l">다듬기 품질 모드</span>
+        <Chips options={QUALITY_OPTIONS} value={d.quality} onChange={(next) => act(() => writeDisplaySetting('quality', next))} labelledBy="quality-l" />
+        <p className="row-hint quality-hint">{QUALITY_OPTIONS.find((o) => o.id === d.quality)?.hint}</p>
       </Group>
 
       <Group title="문장을 넣을 때" note="다듬은 문장·저장 문구를 입력창에 넣는 방식이에요.">
