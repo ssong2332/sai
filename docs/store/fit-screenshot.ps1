@@ -5,11 +5,25 @@ param(
   [Parameter(Mandatory = $true)][string]$In,
   [Parameter(Mandatory = $true)][string]$Out,
   [int]$Width = 1280,
-  [int]$Height = 800
+  [int]$Height = 800,
+  # 먼저 잘라 낼 영역(원본 픽셀). 넓은 창을 그대로 줄이면 글자가 작아진다 — 왼쪽 X부터 CropWidth만 남긴다.
+  [int]$CropX = 0,
+  [int]$CropWidth = 0,
+  [int]$CropHeight = 0
 )
 Add-Type -AssemblyName System.Drawing
 $src = [System.Drawing.Image]::FromFile((Resolve-Path $In).Path)
 try {
+  if ($CropX -gt 0 -or $CropWidth -gt 0 -or $CropHeight -gt 0) {
+    $cw = if ($CropWidth -gt 0) { [Math]::Min($CropWidth, $src.Width - $CropX) } else { $src.Width - $CropX }
+    $ch = if ($CropHeight -gt 0) { [Math]::Min($CropHeight, $src.Height) } else { $src.Height }
+    $cropped = New-Object System.Drawing.Bitmap $cw, $ch
+    $cg = [System.Drawing.Graphics]::FromImage($cropped)
+    $cg.DrawImage($src, (New-Object System.Drawing.Rectangle 0, 0, $cw, $ch), (New-Object System.Drawing.Rectangle $CropX, 0, $cw, $ch), [System.Drawing.GraphicsUnit]::Pixel)
+    $cg.Dispose()
+    $src.Dispose()
+    $src = $cropped
+  }
   $scale = [Math]::Min($Width / $src.Width, $Height / $src.Height)
   $w = [int][Math]::Round($src.Width * $scale)
   $h = [int][Math]::Round($src.Height * $scale)
