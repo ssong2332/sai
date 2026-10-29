@@ -18,14 +18,13 @@ const PLANS = [
     price: '$0',
     unit: '지금 모든 기능',
     cta: { label: '지금 무료', note: '출시 기간에는 개인·팀 기능 모두 무료예요' },
-    lead: '지금 쓸 수 있는 것',
-    features: [
-      '다듬기 · 뜻 풀기 · 회신 초안',
-      '하루 100회(다듬기 · 뜻 풀기 · 회신 초안 합산)',
-      '상대 시간대 · 예약 알림',
-      '개인 용어집 · 저장 문구',
-      '팀 용어집 · 팀 대시보드',
-    ],
+    lead: '계속 무료',
+    features: ['다듬기 · 뜻 풀기', '민감정보 전송 전 차단 · 본문 미저장', '하루 100회(지금 · 다듬기 · 뜻 풀기 · 회신 초안 합산)'],
+    // 🔴 출시 기간에만 여는 것 — 유료 출시 후 Pro·팀으로 옮겨 간다(Spec §0, 2026-10-29). 비교표의 「지금 무료」와 같은 목록.
+    bonus: {
+      lead: '출시 기간에만 무료',
+      features: ['회신 초안', '상대 시간대 · 예약 알림', '개인 용어집 · 저장 문구 · 수정 습관 학습', '팀 용어집 · 팀 대시보드'],
+    },
   },
   {
     id: 'pro',
@@ -185,6 +184,16 @@ export default function Pricing() {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
+              {plan.bonus && (
+                <>
+                  <p className="pr-lead pr-lead-bonus">{plan.bonus.lead}</p>
+                  <ul className="pr-features bonus">
+                    {plan.bonus.features.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </article>
           ))}
         </section>
