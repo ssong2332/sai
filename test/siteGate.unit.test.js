@@ -182,8 +182,9 @@ test('🔴 꺼진 사이트 — 오버레이는 늘 마운트하고 자동 버�
 
   const overlay = readFileSync(new URL('../src/content/SaiOverlay.jsx', import.meta.url), 'utf8');
   assert.ok(overlay.includes('export default function SaiOverlay({ autoButton = true })'));
-  // 자동 버튼 묶음은 autoButton 또는 사용자가 부른 것(Alt+X 저장 문구 · Alt+D 안내)일 때만 그린다.
-  assert.ok(overlay.includes('const showFab = autoButton || snippetOpen || Boolean(fabHint);'));
+  // 자동 버튼 묶음은 autoButton이면서 글을 선택했을 때(2026-10-29 — 커서만으로는 안 뜬다) 또는
+  // 사용자가 부른 것(Alt+X 저장 문구 · Alt+D 안내)일 때만 그린다.
+  assert.ok(overlay.includes('const showFab = (autoButton && hasSelection) || snippetOpen || Boolean(fabHint);'));
   assert.ok(overlay.includes('{!open && showFab && ('));
   // 단축키 수신부는 autoButton을 보지 않는다 — 꺼진 사이트에서도 팝업을 연다.
   const onMessage = overlay.slice(overlay.indexOf("message?.type === 'refine-selection'"), overlay.indexOf('chrome.runtime.onMessage.addListener(onMessage)'));

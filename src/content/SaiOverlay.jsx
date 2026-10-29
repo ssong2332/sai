@@ -409,9 +409,10 @@ export default function SaiOverlay({ autoButton = true }) {
       const picked = readSelection();
 
       if (!picked || picked.text.length < minSelectionLength(picked.text)) {
-        // 🔴 선택이 없어도 **입력창에 커서가 있으면** 저장 문구를 꺼내 쓸 수 있게 버튼을 띄운다
-        //    (2026-08-13 사용자 요청). 단 저장된 문구가 하나도 없으면 띄우지 않는다 — 모든
-        //    사이트의 모든 입력창에서 쓸모없는 버튼이 뜨는 건 방해일 뿐이다.
+        // 🔴 선택이 없어도 **입력창에 커서가 있으면** 그 입력창을 대상으로 잡아 둔다 — Alt+X(저장 문구)가
+        //    여기 잡힌 `targetRef`·`anchor`로 열린다. 단 저장된 문구가 하나도 없으면 잡지 않는다.
+        // 🔴 **버튼은 띄우지 않는다** (2026-10-29 사용자 결정 — 커서만 눌러도 뜨는 버튼은 효용보다 방해가
+        //    컸다). 2026-08-13부터 띄우던 것을 아래 `showFab`에서 막는다. 저장 문구는 Alt+X·사이드 패널로 연다.
         if (!open) {
           const active = document.activeElement;
           const editable =
@@ -1630,7 +1631,8 @@ export default function SaiOverlay({ autoButton = true }) {
    * 🔴 버튼 숨김 사이트(`autoButton=false`)에서도 **사용자가 부른 것**은 그린다 — Alt+X로 연 저장 문구 목록과
    *    Alt+D 안내(`fabHint`)는 이 묶음 안에 그려지므로, 그때만 묶음을 띄운다. 선택만 했을 때는 아무것도 안 뜬다.
    */
-  const showFab = autoButton || snippetOpen || Boolean(fabHint);
+  // 🔴 저절로 뜨는 버튼은 **글을 선택했을 때만**이다(2026-10-29) — 커서만 둔 입력창에는 Alt+X로 부를 때만 그린다.
+  const showFab = (autoButton && hasSelection) || snippetOpen || Boolean(fabHint);
 
   return (
     <>
