@@ -55,6 +55,9 @@ export function Header({ theme, onToggleTheme, landing = false }) {
               {s.label}
             </Link>
           ))}
+          <Link to="/pricing" className="nav-link">
+            요금제
+          </Link>
         </nav>
         <button
           type="button"
@@ -82,6 +85,7 @@ export function Footer({ landing = false }) {
         </Link>
         <span className="sp" />
         <nav aria-label="문서">
+          <Link to="/pricing">요금제</Link>
           <Link to="/privacy">개인정보처리방침</Link>
           <Link to="/terms">이용약관</Link>
           <Link to="/settings">설정</Link>
