@@ -26,3 +26,11 @@ test('근거는 입력 언어로만 쓰고 지시문 영어 단어를 옮기지 
 test('원문에서 인용한 이름·용어는 그대로 둘 수 있다', () => {
   assert.match(instruction, /only names or terms quoted from the original text may stay as written/);
 });
+
+test('뜻 풀기 설명 필드도 지시문 영어 단어를 옮기지 않고, 원문 인용은 그대로 둔다', async () => {
+  const { buildDecodePayload } = await import('../src/core/decode/prompt.js');
+  const decode = buildDecodePayload({ text: 'FYI, no rush.', sourceLanguage: 'en', targetLanguage: 'ko' }).instruction;
+  assert.match(decode, /"actualIntent", "urgencyReason" and "requiredActions" entirely in the target language/);
+  assert.match(decode, /do not carry English words from these instructions \(such as "routine"/);
+  assert.match(decode, /Phrases quoted from the ORIGINAL stay exactly as written/);
+});

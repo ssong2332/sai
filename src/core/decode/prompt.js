@@ -86,6 +86,14 @@ const RESPONSE_FORMAT_RULE =
   'may differ (e.g. "a few minor comments" can surface as LOW but actually mean CRITICAL rework). ' +
   'If they are the same, still fill both with the same value — do not omit either. ' +
   /**
+   * 🔴 2026-10-29 — 다듬기 근거에 지시문 영어 단어(`routine`·`FYI`)가 섞여 나왔다(실측 8건 중 1건,
+   *    `refine/prompt.js` URGENCY_RULE). 여기 설명 필드도 같은 정의 문장을 보므로 같은 금지를 둔다.
+   *    원문 인용(`intentEvidence`·`urgencyEvidence`)은 대조에 쓰이므로 원문 그대로 남긴다.
+   */
+  'Write "actualIntent", "urgencyReason" and "requiredActions" entirely in the target language — do ' +
+  'not carry English words from these instructions (such as "routine", "FYI", "deadline") into ' +
+  'them. Phrases quoted from the ORIGINAL stay exactly as written. ' +
+  /**
    * 🔴 v3 — 인용을 요구하는 이유는 표시가 아니라 **대조**다. `schema.js`가 이 문구가 원문에
    *    실제로 있는지 확인하고, 없으면 격차를 지운다. "긴급하다고 느꼈다"는 검증할 수 없지만
    *    "이 구절 때문이다"는 검증할 수 있다(S36 누락 경고에서 통한 방식).
