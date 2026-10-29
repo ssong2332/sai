@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 
 import { MemoryCacheStore } from '../../../src/core/refine/index.js';
 import { createHandler } from '../src/handler.js';
+import { DEFAULT_QUALITY, QUALITY_MODES } from '../../../src/core/refine/quality.js';
 import { createMemoryUsageStore } from '../src/usageStore.js';
 import {
   BASE_BODY,
@@ -52,9 +53,10 @@ test('성공 교정 — 기존 refineV1과 같은 응답 계약, Claude는 가�
   assert.equal(fetchImpl.seen.calls, 1);
   assert.match(fetchImpl.seen.urls[0], /^https:\/\/api\.anthropic\.com\/v1\/messages/);
   const sent = fetchImpl.seen.bodies[0];
-  assert.equal(sent.model, 'claude-haiku-5-5');
+  // 🔴 2026-10-30 — quality 없는 요청은 기본 모드 표 그대로(모델·사고·effort는 `quality.test.js`가 모드별로 잠근다).
+  assert.equal(sent.model, QUALITY_MODES[DEFAULT_QUALITY].model);
   assert.equal('temperature' in sent, false, '🔴 temperature는 보내면 400');
-  assert.deepEqual(sent.thinking, { type: 'disabled' }, '🔴 설정 없이도 사고가 꺼져야 한다(2026-10-23 기본)');
+  assert.equal(body.quality, DEFAULT_QUALITY);
 
   assert.equal(usageStore.requests.length, 1);
   assert.deepEqual(Object.keys(usageStore.requests[0]).sort(), ['fallback', 'fallbackReason', 'latencyMs', 'mode']);
@@ -200,11 +202,15 @@ test('🔴 Zero Retention — 성공·폴백·401·400 어느 경로에서도 �
   }
 });
 
+// 🔴 2026-10-30 — 다듬기(refine)는 품질 모드 표(`quality.js`)가 사고를 정한다(`quality.test.js`). env 스위치는 나머지 mode에만 —
+//    그래서 아래 두 테스트는 뜻 풀기(decode)로 본다.
+const DECODE_BODY = { ...BASE_BODY, mode: 'decode' };
+
 test('🔴 사고 스위치 — env SAI_ANTHROPIC_THINKING=adaptive일 때만 켠다(실험용), /health도 같은 값을 보고한다', async () => {
   delete process.env.SAI_ANTHROPIC_THINKING;
   const { handle, fetchImpl } = setup();
   const env = { ...TEST_ENV, SAI_ANTHROPIC_THINKING: 'adaptive' };
-  assert.equal((await handle(refineRequest(token, BASE_BODY), env)).status, 200);
+  assert.equal((await handle(refineRequest(token, DECODE_BODY), env)).status, 200);
   assert.equal('thinking' in fetchImpl.seen.bodies[0], false, 'adaptive면 thinking을 생략(모델 기본)해야 한다');
   const health = await (await handle(refineRequest(null, undefined, { method: 'GET', path: '/health' }), env)).json();
   assert.equal(health.thinking, 'adaptive');
@@ -220,7 +226,7 @@ test('🔴 사고 스위치 — Worker는 값을 명시해 넘긴다: process.en
     for (const [envValue, expected] of [[undefined, { type: 'disabled' }], ['typo', { type: 'disabled' }], ['adaptive', '(생략)']]) {
       const { handle, fetchImpl } = setup();
       const env = envValue === undefined ? TEST_ENV : { ...TEST_ENV, SAI_ANTHROPIC_THINKING: envValue };
-      assert.equal((await handle(refineRequest(token, BASE_BODY), env)).status, 200);
+      assert.equal((await handle(refineRequest(token, DECODE_BODY), env)).status, 200);
       const sent = fetchImpl.seen.bodies[0];
       assert.deepEqual('thinking' in sent ? sent.thinking : '(생략)', expected, `env=${envValue}`);
     }

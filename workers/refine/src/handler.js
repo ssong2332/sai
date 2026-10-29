@@ -58,6 +58,7 @@ import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
 import { handleTeam } from './teamRoute.js';
+import { resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
 import { googleClientsFromEnv } from './google/clients.js';
 
 /**
@@ -276,10 +277,14 @@ export function createHandler(deps = {}) {
     }
 
     const thinking = thinkingSwitch(config.thinking);
+    // 🔴 2026-10-30 품질 모드 — 다듬기(refine)만. 확장은 이름만 보내고 모델·사고·effort는 `quality.js` 표가 정한다.
+    //    모르는 값·없음은 기본 모드. 사슬 단계 모델(stepModel)이 있으면 그 단계는 표를 쓰지 않는다.
+    const quality = modeName === 'refine' ? resolveQuality(body.quality) : null;
 
     /** 한 단계 호출. 🔴 `ANTHROPIC_MODEL`은 anthropic 단계에만 — 사슬 단계 모델이 있으면 그게 이긴다. */
     const runStep = ({ provider, apiKey }, stepModel) => {
       const model = stepModel ?? (provider === 'anthropic' ? config.anthropicModel : undefined);
+      const q = quality && !stepModel ? qualityStepDeps(quality, provider) : {};
       return mode.run(body, {
         apiKey,
         provider,
@@ -287,6 +292,8 @@ export function createHandler(deps = {}) {
         cache: modeCaches[modeName],
         // 🔴 네 코어 모두 이 값을 provider에 그대로 넘긴다 — Worker 요청 경로가 `process`를 건드리지 않게.
         thinking,
+        // 품질 모드 표 값이 있으면 위 model·thinking보다 이긴다(anthropic 단계만 — `qualityStepDeps`).
+        ...q,
         ...(fetchImpl ? { fetchImpl } : {}),
         now,
         // 🔴 성공(폴백 아님) 이벤트는 로그를 쓰지 않는다 (2026-10-24 L33). 무료 플랜 CPU 한도 10ms에 실측 콜드 22ms —
@@ -334,6 +341,9 @@ export function createHandler(deps = {}) {
       );
       return json(400, { error: error?.message ?? 'bad request' });
     }
+
+    // 다듬기 응답에 실제로 쓴 품질 모드 이름을 붙인다(화면 표시용 — 모델명은 싣지 않는다).
+    if (quality && result && typeof result === 'object') result = { ...result, quality };
 
     // ⑨ 지표 — 모드·성공 여부·사유 코드·시간뿐.
     await safeMetric(logger, () =>

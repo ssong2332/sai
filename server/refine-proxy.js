@@ -39,6 +39,7 @@ import {
   shouldFailOver,
   stepLabel,
 } from '../src/core/refine/failover.js';
+import { qualityStepDeps, resolveQuality } from '../src/core/refine/quality.js';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -177,13 +178,15 @@ function logReplyEvent(event) {
 const MODES = {
   refine: {
     name: 'refine',
-    run: (request, creds) =>
+    // 🔴 2026-10-30 품질 모드 — Worker와 같은 표(`quality.js` `qualityStepDeps`). 사슬 단계 모델이 있으면 표를 쓰지 않는다.
+    run: (request, creds, q = creds.model ? {} : qualityStepDeps(request.quality, creds.provider)) =>
       refine(request, {
         ...creds,
+        ...q,
         // 🔴 `creds.model`이 이기게 둔다 — 사슬 단계마다 모델이 다르다. 예전에는 `model`(CLI
         //    플래그)이 뒤에 와서 creds를 «덮었고», `--model gpt-4.1`로 띄운 채 한도에 걸리면
         //    **Gemini에게 openai 모델명을 넘겨** 그쪽에서 또 실패했다.
-        model: creds.model ?? model,
+        model: creds.model ?? model ?? q.model,
         cache: refineCache,
         logger: logRefineEvent,
       }),
@@ -335,7 +338,9 @@ const server = createServer(async (req, res) => {
    */
   const mode = MODES[request?.mode] ?? MODES.refine;
   try {
-    sendJson(res, 200, await runWithFailover(mode, request));
+    const out = await runWithFailover(mode, request);
+    // Worker와 같이 다듬기 응답에 쓴 품질 모드 이름을 붙인다.
+    sendJson(res, 200, mode.name === 'refine' && out && typeof out === 'object' ? { ...out, quality: resolveQuality(request.quality) } : out);
   } catch (error) {
     // 🔴 에러 메시지에 본문이 섞이지 않게 우리 문구만 내보낸다.
     console.error(`[${mode.name}] 요청 거절: ${error?.name ?? 'error'}`);

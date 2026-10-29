@@ -36,9 +36,23 @@ export const anthropicUsage = { calls: 0, input: 0, output: 0, cacheRead: 0, cac
  * | `SAI_ANTHROPIC_THINKING` | 보내는 것 | 용도 |
  * |---|---|---|
  * | 없음 · `disabled` · 그 밖의 값 | `thinking: {type:'disabled'}` | 기본(운영) — 오타가 비용·지연을 3배로 올리지 않게 모르는 값도 끔 |
- * | `adaptive` | `thinking` 생략(모델 기본) | 실험 전용 — L30의 「켬」 측정과 같은 조건 |
+ * | `adaptive` | `thinking` 생략(모델 기본) | 실험 전용 — L30의 「켬」 측정과 같은 조건 · 품질 모드 표(`quality.js`) |
+ * | `between_tools` | `thinking: {type:'between_tools'}` | 품질 모드 표 전용 — Sonnet 5.5는 `disabled`가 400이라 이것이 「끔」이다(effort `high` 이하만) |
  */
 export const THINKING_ON_VALUE = 'adaptive';
+export const THINKING_BETWEEN_TOOLS = 'between_tools';
+
+/**
+ * effort 판정표 (2026-10-30 품질 모드). 🔴 표 밖 값·없음은 `low` — 오타가 지연을 늘리지 않게.
+ * | `deps.effort` | 보내는 값 |
+ * |---|---|
+ * | `low` · `medium` · `high` | 그 값 |
+ * | 그 밖 · 없음 | `low`(이전과 같다) |
+ */
+export const EFFORT_LEVELS = ['low', 'medium', 'high'];
+export function effortValue(value) {
+  return EFFORT_LEVELS.includes(value) ? value : 'low';
+}
 /**
  * 값의 출처 판정표 (2026-10-24 L33 — Worker 콜드 CPU 절감)
  * | `deps.thinking` | 읽는 값 | 쓰는 곳 |
@@ -49,7 +63,9 @@ export const THINKING_ON_VALUE = 'adaptive';
  */
 function thinkingConfig(explicit) {
   const value = explicit === undefined ? globalThis.process?.env?.SAI_ANTHROPIC_THINKING : explicit;
-  return value === THINKING_ON_VALUE ? {} : { thinking: { type: 'disabled' } };
+  if (value === THINKING_ON_VALUE) return {};
+  if (value === THINKING_BETWEEN_TOOLS) return { thinking: { type: THINKING_BETWEEN_TOOLS } };
+  return { thinking: { type: 'disabled' } };
 }
 
 /**
@@ -83,12 +99,13 @@ function stripFence(text) {
  * @param {number} [deps.timeoutMs]
  * @param {typeof fetch} [deps.fetchImpl] 테스트에서 주입 — SDK `fetch` 옵션으로 넘긴다.
  * @param {string} [deps.thinking] 사고 스위치 — 위 `thinkingConfig` 판정표. 생략하면 `process.env`를 읽는다.
+ * @param {string} [deps.effort] 위 effort 판정표. 생략하면 `low`.
  * @param {object} deps.errors `providers/index.js`가 넘기는 { RefineCallError, classifyHttpFailure, parseJsonContent }.
  * @returns {Promise<object>} 파싱된 LLM JSON (검증은 schema.js가 한다).
  */
 export async function callAnthropic(
   payload,
-  { apiKey, model = DEFAULT_ANTHROPIC_MODEL, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl, thinking, errors },
+  { apiKey, model = DEFAULT_ANTHROPIC_MODEL, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl, thinking, effort, errors },
 ) {
   const { RefineCallError, classifyHttpFailure, parseJsonContent } = errors;
 
@@ -108,8 +125,8 @@ export async function callAnthropic(
     response = await client.messages.create({
       model,
       max_tokens: 8000,
-      // 교정은 짧은 변환이다 — 사고 깊이를 낮춰 지연·비용을 줄인다(Haiku 5.5 기본값은 medium).
-      output_config: { effort: 'low' },
+      // 교정은 짧은 변환이다 — 기본은 사고 깊이를 낮춰 지연·비용을 줄인다(Haiku 5.5 기본값은 medium). 품질 모드가 올릴 수 있다.
+      output_config: { effort: effortValue(effort) },
       ...thinkingConfig(thinking),
       system: SYSTEM,
       messages: [{ role: 'user', content: JSON.stringify(payload) }],

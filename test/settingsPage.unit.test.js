@@ -95,6 +95,7 @@ test('표시 설정 기본값 — 팝업이 읽는 기본값과 같다', () => {
     threadContextPreview: false,
     replyAuto: false,
     snippetInsertMode: 'replace',
+    quality: 'standard', // 2026-10-30 품질 모드 — 표 밖 값은 기본 모드(`quality.unit.test.js`)
   });
   assert.equal(coerceDisplayValue('theme', 'purple'), 'light');
   assert.equal(coerceDisplayValue('backTranslation', 'yes'), true);

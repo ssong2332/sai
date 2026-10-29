@@ -14,10 +14,12 @@
  * | threadContextPreview | THREAD_CONTEXT_PREVIEW | false | 미리보기를 그리는 팝업의 기본값 |
  * | replyAuto | REPLY_AUTO | false | `SaiOverlay.jsx` |
  * | snippetInsertMode | SNIPPET_INSERT_MODE | 'replace' | 오버레이·사이드패널 |
+ * | quality | QUALITY | `DEFAULT_QUALITY`('standard') | 다듬기 품질 모드 이름(2026-10-30) — `core/refine/quality.js` |
  * 🔴 여기에는 on/off·선택값만 있다 — 본문 없음(Spec 필수 5).
  */
 
 import { getLocal, setLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from './storage.js';
+import { DEFAULT_QUALITY, QUALITY_IDS } from '../core/refine/quality.js';
 
 export const DISPLAY_SETTINGS = {
   theme: { key: STORAGE_KEYS.THEME, fallback: 'light', values: ['light', 'dark'] },
@@ -28,6 +30,7 @@ export const DISPLAY_SETTINGS = {
   threadContextPreview: { key: STORAGE_KEYS.THREAD_CONTEXT_PREVIEW, fallback: false },
   replyAuto: { key: STORAGE_KEYS.REPLY_AUTO, fallback: false },
   snippetInsertMode: { key: STORAGE_KEYS.SNIPPET_INSERT_MODE, fallback: 'replace', values: ['replace', 'append'] },
+  quality: { key: STORAGE_KEYS.QUALITY, fallback: DEFAULT_QUALITY, values: QUALITY_IDS },
 };
 
 /** 저장값 하나를 검증한다 — 형식 밖이면 기본값. */

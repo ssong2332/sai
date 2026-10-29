@@ -94,6 +94,11 @@ export const STORAGE_KEYS = {
    *    값: 'casual' | 'formal' | null(기본)
    */
   REGISTER: 'sai.register',
+  /**
+   * 다듬기 품질 모드 이름 — 'fast' | 'standard' | 'deep' (2026-10-30). 🔴 **이름만** 담는다 — 모델은 서버가
+   *    `core/refine/quality.js` 표로 정한다. 없으면 기본 모드.
+   */
+  QUALITY: 'sai.quality',
   CASUAL_TONE: 'sai.casualTone',
   /**
    * {language, partnerRegion, tone, completedAt} — 3초 퀵 온보딩 (Spec 권장 9). S11이 쓴다.
