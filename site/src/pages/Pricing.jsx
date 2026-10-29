@@ -6,7 +6,7 @@ import { Link } from '../router.jsx';
  * 🔴 **결제는 붙이지 않는다.** 출시 v1.0은 전부 무료이고 유료 플랜은 「곧 출시」로만 보여 준다.
  * 🔴 **정하지 않은 숫자를 쓰지 않는다** — 유료 출시 후 무료 하루 횟수 · Pro 하루 횟수 · 팀 1인당 가격은
  *    미정이다(Spec §0). 정해진 것만 숫자로: 지금 하루 100회(`functions/refineQuota.js` DAILY_REFINE_LIMIT —
- *    Worker가 mode를 가리지 않고 센다, `workers/refine/src/handler.js` consumeDailyQuota) · Pro 월 $4.
+ *    Worker가 mode를 가리지 않고 센다, `workers/refine/src/handler.js` consumeDailyQuota) · Pro 연 결제 $48(월 $4 꼴) · 월 결제 $6.
  * 🔴 유료 출시 후 기능 범위·품질 모드는 Spec §0(2026-10-29): 무료 = 다듬기·뜻 풀기, 나머지는 Pro·팀. 지금은 전부 열어 둔다 —
  *    그래서 비교표의 무료 칸은 「지금 무료」로 쓴다. 보호 기능(민감정보 차단·본문 미저장)은 어느 플랜에서도 ✓.
  */
@@ -31,9 +31,9 @@ const PLANS = [
     name: '개인 Pro',
     blurb: '매일 많이 보내는 사람',
     price: '$4',
-    unit: '월 · 예정',
+    unit: '월 · 연 결제 · 예정',
     featured: true,
-    cta: { label: '곧 출시', note: '나오면 이 페이지에서 알려 드려요' },
+    cta: { label: '곧 출시', note: '연 $48로 결제할 때 기준 · 월 결제는 $6 · 나오면 이 페이지에서 알려 드려요' },
     lead: '무료의 모든 기능에 더해',
     features: [
       '회신 초안',

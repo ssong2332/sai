@@ -982,7 +982,7 @@ function PlanPanel() {
         </p>
       </Group>
 
-      <Group title="유료 플랜" note="개인 Pro(월 $4 예정)와 팀 플랜을 준비하고 있어요. 유료 플랜이 나와도 무료 플랜은 남아요.">
+      <Group title="유료 플랜" note="개인 Pro(연 결제 시 월 $4 · 월 결제 $6 예정)와 팀 플랜을 준비하고 있어요. 유료 플랜이 나와도 무료 플랜은 남아요.">
         <a className="btn press plan-link" href={PRICING_URL} target="_blank" rel="noopener noreferrer">
           요금제 자세히 보기
         </a>
