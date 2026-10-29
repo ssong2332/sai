@@ -21,12 +21,30 @@
   color: var(--sub);
 }
 
+/* ── 결제 주기 (월 / 연) ── */
+.pr-billing {
+  display: flex;
+  margin-top: clamp(28px, 4vw, 40px);
+}
+.pr-billing .seg {
+  min-width: 260px;
+}
+.pr-save {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--kept-tint);
+  color: var(--kept-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
 /* ── 카드 ── */
 .pr-plans {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-top: clamp(32px, 5vw, 56px);
+  margin-top: clamp(20px, 3vw, 28px);
 }
 .pr-card {
   position: relative;
