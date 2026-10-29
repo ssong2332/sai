@@ -115,6 +115,18 @@
   color: var(--kept-ink);
   font-weight: 700;
 }
+/* 출시 기간에만 무료 — 계속 무료(✓)와 구분: 흐린 글자 + 「+」 */
+.pr-lead-bonus {
+  margin-top: 18px;
+  color: var(--sub);
+}
+.pr-features.bonus li {
+  color: var(--sub);
+}
+.pr-features.bonus li::before {
+  content: '+';
+  color: var(--mut);
+}
 
 /* ── 비교표 ── */
 .pr-section-title {
