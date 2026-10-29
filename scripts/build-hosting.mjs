@@ -4,7 +4,7 @@
  *
  * | 주소 | 내용 | 출처 |
  * |---|---|---|
- * | `/` · `/settings` · `/privacy` · `/terms` | 소개 사이트(SPA) | `site/` 빌드 |
+ * | `/` · `/pricing` · `/settings` · `/privacy` · `/terms` | 소개 사이트(SPA) | `site/` 빌드 |
  * | `/dashboard/` | 팀 대시보드(SPA) | `dashboard/` 빌드(`--base=/dashboard/`) |
  * | `/privacy.html` · `/terms.html` | 처리방침·약관 원본 | `dashboard/public/` — 구글 브랜딩(L25)이 이 주소를 가리킨다 |
  *

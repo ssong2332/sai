@@ -5,12 +5,14 @@ import './styles/base.css';
 import './styles/landing.css';
 import './styles/settings.css';
 import './styles/legal.css';
+import './styles/pricing.css';
 import { Link, useLocation } from './router.jsx';
 import { useSiteTheme } from './theme.js';
 import { Footer, Header } from './components/Chrome.jsx';
 import Landing from './pages/Landing.jsx';
 import Settings from './pages/Settings.jsx';
 import Legal from './pages/Legal.jsx';
+import Pricing from './pages/Pricing.jsx';
 
 function NotFound() {
   return (
@@ -39,6 +41,7 @@ function App() {
 
   let page;
   if (landing) page = <Landing />;
+  else if (path === '/pricing') page = <Pricing />;
   else if (path === '/settings') page = <Settings search={search} />;
   else if (path === '/privacy') page = <Legal doc="privacy" />;
   else if (path === '/terms') page = <Legal doc="terms" />;
