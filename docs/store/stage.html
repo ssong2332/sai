@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스토어 촬영 무대</title>
+<!--
+  스토어 스크린샷 촬영 무대 (L21). 🔴 실제 서비스를 흉내 내지 않는다 — 상표·로고 없는 가상의 업무 메시지 화면이다.
+  🔴 등장인물·회사는 모두 지어낸 것이다. 실제 사람 이름·메일 주소를 넣지 않는다.
+  사이 확장은 이 페이지 위에서 실제로 동작한다(콘텐츠 스크립트 <all_urls>). 띄우는 법은 docs/store/README.md.
+-->
+<style>
+  :root { --ink: #191f28; --sub: #4e5968; --mut: #8b95a1; --bg: #f2f4f6; --line: #e5e8eb; --card: #fff; --me: #eef2ff; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: 'Malgun Gothic', system-ui, sans-serif; font-size: 15px; }
+  .app { display: grid; grid-template-columns: 260px minmax(0, 1fr); height: 100vh; }
+  .side { background: var(--card); border-right: 1px solid var(--line); padding: 20px 12px; }
+  .side h1 { font-size: 15px; font-weight: 700; padding: 0 10px 14px; color: var(--sub); }
+  .thread { display: grid; grid-template-columns: 36px 1fr; gap: 10px; padding: 10px; border-radius: 10px; }
+  .thread.on { background: var(--bg); }
+  .av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; }
+  .t-name { font-weight: 700; font-size: 14px; }
+  .thread > span:last-child { min-width: 0; }
+  .t-last { display: block; color: var(--mut); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .main { display: flex; flex-direction: column; min-width: 0; }
+  .head { display: flex; align-items: center; gap: 12px; padding: 16px 28px; background: var(--card); border-bottom: 1px solid var(--line); }
+  .head small { color: var(--mut); font-size: 13px; }
+  .log { flex: 1; overflow: auto; padding: 28px; display: flex; flex-direction: column; gap: 18px; }
+  .msg { max-width: 640px; }
+  .msg .who { font-size: 13px; color: var(--mut); margin-bottom: 6px; }
+  .bubble { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; line-height: 1.6; }
+  .msg.me { align-self: flex-end; }
+  .msg.me .bubble { background: var(--me); border-color: transparent; }
+  .compose { padding: 16px 28px 24px; background: var(--card); border-top: 1px solid var(--line); }
+  .compose textarea { width: 100%; min-height: 96px; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font: inherit; line-height: 1.6; color: var(--ink); }
+  .bar { display: flex; justify-content: flex-end; margin-top: 10px; }
+  .send { background: var(--ink); color: #fff; border: 0; border-radius: 10px; padding: 10px 20px; font: inherit; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1>메시지</h1>
+    <div class="thread on">
+      <span class="av" style="background:#3d5afe">DW</span>
+      <span><span class="t-name">Daniel Weber</span><span class="t-last">Quick heads-up — the vendor pushed…</span></span>
+    </div>
+    <div class="thread">
+      <span class="av" style="background:#00a37a">MT</span>
+      <span><span class="t-name">Mei Tanaka</span><span class="t-last">Thanks, the slides look great.</span></span>
+    </div>
+    <div class="thread">
+      <span class="av" style="background:#f59f00">PR</span>
+      <span><span class="t-name">Priya Raman</span><span class="t-last">Can we move the sync to 4pm?</span></span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="head">
+      <span class="av" style="background:#3d5afe">DW</span>
+      <span><b>Daniel Weber</b><br><small>Berlin · 프로젝트 파트너</small></span>
+    </header>
+
+    <section class="log">
+      <div class="msg">
+        <p class="who">Daniel Weber · 오전 9:12</p>
+        <p class="bubble">Hi! Quick heads-up — the vendor pushed the delivery to next Thursday. Could you check whether that still works on your end, and let me know by EOD tomorrow if we need to escalate? Thanks!</p>
+      </div>
+      <div class="msg me">
+        <p class="who">나 · 오전 9:40</p>
+        <p class="bubble">Got it, I'll check with our QA team and get back to you.</p>
+      </div>
+    </section>
+
+    <section class="compose">
+      <textarea aria-label="메시지 쓰기">목요일로 밀리면 저희 쪽 테스트 일정이 빠듯해요. 금요일 오전까지 받을 수 있는지 다시 확인해 주실 수 있을까요?</textarea>
+      <div class="bar"><button class="send" type="button">보내기</button></div>
+    </section>
+  </main>
+</div>
+</body>
+</html>
