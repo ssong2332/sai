@@ -36,7 +36,7 @@ export default defineManifest({
    *    L28 안전망·경고 상자가 들어갔는데 숫자가 그대로라 「다시 로드」가 됐는지 화면으로 알 수 없었다.
    *    `package.json`과 같은 값이어야 한다(`test/version.unit.test.js`).
    */
-  version: '0.1.51',
+  version: '0.1.52',
   /**
    * 🔴 **동작을 먼저, 은유는 빼고.** 예전 문구("사람과 사람, 언어와 언어 사이를 매끄럽게 잇는")는
    *    첫 줄이 은유라 무엇을 하는 도구인지 읽는 데 시간이 걸렸다.
@@ -156,10 +156,11 @@ export default defineManifest({
       }
     : {}),
   // 🔴 'identity'는 **로그인**(`launchWebAuthFlow`, S31)에 필요하다 — 캘린더를 꺼도 뺄 수 없다.
+  // 🔴 'activeTab'은 뺐다(2026-10-29 L21) — 쓰는 호출이 없다. Alt+D의 `tabs.query`·`sendMessage`는
+  //    탭 URL을 읽지 않으므로 권한 없이 된다. 스토어 심사는 쓰지 않는 권한을 거절 사유로 삼는다.
   permissions: [
     'sidePanel',
     'storage',
-    'activeTab',
     'clipboardWrite',
     'alarms',
     'notifications',
