@@ -139,7 +139,7 @@ function Cell({ value }) {
   return <span className="pr-text">{value}</span>;
 }
 
-/** 결제 주기 — 연 결제가 기본(DeepL과 같다). 값이 주기마다 다른 플랜만 바뀐다(지금은 개인 Pro). */
+/** 결제 주기 — 연 결제가 기본(DeepL과 같다). 값이 주기마다 다른 플랜 카드 안에만 그린다(지금은 개인 Pro). */
 const BILLING = [
   { id: 'monthly', label: '월 결제' },
   { id: 'annual', label: '연 결제', badge: '33% 할인' },
@@ -169,29 +169,32 @@ export default function Pricing() {
           </p>
         </header>
 
-        <div className="pr-billing">
-          <div className="seg" role="radiogroup" aria-label="결제 주기">
-            {BILLING.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                role="radio"
-                aria-checked={billing === b.id}
-                onClick={() => setBilling(b.id)}
-              >
-                {b.label}
-                {b.badge && <span className="pr-save">{b.badge}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <section className="pr-plans" aria-label="플랜">
           {PLANS.map((plan) => (
             <article key={plan.id} className={`pr-card${plan.featured ? ' featured' : ''}`}>
               {plan.featured && <p className="pr-flag">예정</p>}
               <h2 className="pr-name">{plan.name}</h2>
               <p className="pr-blurb">{plan.blurb}</p>
+              {/* 결제 주기는 값이 주기마다 다른 플랜 카드 안에만(2026-10-29 사용자 지적 — 카드 밖에 두면 무료·팀에도 걸려 보인다) */}
+              {typeof plan.price === 'object' ? (
+                <div className="seg pr-billing" role="radiogroup" aria-label="결제 주기">
+                  {BILLING.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={billing === b.id}
+                      onClick={() => setBilling(b.id)}
+                    >
+                      {b.label}
+                      {b.badge && <span className="pr-save">{b.badge}</span>}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                // 세 카드의 가격·버튼 줄을 맞추는 빈 자리(넓은 화면에서만 — 한 줄로 쌓이면 숨긴다)
+                <div className="pr-billing-spacer" aria-hidden="true" />
+              )}
               <p className="pr-price">
                 <span className="num">{byBilling(plan.price, billing)}</span>
                 <span className="pr-unit">{byBilling(plan.unit, billing)}</span>
