@@ -30,10 +30,11 @@ const PLANS = [
     id: 'pro',
     name: '개인 Pro',
     blurb: '매일 많이 보내는 사람',
-    price: '$4',
-    unit: '월 · 연 결제 · 예정',
+    // 🔴 결제 주기에 따라 바뀐다(2026-10-29 사용자 결정 — 월·연 선택). 연 $48 = 월 $4 꼴, 월 결제 $6 → 연 결제가 33% 싸다.
+    price: { annual: '$4', monthly: '$6' },
+    unit: { annual: '월 · 연 $48 결제 · 예정', monthly: '월 · 월 결제 · 예정' },
     featured: true,
-    cta: { label: '곧 출시', note: '연 $48로 결제할 때 기준 · 월 결제는 $6 · 나오면 이 페이지에서 알려 드려요' },
+    cta: { label: '곧 출시', note: '나오면 이 페이지에서 알려 드려요' },
     lead: '무료의 모든 기능에 더해',
     features: [
       '회신 초안',
@@ -138,8 +139,17 @@ function Cell({ value }) {
   return <span className="pr-text">{value}</span>;
 }
 
+/** 결제 주기 — 연 결제가 기본(DeepL과 같다). 값이 주기마다 다른 플랜만 바뀐다(지금은 개인 Pro). */
+const BILLING = [
+  { id: 'monthly', label: '월 결제' },
+  { id: 'annual', label: '연 결제', badge: '33% 할인' },
+];
+
+const byBilling = (value, billing) => (value && typeof value === 'object' ? value[billing] : value);
+
 export default function Pricing() {
   const [open, setOpen] = useState(0);
+  const [billing, setBilling] = useState('annual');
 
   useEffect(() => {
     document.title = '요금제 — 사이';
@@ -159,6 +169,23 @@ export default function Pricing() {
           </p>
         </header>
 
+        <div className="pr-billing">
+          <div className="seg" role="radiogroup" aria-label="결제 주기">
+            {BILLING.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                role="radio"
+                aria-checked={billing === b.id}
+                onClick={() => setBilling(b.id)}
+              >
+                {b.label}
+                {b.badge && <span className="pr-save">{b.badge}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <section className="pr-plans" aria-label="플랜">
           {PLANS.map((plan) => (
             <article key={plan.id} className={`pr-card${plan.featured ? ' featured' : ''}`}>
@@ -166,8 +193,8 @@ export default function Pricing() {
               <h2 className="pr-name">{plan.name}</h2>
               <p className="pr-blurb">{plan.blurb}</p>
               <p className="pr-price">
-                <span className="num">{plan.price}</span>
-                <span className="pr-unit">{plan.unit}</span>
+                <span className="num">{byBilling(plan.price, billing)}</span>
+                <span className="pr-unit">{byBilling(plan.unit, billing)}</span>
               </p>
               <button
                 type="button"
