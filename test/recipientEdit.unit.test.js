@@ -273,3 +273,23 @@ test('🔴 바뀐 게 없으면 저장하지 않는다', async () => {
   assert.equal(result.changed, false);
   assert.equal(store[TEAMS_KEY], before, '변화가 없는데 새 배열로 덮어썼다');
 });
+
+/* ── 감지된 상대가 미등록이면 선택 비우기 (2026-11-01 사용자 결정) ───────────── */
+
+test('🔴 「없음」 선택값이면 getSelectedRecipient는 null — 목록 첫 사람으로 채우지 않는다', async () => {
+  installStorage();
+  const { addRecipient, getSelectedRecipient, setSelectedRecipientId, NO_RECIPIENT_ID } = await import('../src/lib/recipients.js');
+  const daniel = await addRecipient({ name: 'Daniel Weber', timeZone: 'Europe/Berlin' });
+  await setSelectedRecipientId(null);
+  assert.equal((await getSelectedRecipient())?.id, daniel.id, '아직 안 고름(null)은 예전처럼 첫 사람');
+  await setSelectedRecipientId(NO_RECIPIENT_ID);
+  assert.equal(await getSelectedRecipient(), null, '명시적 「없음」은 null — 다른 사람 설정으로 다듬지 않는다');
+});
+
+test('decideRecipientSelection 판정표 — 후보 없음 keep · 등록된 사람 select · 미등록 후보 clear', async () => {
+  const { decideRecipientSelection } = await import('../src/content/detectPeople.js');
+  assert.deepEqual(decideRecipientSelection([], null), { action: 'keep' });
+  assert.deepEqual(decideRecipientSelection(undefined, null), { action: 'keep' });
+  assert.deepEqual(decideRecipientSelection(['Daniel Weber'], 'rc-1'), { action: 'select', id: 'rc-1' });
+  assert.deepEqual(decideRecipientSelection(['Mei Tanaka'], null), { action: 'clear' });
+});

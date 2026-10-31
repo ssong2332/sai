@@ -137,6 +137,22 @@ export function detectSpeakerNames(lines, limit = 3) {
     .map(([name]) => name);
 }
 
+/**
+ * 감지 결과로 받는 사람 선택을 어떻게 바꿀지 (2026-11-01 사용자 결정 「선택 비우기」).
+ *
+ * | 경우 | 결과 |
+ * |---|---|
+ * | 후보 없음(감지 안 됨·감지 대상 사이트 아님) | `keep` — 기존 선택 그대로 |
+ * | 등록된 사람과 일치 | `select` — 그 사람 |
+ * | 후보는 있는데 아무도 등록 안 됨 | `clear` — 비운다(다른 사람 설정으로 다듬지 않게). 제안 줄은 그대로 뜬다 |
+ * @returns {{action: 'keep'|'select'|'clear', id?: string}}
+ */
+export function decideRecipientSelection(names, matchedId) {
+  if (matchedId) return { action: 'select', id: matchedId };
+  if (Array.isArray(names) && names.length > 0) return { action: 'clear' };
+  return { action: 'keep' };
+}
+
 /** 이름 비교 — 공백·대소문자 차이는 같은 사람으로 본다. */
 function sameName(a, b) {
   return String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();

@@ -38,7 +38,7 @@ import {
   isUrgencyMasked,
 } from '../lib/friction.js';
 // 🔴 대화 상대 **후보만** 뽑는다 — 등록은 사용자가 누를 때만(`detectPeople.js` 헤더).
-import { detectSpeakerNames, matchRecipient } from './detectPeople.js';
+import { decideRecipientSelection, detectSpeakerNames, matchRecipient } from './detectPeople.js';
 import { findIntegration, isPersonDetectHost } from '../lib/siteGate.js';
 import { collectGmailPeople } from './gmailPeople.js';
 import {
@@ -55,6 +55,7 @@ import {
   updateRecipient,
   getSelectedRecipient,
   setSelectedRecipientId,
+  NO_RECIPIENT_ID,
   addRecipient,
   PERSONAL_TEAM_ID,
 } from '../lib/recipients.js';
@@ -1303,10 +1304,16 @@ export default function SaiOverlay({ autoButton = true }) {
             : [];
       const { matchedId, suggestions } = matchRecipient(names, list);
       setPersonSuggestions(suggestions ?? []);
-      if (matchedId && matchedId !== selected?.id) {
-        const matched = list.find((entry) => entry.id === matchedId) ?? selected;
+      // 🔴 2026-11-01 — 감지된 상대가 미등록이면 선택을 비운다(`decideRecipientSelection` 표). 예전엔 이전 사람이 남아
+      //    Mei에게 쓰는 글이 Daniel 설정으로 다듬어졌다(실확장 실측). 다듬기는 저장값을 읽으므로 저장도 「없음」으로.
+      const decision = decideRecipientSelection(names, matchedId);
+      if (decision.action === 'select' && decision.id !== selected?.id) {
+        const matched = list.find((entry) => entry.id === decision.id) ?? selected;
         setRecipient(matched);
-        await setSelectedRecipientId(matchedId);
+        await setSelectedRecipientId(decision.id);
+      } else if (decision.action === 'clear') {
+        setRecipient(null);
+        await setSelectedRecipientId(NO_RECIPIENT_ID);
       } else {
         setRecipient(selected);
       }
