@@ -1960,6 +1960,9 @@ function teamPlanLine(billing) {
  */
 function TeamPlanSection({ team, plan, onToast, onChanged }) {
   const minSeats = Math.max(2, plan.members.length);
+  // 2026-11-01 — 저장 성공 즉시 칩을 바꾼다(서버에서 다시 불러오는 1초 동안 옛 칩이 남아 안내와 어긋났다).
+  const [current, setCurrent] = useState(plan.defaultQuality);
+  useEffect(() => setCurrent(plan.defaultQuality), [plan.defaultQuality]);
   const [seats, setSeats] = useState(minSeats);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -1980,6 +1983,7 @@ function TeamPlanSection({ team, plan, onToast, onChanged }) {
     setError('');
     try {
       await setTeamDefaultQuality(quality);
+      setCurrent(quality);
       onToast(quality ? `팀 기본 모드를 「${QUALITY_LABELS[quality]}」로 정했어요` : '팀 기본 모드를 지웠어요');
       await onChanged?.();
     } catch (e) {
@@ -2023,10 +2027,10 @@ function TeamPlanSection({ team, plan, onToast, onChanged }) {
           <button
             key={id}
             type="button"
-            className={plan.defaultQuality === id ? 'chip chip-on' : 'chip'}
-            aria-pressed={plan.defaultQuality === id}
+            className={current === id ? 'chip chip-on' : 'chip'}
+            aria-pressed={current === id}
             disabled={busy !== ''}
-            onClick={() => pickDefault(plan.defaultQuality === id ? null : id)}
+            onClick={() => pickDefault(current === id ? null : id)}
           >
             {QUALITY_LABELS[id]}
           </button>

@@ -38,3 +38,26 @@ powershell -File docs/store/fit-screenshot.ps1 -In <찍은 파일> -Out docs/sto
 ```
 
 넓은 창은 그대로 줄이면 글자가 작아진다 — `-CropX <왼쪽 px> -CropWidth <폭 px> -CropHeight <높이 px>`로 먼저 자른다(셋 다 선택, 원본 픽셀). 2026-10-29에 쓴 값: 1번 `-CropX 265 -CropWidth 1430 -CropHeight 894` · 2번 `-CropX 270 -CropWidth 1459` · 3번 `-CropX 270` · 4번 자르지 않음.
+
+## 대화 상대 감지 시험 (2026-11-01)
+무대 주소(`localhost:5300`)에서만 대화 상대 감지가 켜진다(`src/lib/siteGate.js` DEV_STAGE_HOSTS). 왼쪽 대화를 누르면 바뀌고, `?layout=`으로 배치를 고른다.
+
+| 배치 | Daniel | Mei | Priya | 결과 |
+|---|---|---|---|---|
+| `store`(주소에 없음 — 촬영 화면) | 후보 없음 | 후보 없음 | 후보 없음 | ✔ 기대대로(「이름 · 시각」은 규칙 N1이 거름) |
+| `name` (이름 줄 → 본문 → 시각) | ＋ Daniel Weber | ＋ Mei Tanaka | ＋ Priya Raman | ✔ |
+| `colon` (「이름: 내용」) | ＋ Daniel Weber | ＋ Mei Tanaka | ＋ Priya Raman | ✔ |
+| `mail` (「이름 <주소>」) | ＋ Daniel Weber | ＋ Mei Tanaka | ＋ Priya Raman | ✔ |
+| `name`, 새로 열지 않고 Daniel → Priya | ＋ Daniel Weber → ＋ Priya Raman | | | ✔ 상대를 바꾸면 제안도 바뀐다 |
+
+실확장 0.1.65 · 운영 Worker · 받는 사람 미등록 상태.
+
+**자동 선택·비우기 (0.1.66, 가상 인물 Daniel·Mei 등록 — 사용자 허락)**
+| 순서 | 대화 | 받는 사람 | 제안 | 판정 |
+|---|---|---|---|---|
+| 1 | Mei(미등록) | 선택 안 함 | ＋ Mei Tanaka | ✔ 비움(0.1.65까지는 이전의 Daniel이 남았다) |
+| 2 | Mei → 「＋ Mei Tanaka」로 등록 | Mei Tanaka | — | ✔ |
+| 3 | Daniel | Daniel Weber | 없음 | ✔ 자동 선택 |
+| 4 | Mei | Mei Tanaka | 없음 | ✔ 자동 선택(직전 Daniel과 달라 자동임이 구분된다) |
+| 5 | Priya(미등록) | 선택 안 함 | ＋ Priya Raman | ✔ 비움 |
+🔴 발견: 무대 시험 막대 「배치(시험용): …」가 `이름: 내용`으로 읽혀 후보에 떴다(콜론을 빼서 해결). **실제 사이트에서도 「라벨(괄호): 내용」 줄은 사람 이름으로 잡힐 수 있다**(괄호는 `이름:` 구조 안에서는 거르지 않음) — 대화형 8곳 한정이라 영향은 작다(추정).
