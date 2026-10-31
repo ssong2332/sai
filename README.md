@@ -87,6 +87,8 @@ npm run dev
 | `ANTHROPIC_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **기본 provider**(2026-10-23, Claude Haiku 5.5, 사고 끔 — `SAI_ANTHROPIC_THINKING=adaptive`로만 켬). 폴오버 1단계 |
 | `GROQ_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **폴오버 예비**(2026-10-23, `openai/gpt-oss-120b`). 폴오버 2단계 |
 | `SAI_SERVICE_ACCOUNT_FILE` | 실행하는 셸(또는 로컬 `.env`) — **키 파일 경로**, 키 파일은 저장소 밖 | Worker 주간 점검 `npm --prefix workers/refine run report`(2026-10-27, M2) — 최근 7일 `betaMetrics` + `/health`, 경고 있으면 종료 코드 1 |
+| `PADDLE_API_KEY` · `PADDLE_WEBHOOK_SECRET` | 🔴 Worker 시크릿만(`npx wrangler secret put …`) — 로컬 `.env`·소스에 두지 않음 | 결제(Paddle, 2026-10-31 — `docs/BillingDesign.md`). 없으면 `/v1/billing/*` 503 |
+| `PADDLE_ENV` · `PADDLE_PRICE_PRO_MONTH` · `PADDLE_PRICE_PRO_YEAR` · `BILLING_ENFORCED` | `workers/refine/wrangler.toml` `[vars]`(비밀 아님) | 샌드박스/실판매 · Pro 가격 ID · `1`이면 구독 없는 사용자 = 무료 한도(꺼지면 지금과 같음). 실판매 전환은 사용자 승인 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
 | `SAI_CACHE_TTL_MS` | 로컬 `.env` | 프록시 캐시 수명(기본 10분 · 상한 6시간). 시연 촬영 때 호출을 줄이는 용도 |
 | `SAI_SITE_DEV` | 빌드 시점 — `npm run build:sitedev`가 켠다 (🔴 `.env`에서 읽지 않는다) | `1`이면 manifest `externally_connectable`에 `http://localhost:5180/*`가 붙고 설정에 「자세한 설정 — 웹에서 열기」가 뜬다(`docs/WebSplit.md` C). 🔴 이 빌드는 배포하지 않는다 |

@@ -40,6 +40,14 @@ compatibility_flags = ["nodejs_compat"]
 FIREBASE_PROJECT_ID = "sai-global-msg-2026"
 # `src/manifest.js`의 `key`가 고정한 확장 ID — `functions/index.js` `EXTENSION_ID`와 같은 값이어야 한다.
 EXTENSION_ID = "gdipbmakeghjecpenebjlfhgcajbikkg"
+
+# 결제(Paddle, 2026-10-31 — docs/BillingDesign.md). 🔴 키·웹훅 비밀값은 여기 쓰지 않는다(시크릿):
+#   npx wrangler secret put PADDLE_API_KEY · npx wrangler secret put PADDLE_WEBHOOK_SECRET
+# 가격 ID는 비밀이 아니다. 🔴 실판매 전환(PADDLE_ENV = "live" · 실판매 가격 ID · BILLING_ENFORCED = "1")은 사용자 승인 건.
+PADDLE_ENV = "sandbox"
+PADDLE_PRICE_PRO_MONTH = "pri_01m691c650td0gbxbh224ykhda"
+PADDLE_PRICE_PRO_YEAR = "pri_01m691emykvm3xb27tdn7kwq92"
+# BILLING_ENFORCED = "1"   # 켜면 구독 없는 사용자 = free(하루 20 · 빠른만). 꺼져 있으면 beta(지금과 같음)
 # 사고(thinking) — 2026-10-23부터 코어 기본이 **끔**이라 적지 않는다(L30 실측: 끔 건당 $0.00070·중앙값 2.4~2.5초 /
 # 켬 $0.00107·6.2~6.7초). 실험으로 켤 때만:
 # SAI_ANTHROPIC_THINKING = "adaptive"
