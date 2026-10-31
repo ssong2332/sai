@@ -88,6 +88,7 @@ export function Footer({ landing = false }) {
           <Link to="/pricing">요금제</Link>
           <Link to="/privacy">개인정보처리방침</Link>
           <Link to="/terms">이용약관</Link>
+          <Link to="/refund">환불 정책</Link>
           <Link to="/settings">설정</Link>
         </nav>
         <p className="footer-note">메시지 본문은 사이 서버와 데이터베이스에 저장하지 않습니다.

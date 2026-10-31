@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { navigate } from '../router.jsx';
 import privacyHtml from '../legal/privacy.html?raw';
 import termsHtml from '../legal/terms.html?raw';
+import refundHtml from '../legal/refund.html?raw';
 
 /**
  * 개인정보처리방침 · 이용약관 — `dashboard/public/*.html`의 본문을 글자 그대로 옮겨 스타일만 바꿨다.
@@ -10,6 +11,7 @@ import termsHtml from '../legal/terms.html?raw';
 const DOCS = {
   privacy: { html: privacyHtml, title: '개인정보처리방침' },
   terms: { html: termsHtml, title: '이용약관' },
+  refund: { html: refundHtml, title: '환불 정책' },
 };
 
 export default function Legal({ doc }) {

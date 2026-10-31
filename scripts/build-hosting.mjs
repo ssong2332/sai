@@ -4,9 +4,9 @@
  *
  * | 주소 | 내용 | 출처 |
  * |---|---|---|
- * | `/` · `/pricing` · `/settings` · `/privacy` · `/terms` | 소개 사이트(SPA) | `site/` 빌드 |
+ * | `/` · `/pricing` · `/settings` · `/privacy` · `/terms` · `/refund` | 소개 사이트(SPA) | `site/` 빌드 |
  * | `/dashboard/` | 팀 대시보드(SPA) | `dashboard/` 빌드(`--base=/dashboard/`) |
- * | `/privacy.html` · `/terms.html` | 처리방침·약관 원본 | `dashboard/public/` — 구글 브랜딩(L25)이 이 주소를 가리킨다 |
+ * | `/privacy.html` · `/terms.html` · `/refund.html` | 처리방침·약관·환불 정책 원본 | `dashboard/public/` — 구글 브랜딩(L25)이 이 주소를 가리킨다(환불 정책은 2026-10-31, Paddle 도메인 심사) |
  *
  * 🔴 처리방침·약관의 **단일 출처는 `dashboard/public/*.html`**이다. 소개 사이트의 `/privacy`·`/terms`가
  *    쓰는 `site/src/legal/*.html`은 여기서 그 `<main>` 본문을 뽑아 다시 쓴다 — 손으로 고치지 않는다.
@@ -24,7 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const out = join(root, 'hosting-dist');
-const LEGAL_DOCS = ['privacy', 'terms'];
+const LEGAL_DOCS = ['privacy', 'terms', 'refund'];
 
 /** 원본 HTML의 `<main>` 안쪽만 돌려준다. 못 찾으면 멈춘다(조용히 빈 페이지를 올리지 않는다). */
 export function extractMain(html) {

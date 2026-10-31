@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 /** History API 라우터 — 경로 5개뿐이라 라이브러리를 들이지 않는다. */
-export const ROUTES = ['/', '/pricing', '/settings', '/privacy', '/terms'];
+export const ROUTES = ['/', '/pricing', '/settings', '/privacy', '/terms', '/refund'];
 
 function currentLocation() {
   return { path: window.location.pathname.replace(/\/+$/, '') || '/', search: window.location.search };
