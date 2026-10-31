@@ -90,11 +90,11 @@ test('표시 설정 기본값 — 팝업이 읽는 기본값과 같다', () => {
     theme: 'light',
     backTranslation: true,
     refineReasoning: false,
-    highlightHints: false,
+    highlightHints: true, // 2026-10-31 기본값 변경
     threadContext: THREAD_CONTEXT_DEFAULT,
-    threadContextPreview: false,
+    threadContextPreview: true, // 2026-10-31
     replyAuto: false,
-    snippetInsertMode: 'replace',
+    snippetInsertMode: 'append', // 2026-10-31 — 기본값이 쓰던 글을 지우지 않게
     quality: 'fast', // 2026-10-31 품질 모드 기본값 = 빠른 — 표 밖 값도 빠른(`quality.unit.test.js`)
   });
   assert.equal(coerceDisplayValue('theme', 'purple'), 'light');
@@ -104,14 +104,14 @@ test('표시 설정 기본값 — 팝업이 읽는 기본값과 같다', () => {
 test('표시 설정 쓰기 — 형식 밖 값은 쓰지 않는다', async () => {
   await clearAllLocal();
   await writeDisplaySetting('theme', 'dark');
-  await writeDisplaySetting('snippetInsertMode', 'append');
+  await writeDisplaySetting('snippetInsertMode', 'replace'); // 기본값('append')의 반대
   assert.equal(await getLocal(STORAGE_KEYS.THEME), 'dark');
   await assert.rejects(() => writeDisplaySetting('theme', 'purple'));
   await assert.rejects(() => writeDisplaySetting('backTranslation', 'on'));
   await assert.rejects(() => writeDisplaySetting('nope', true));
   const all = await readDisplaySettings();
   assert.equal(all.theme, 'dark');
-  assert.equal(all.snippetInsertMode, 'append');
+  assert.equal(all.snippetInsertMode, 'replace');
   assert.equal(all.threadContext, THREAD_CONTEXT_DEFAULT);
 });
 
