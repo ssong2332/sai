@@ -200,6 +200,37 @@ export async function createTeam(req, deps) {
   return { teamId: teamRef.id, name, inviteCode, role: 'owner', canViewDashboard: true };
 }
 
+/** 베타 팀 유예 — 유료 출시(`BILLING_ENFORCED_AT`) 전에 만든 팀은 이 기간 동안 미결제여도 참가를 받는다(2026-11-01). */
+export const TEAM_GRACE_DAYS = 30;
+const PAID_TEAM_STATUSES = ['active', 'trialing', 'past_due'];
+
+/**
+ * 팀 참가 판정 (2026-11-01 사용자 결정, `docs/BillingDesign.md` 8절). 순수 함수.
+ *
+ * | 순서 | 조건 | 결과 |
+ * |---|---|---|
+ * | 1 | 결제된 팀이고 팀원 수 ≥ 좌석 | `team-full` |
+ * | 2 | 결제된 팀 | 통과 |
+ * | 3 | 유료 출시 전(`enforced` 꺼짐) | 통과 — 지금(베타)과 같다 |
+ * | 4 | 출시 시각을 모름(`enforcedAtMs` 없음) | 통과 — 🔴 잠그는 쪽으로 틀리지 않는다 |
+ * | 5 | 출시 전에 만든 팀이고 출시 + 30일 이내 | 통과(유예) |
+ * | 6 | 그 밖(미결제) | `team-plan-required` |
+ * @returns {null|'team-full'|'team-plan-required'}
+ */
+export function judgeTeamJoin({ billing = null, memberCount = 0, createdAtMs = NaN, enforced = false, enforcedAtMs = NaN, nowMs = Date.now() }) {
+  const paid = Boolean(billing && PAID_TEAM_STATUSES.includes(billing.status));
+  if (paid) return memberCount >= Number(billing.seats ?? 0) ? 'team-full' : null;
+  if (!enforced || !Number.isFinite(enforcedAtMs)) return null;
+  const inGrace = Number.isFinite(createdAtMs) && createdAtMs < enforcedAtMs && nowMs < enforcedAtMs + TEAM_GRACE_DAYS * 86_400_000;
+  return inGrace ? null : 'team-plan-required';
+}
+
+function toMillis(value) {
+  if (value && typeof value.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return NaN;
+}
+
 /**
  * 초대 코드로 참가한다.
  * 🔴 **틀린 코드와 없는 팀을 같은 응답으로 돌려준다** — 나뉘면 코드 존재 여부를 물어보는
@@ -217,6 +248,20 @@ export async function joinTeam(req, deps) {
   const team = found.docs[0];
   const memberRef = team.ref.collection('members').doc(uid);
   const existing = await memberRef.get();
+
+  // 🔴 결제 판정(2026-11-01) — 새 참가만. 이미 팀원이면(재참가) 막지 않는다. `deps.teamBilling`이 없으면(Functions) 판정 안 함.
+  if (!existing.exists && deps.teamBilling) {
+    const members = await team.ref.collection('members').get();
+    const blocked = judgeTeamJoin({
+      billing: team.get('billing') ?? null,
+      memberCount: members.docs.length,
+      createdAtMs: toMillis(team.get('createdAt')),
+      enforced: deps.teamBilling.enforced === true,
+      enforcedAtMs: deps.teamBilling.enforcedAtMs ?? NaN,
+      nowMs: deps.teamBilling.now?.() ?? Date.now(),
+    });
+    if (blocked) throw new TeamError(409, blocked);
+  }
 
   /**
    * 🔴 **이미 팀원이면 역할·권한을 덮어쓰지 않는다.** 그냥 두면 팀장이 자기 초대 코드로 다시
@@ -246,6 +291,8 @@ export async function joinTeam(req, deps) {
   );
 
   const after = await memberRef.get();
+  // 좌석 재배정(결제된 팀이면 새 팀원에게 좌석) — 실패해도 참가는 끝난 것이라 Worker 쪽에서 로그만.
+  if (!existing.exists) await deps.teamBilling?.onMembersChanged?.(team.id);
   // 🔴 `inviteCode`를 응답에 싣지 않는다 — 참가자가 코드를 재배포할 수 있게 만들 이유가 없다.
   return {
     teamId: team.id,
@@ -425,6 +472,7 @@ export async function removeMember(req, deps) {
   const targetRef = db.collection('teams').doc(teamId).collection('members').doc(targetUid);
   if (!(await targetRef.get()).exists) throw new TeamError(404, 'no-such-member');
   await targetRef.delete();
+  await deps.teamBilling?.onMemberLeft?.(teamId, targetUid); // 좌석 해제·재배정(2026-11-01)
   return { uid: targetUid, removed: true };
 }
 

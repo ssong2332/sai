@@ -42,6 +42,8 @@ export function readBillingConfig(env = {}) {
     // 팀 요금제(2026-11-01, `docs/BillingDesign.md` 8절) — 1석당 가격, 수량 = 좌석.
     teamPrices: { month: str(env.PADDLE_PRICE_TEAM_MONTH), year: str(env.PADDLE_PRICE_TEAM_YEAR) },
     enforced: str(env.BILLING_ENFORCED) === '1',
+    // 유료 출시 시각(ISO) — 베타 팀 30일 유예의 기준(`functions/teams.js` judgeTeamJoin). 없으면 유예 판정을 하지 않는다(잠그지 않음).
+    enforcedAtMs: Date.parse(str(env.BILLING_ENFORCED_AT) ?? ''),
   };
   config.checkoutReady = Boolean(config.apiBase && config.apiKey && config.prices.month && config.prices.year);
   config.webhookReady = Boolean(config.webhookSecret);
@@ -162,6 +164,16 @@ export async function applySubscriptionEvent(db, event) {
     );
     return 'saved';
   });
+}
+
+/** 팀원이 나갔다 — 그 사람의 이 팀 좌석을 풀고 남은 팀원으로 다시 배정한다. */
+export async function releaseTeamSeat(db, teamId, uid) {
+  const ref = db.collection('billing').doc(uid);
+  const snap = await ref.get();
+  if (snap.exists && snap.get('teamSeat')?.teamId === teamId) {
+    await ref.set({ teamSeat: { teamId, paid: false } }, { merge: true });
+  }
+  await syncTeamSeats(db, teamId);
 }
 
 /** 팀 구독 이벤트 → `teams/{teamId}.billing` 갱신 + 좌석 재배정. 옛 이벤트는 덮지 않는다. */

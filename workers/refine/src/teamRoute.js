@@ -19,9 +19,27 @@ import { leaveTeamOnServer, deleteAccount, listMyTeams, accountStore } from '../
 import { recordClientMetric } from '../../../functions/betaMetrics.js';
 import { verifyFirebaseIdToken } from './auth.js';
 import { createAuthAdmin } from './google/authAdmin.js';
+import { readBillingConfig, releaseTeamSeat, syncTeamSeats } from './billing.js';
 
 /** Functions `index.js` `ACCOUNT_ACTIONS`와 같은 표 — 이름이 TEAM_ACTIONS와 겹치지 않는다. */
 const ACCOUNT_ACTIONS = { leave: leaveTeamOnServer, deleteAccount, myTeams: listMyTeams, metric: recordClientMetric };
+
+function teamBillingDeps(db, billing, logger, now) {
+  const safe = (label, work) => async (...args) => {
+    try {
+      await work(...args);
+    } catch (error) {
+      logger.error(`[billing] ${label} 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+    }
+  };
+  return {
+    enforced: billing.enforced,
+    enforcedAtMs: billing.enforcedAtMs,
+    now: now ?? (() => Date.now()),
+    onMembersChanged: safe('좌석 재배정', (teamId) => syncTeamSeats(db, teamId)),
+    onMemberLeft: safe('좌석 해제', (teamId, uid) => releaseTeamSeat(db, teamId, uid)),
+  };
+}
 
 /** [0, max) 정수 — 거절 표본으로 치우침 없이. 초대 코드 생성용(`teams.js` generateCode). */
 export function randomInt(max) {
@@ -44,7 +62,7 @@ export function randomInt(max) {
  * @param {Function} [ctx.jwks]
  * @param {() => number} [ctx.now]
  */
-export async function handleTeam(request, { config, google, json, logger, jwks, now }) {
+export async function handleTeam(request, { config, google, json, logger, jwks, now, env = {} }) {
   if (request.method !== 'POST') return json(405, { error: 'method not allowed' });
   let body;
   try {
@@ -70,6 +88,8 @@ export async function handleTeam(request, { config, google, json, logger, jwks, 
     verifyIdToken: (token) => verifyFirebaseIdToken(token, { projectId: config.projectId, ...(jwks ? { jwks } : {}), now }),
     randomInt,
     accountStore: () => accountStore(google.db, auth),
+    // 결제(2026-11-01, `docs/BillingDesign.md` 8절) — 참가 판정·좌석 재배정. 🔴 좌석 동기화 실패는 참가·나가기를 막지 않는다(로그만).
+    teamBilling: teamBillingDeps(google.db, readBillingConfig(env), logger, now),
   };
   try {
     return json(200, await handler(req, deps));
