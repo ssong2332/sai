@@ -166,3 +166,11 @@ test('TP3 — 좌석 팀원 = 팀 한도(200·기본 20·심층 5), 좌석 밖�
   const over = await refine();
   assert.deepEqual([over.quality, over.qualityDowngrade], ['fast', 'daily']);
 });
+
+test('팀 기능 잠금 — 결제 웹훅(유료 상태)이 잠금을 바로 푼다', async () => {
+  const { handle, db } = setup();
+  await seedTeam(db);
+  await db.collection('teams').doc('team-1').set({ locked: true }, { merge: true });
+  assert.equal((await webhook(handle, teamEvent({ seats: 3 }))).status, 200);
+  assert.equal((await db.collection('teams').doc('team-1').get()).get('locked'), false);
+});

@@ -226,6 +226,14 @@ export function judgeTeamJoin({ billing = null, memberCount = 0, createdAtMs = N
   return inGrace ? null : 'team-plan-required';
 }
 
+/**
+ * 팀 기능 잠금 판정(2026-11-01 사용자 결정 「이 설계로」) — 참가 판정의 「미결제」 줄과 같은 조건.
+ * 🔴 결제 팀·출시 전·출시 시각 모름·유예 안이면 잠그지 않는다.
+ */
+export function teamShouldLock({ billing = null, createdAtMs = NaN, enforced = false, enforcedAtMs = NaN, nowMs = Date.now() }) {
+  return judgeTeamJoin({ billing, memberCount: 0, createdAtMs, enforced, enforcedAtMs, nowMs }) === 'team-plan-required';
+}
+
 function toMillis(value) {
   if (value && typeof value.toMillis === 'function') return value.toMillis();
   if (value instanceof Date) return value.getTime();
@@ -433,6 +441,8 @@ export async function whoAmI(req, deps) {
   return {
     // 팀 기본 품질 모드(2026-11-01) — 품질을 한 번도 안 고른 팀원에게만 적용(확장 refineClient).
     defaultQuality: teamDefaultQuality(team),
+    // 팀 기능 잠금(2026-11-01) — 유예 끝난 미결제 팀. 확장은 안내를 띄우고 팀 용어집을 싣지 않는다.
+    locked: team.exists && team.get('locked') === true,
     role,
     // 🔴 2026-10-26 L18 4-7 — 팀장이 이름을 바꿔도 팀원 화면은 참가 때 이름 그대로였다. 패널을 열 때 부르는 이 응답에 싣는다.
     name: teamName(team),

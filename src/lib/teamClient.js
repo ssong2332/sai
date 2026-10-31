@@ -339,6 +339,8 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
           canViewDashboard: me.role === 'owner' || me.canViewDashboard === true,
           // 팀 기본 품질 모드(2026-11-01) — 품질을 안 고른 팀원에게만(refineClient).
           defaultQuality: typeof me.defaultQuality === 'string' ? me.defaultQuality : null,
+          // 팀 기능 잠금(2026-11-01) — 유예 끝난 미결제 팀. 규칙이 막지만 화면이 이유를 알게 한다.
+          locked: me.locked === true,
         };
       } catch (error) {
         // 🔴 서버가 「팀원이 아님」을 확정한 경우만 뺀다 — 네트워크·권한·알 수 없는 오류는 옛 값 유지.
@@ -364,7 +366,8 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
       next.name !== teams[index].name ||
       next.role !== teams[index].role ||
       next.canViewDashboard !== teams[index].canViewDashboard ||
-      (next.defaultQuality ?? null) !== (teams[index].defaultQuality ?? null),
+      (next.defaultQuality ?? null) !== (teams[index].defaultQuality ?? null) ||
+      (next.locked === true) !== (teams[index].locked === true),
   );
   // 🔴 순서·활성 팀을 건드리지 않는다 — `upsertTeam`을 쓰지 않는 이유가 이것이다.
   if (changed) await setLocal(STORAGE_KEYS.TEAMS, results);
@@ -557,6 +560,8 @@ export async function listTeamGlossary({ teamId = null, fetchImpl = globalThis.f
   const teams = await listTeams();
   const team = teamId ? teams.find((item) => item.teamId === teamId) ?? null : await getTeam();
   if (!team) return [];
+  // 🔴 2026-11-01 팀 기능 잠금 — 규칙이 막으니 헛요청을 보내지 않는다(다듬기는 개인 용어집으로 계속).
+  if (team.locked === true) return [];
   try {
     const page = await firestore(`/teams/${team.teamId}/glossary`, { fetchImpl });
     const entries = (page?.documents ?? []).map((doc) => ({

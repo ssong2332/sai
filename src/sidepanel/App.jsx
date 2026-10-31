@@ -3184,6 +3184,17 @@ function TeamPanel({ team, onToast, onChanged }) {
         {note && <p className="meta">{note}</p>}
       </div>
 
+      {/* 2026-11-01 팀 기능 잠금 — 유예가 끝난 미결제 팀. 데이터는 지우지 않았고 구매하면 풀린다(이유와 할 일을 같이). */}
+      {team.locked === true && (
+        <div className="card card-accent" role="status">
+          <p className="card-label">팀 요금제가 필요해요</p>
+          <p className="meta">
+            이 팀의 무료 기간이 끝나 팀 용어집과 대시보드를 잠갔어요. 데이터는 그대로 있어요 —{' '}
+            {team.role === 'owner' ? '아래 「팀 관리」에서 팀 요금제를 구매하면' : '팀장이 팀 요금제를 구매하면'} 바로 다시 열려요.
+          </p>
+        </div>
+      )}
+
       {/* 🔴 대시보드는 **고르는 곳과 같은 화면**에 있어야 한다(위 주석).
           🔴 key는 붙이지 않는다 — 팀이 바뀌면 부모(`TeamPanel`)째로 교체된다(호출부 주석). */}
       <TeamDashboardCard team={team} onToast={onToast} />
