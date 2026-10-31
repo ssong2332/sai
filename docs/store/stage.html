@@ -8,6 +8,14 @@
   스토어 스크린샷 촬영 무대 (L21). 🔴 실제 서비스를 흉내 내지 않는다 — 상표·로고 없는 가상의 업무 메시지 화면이다.
   🔴 등장인물·회사는 모두 지어낸 것이다. 실제 사람 이름·메일 주소를 넣지 않는다.
   사이 확장은 이 페이지 위에서 실제로 동작한다(콘텐츠 스크립트 <all_urls>). 띄우는 법은 docs/store/README.md.
+  2026-11-01 — 개발 시험용: 왼쪽 대화를 누르면 바뀐다. 주소에 `?layout=`을 주면 대화 상대 감지(`detectPeople.js`) 배치를 바꿔 시험한다.
+  | layout | 상대 메시지 모양 | 감지 |
+  |---|---|---|
+  | (없음) `store` | 「이름 · 시각」 한 줄 — 스토어 촬영 화면 그대로 | 안 됨(규칙 N1 `·`) |
+  | `name` | 이름 줄 → 본문 → 시각 (Slack·Teams 꼴) | 별도 줄 이름 |
+  | `colon` | 「이름: 내용」 | `이름:` |
+  | `mail` | 「이름 <주소>」 머리줄 → 본문 | 메일 머리줄 |
+  🔴 감지는 이 무대 주소(localhost:5300)에서만 켜진다(`src/lib/siteGate.js` DEV_STAGE_HOSTS).
 -->
 <style>
   :root { --ink: #191f28; --sub: #4e5968; --mut: #8b95a1; --bg: #f2f4f6; --line: #e5e8eb; --card: #fff; --me: #eef2ff; }
@@ -35,6 +43,11 @@
   .compose textarea { width: 100%; min-height: 96px; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font: inherit; line-height: 1.6; color: var(--ink); }
   .bar { display: flex; justify-content: flex-end; margin-top: 10px; }
   .send { background: var(--ink); color: #fff; border: 0; border-radius: 10px; padding: 10px 20px; font: inherit; font-weight: 700; }
+  .thread { cursor: pointer; }
+  .msg .time { font-size: 12px; color: var(--mut); margin-top: 4px; }
+  .layout-bar { font-size: 12px; color: var(--sub); padding: 6px 28px; background: #fff8e6; border-bottom: 1px solid var(--line); }
+  .layout-bar a { margin-left: 8px; color: var(--sub); }
+  .layout-bar a.on { font-weight: 700; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -78,5 +91,56 @@
     </section>
   </main>
 </div>
+<script>
+// 2026-11-01 개발 시험용 — 대화 전환·배치 선택(위 주석 표). 기본(`store`)은 위 정적 화면과 같은 모양을 그린다.
+(() => {
+  const PEOPLE = [
+    { name: 'Daniel Weber', initials: 'DW', color: '#3d5afe', role: 'Berlin · 프로젝트 파트너', email: 'daniel.weber@example.com',
+      them: ['오전 9:12', 'Hi! Quick heads-up — the vendor pushed the delivery to next Thursday. Could you check whether that still works on your end, and let me know by EOD tomorrow if we need to escalate? Thanks!'],
+      me: ['오전 9:40', "Got it, I'll check with our QA team and get back to you."],
+      draft: '목요일로 밀리면 저희 쪽 테스트 일정이 빠듯해요. 금요일 오전까지 받을 수 있는지 다시 확인해 주실 수 있을까요?' },
+    { name: 'Mei Tanaka', initials: 'MT', color: '#00a37a', role: 'Tokyo · 디자인 리드', email: 'mei.tanaka@example.com',
+      them: ['오전 10:05', 'Thanks, the slides look great. Could you send me the final version with the updated chart by Wednesday?'],
+      me: ['오전 10:20', "Sure, I'll update the chart and share it by Tuesday."],
+      draft: '수요일 오전까지 최종본 보내 드릴게요. 차트 색만 한 번 더 확인 부탁드려요.' },
+    { name: 'Priya Raman', initials: 'PR', color: '#f59f00', role: 'Bangalore · 백엔드 리드', email: 'priya.raman@example.com',
+      them: ['오후 2:30', 'Can we move the sync to 4pm? I have a customer call that might run over.'],
+      me: ['오후 2:41', '4pm works for me.'],
+      draft: '4시로 옮겨도 괜찮아요. 회의 링크는 그대로 쓸게요.' },
+  ];
+  const params = new URLSearchParams(location.search);
+  const layout = ['name', 'colon', 'mail'].includes(params.get('layout')) ? params.get('layout') : 'store';
+  const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  function message(name, email, [time, text], mine) {
+    const cls = mine ? 'msg me' : 'msg';
+    if (layout === 'name') return `<div class="${cls}"><p class="who">${esc(name)}</p><p class="bubble">${esc(text)}</p><p class="time">${esc(time)}</p></div>`;
+    if (layout === 'colon') return `<div class="${cls}"><p class="bubble">${esc(name)}: ${esc(text)}</p><p class="time">${esc(time)}</p></div>`;
+    if (layout === 'mail') {
+      const head = mine ? esc(name) : `${esc(name)} &lt;${esc(email)}&gt;`;
+      return `<div class="${cls}"><p class="who">${head}</p><p class="bubble">${esc(text)}</p><p class="time">${esc(time)}</p></div>`;
+    }
+    return `<div class="${cls}"><p class="who">${esc(name)} · ${esc(time)}</p><p class="bubble">${esc(text)}</p></div>`;
+  }
+
+  function show(index) {
+    const p = PEOPLE[index];
+    document.querySelectorAll('.thread').forEach((el, i) => el.classList.toggle('on', i === index));
+    document.querySelector('.head').innerHTML = `<span class="av" style="background:${p.color}">${p.initials}</span><span><b>${esc(p.name)}</b><br><small>${esc(p.role)}</small></span>`;
+    document.querySelector('.log').innerHTML = message(p.name, p.email, p.them, false) + message('나', '', p.me, true);
+    document.querySelector('.compose textarea').value = p.draft;
+  }
+
+  document.querySelectorAll('.thread').forEach((el, i) => el.addEventListener('click', () => show(i)));
+  if (params.has('layout')) {
+    const bar = document.createElement('div');
+    bar.className = 'layout-bar';
+    // 🔴 콜론을 쓰지 않는다 — 「배치(시험용): …」가 `이름: 내용`으로 읽혀 대화 상대 후보로 떴다(2026-11-01 실측).
+    bar.innerHTML = '시험용 배치 → ' + ['store', 'name', 'colon', 'mail'].map((id) => `<a href="?layout=${id}" class="${id === layout ? 'on' : ''}">${id}</a>`).join('');
+    document.querySelector('.main').prepend(bar);
+    show(0);
+  }
+})();
+</script>
 </body>
 </html>

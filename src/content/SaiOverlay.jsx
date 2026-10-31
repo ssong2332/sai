@@ -1298,7 +1298,7 @@ export default function SaiOverlay({ autoButton = true }) {
       const names =
         findIntegration(host)?.id === 'gmail'
           ? collectGmailPeople(targetRef.current)
-          : isPersonDetectHost(host)
+          : isPersonDetectHost(host, location.host)
             ? detectSpeakerNames(collected.messages)
             : [];
       const { matchedId, suggestions } = matchRecipient(names, list);
