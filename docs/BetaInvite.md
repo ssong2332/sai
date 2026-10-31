@@ -9,8 +9,8 @@
 | 항목 | 값 | 근거 |
 |---|---|---|
 | 스토어 링크(짧은 형태) | `https://chromewebstore.google.com/detail/gdipbmakeghjecpenebjlfhgcajbikkg` | 2026-10-31 조회 200, 제목 「SAI — 해외 협업 메시지 다듬기」 |
-| 지금 스토어 버전 | 0.1.55 | 같은 조회 |
-| 심사 중 다음 버전 | 0.1.58(품질 모드 설정 포함) — 업로드·심사 뒤 자동 업데이트 | `sai-extension-0.1.58.zip` |
+| 지금 스토어 버전 | **0.1.58**(2026-10-31 게시 — 공개 페이지 조회) | 대시보드 패키지 「게시됨 0.1.58」 |
+| 다음 업로드 | 0.1.59(설정 기본값 3개 변경) — 업로드·심사 뒤 자동 업데이트 | `sai-extension-0.1.59.zip`(`npm run pack:store`) |
 | 문의처 | `asg21274@gmail.com` | `site/src/legal/privacy.html` 8절 |
 
 ## 2. 테스터에게 알려 줄 것
