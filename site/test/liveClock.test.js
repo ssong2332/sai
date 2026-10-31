@@ -34,12 +34,21 @@ test('판정표 ① — 서울 시각에 따라 퇴근 뒤인 첫 도시', () =>
   }
 });
 
-test('판정표 ② — 서울 23:00~03:00은 맞는 도시가 없어 「지금 보내도 돼요」(샌프란시스코)', () => {
-  for (const [h, m] of [[23, 0], [1, 0], [2, 59]]) {
+test('2026-11-01 3시간 조건 — 서울 23:00~03:00은 벵갈루루(퇴근 뒤)로 예약 장면, 서울은 하루 종일 예외 없음', () => {
+  for (const [h, m, time] of [[23, 0, '19:30'], [1, 0, '21:30'], [2, 59, '23:29']]) {
     const s = pickScene(seoul(h, m), 'Asia/Seoul');
-    assert.equal(s.mode, 'now', `${h}:${m}`);
-    assert.equal(s.them.city, '샌프란시스코');
+    assert.equal(s.mode, 'schedule', `${h}:${m}`);
+    assert.deepEqual([s.them.city, s.them.time, s.gap], ['벵갈루루', time, '3시간 30분'], `${h}:${m}`);
   }
+  for (let minute = 0; minute < 1440; minute += 15) {
+    assert.equal(pickScene(new Date(Date.UTC(2026, 9, 31, 0, minute)), 'Asia/Seoul').mode, 'schedule', `UTC +${minute}분`);
+  }
+});
+
+test('판정표 ② — 맞는 도시가 없으면 「지금 보내도 돼요」(샌프란시스코): 시카고 새벽 2시', () => {
+  const s = pickScene(new Date(Date.UTC(2026, 9, 31, 7, 15)), 'America/Chicago'); // 시카고 02:15(CDT)
+  assert.equal(s.mode, 'now');
+  assert.equal(s.them.city, '샌프란시스코');
 });
 
 test('방문자가 샌프란시스코면 자기 도시는 건너뛴다(4시간 미만)', () => {
