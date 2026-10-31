@@ -12,7 +12,7 @@ import { extractMain } from '../scripts/build-hosting.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
-for (const doc of ['privacy', 'terms']) {
+for (const doc of ['privacy', 'terms', 'refund']) {
   test(`site/src/legal/${doc}.html이 dashboard/public 원본의 <main> 본문과 같다`, () => {
     const expected = extractMain(read(`dashboard/public/${doc}.html`));
     const copy = read(`site/src/legal/${doc}.html`).replace(/^<!--[^\n]*-->\n/, '');
