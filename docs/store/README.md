@@ -50,5 +50,14 @@ powershell -File docs/store/fit-screenshot.ps1 -In <찍은 파일> -Out docs/sto
 | `mail` (「이름 <주소>」) | ＋ Daniel Weber | ＋ Mei Tanaka | ＋ Priya Raman | ✔ |
 | `name`, 새로 열지 않고 Daniel → Priya | ＋ Daniel Weber → ＋ Priya Raman | | | ✔ 상대를 바꾸면 제안도 바뀐다 |
 
-실확장 0.1.65 · 운영 Worker · 받는 사람 미등록 상태(자동 선택은 등록된 사람이 있어야 해서 이번에는 보지 않음).
+실확장 0.1.65 · 운영 Worker · 받는 사람 미등록 상태.
+
+**자동 선택·비우기 (0.1.66, 가상 인물 Daniel·Mei 등록 — 사용자 허락)**
+| 순서 | 대화 | 받는 사람 | 제안 | 판정 |
+|---|---|---|---|---|
+| 1 | Mei(미등록) | 선택 안 함 | ＋ Mei Tanaka | ✔ 비움(0.1.65까지는 이전의 Daniel이 남았다) |
+| 2 | Mei → 「＋ Mei Tanaka」로 등록 | Mei Tanaka | — | ✔ |
+| 3 | Daniel | Daniel Weber | 없음 | ✔ 자동 선택 |
+| 4 | Mei | Mei Tanaka | 없음 | ✔ 자동 선택(직전 Daniel과 달라 자동임이 구분된다) |
+| 5 | Priya(미등록) | 선택 안 함 | ＋ Priya Raman | ✔ 비움 |
 🔴 발견: 무대 시험 막대 「배치(시험용): …」가 `이름: 내용`으로 읽혀 후보에 떴다(콜론을 빼서 해결). **실제 사이트에서도 「라벨(괄호): 내용」 줄은 사람 이름으로 잡힐 수 있다**(괄호는 `이름:` 구조 안에서는 거르지 않음) — 대화형 8곳 한정이라 영향은 작다(추정).
