@@ -102,6 +102,7 @@ export async function leaveTeamOnServer(req, deps) {
     return { teamId, left: true, teamDeleted: true };
   }
   await store.deleteMember(teamId, uid);
+  await deps.teamBilling?.onMemberLeft?.(teamId, uid); // 좌석 해제·재배정(2026-11-01)
   return { teamId, left: true, teamDeleted: false };
 }
 
@@ -124,7 +125,10 @@ export async function deleteAccount(req, deps) {
   const billing = store.billing ? await store.billing(uid) : null;
   if (subscriptionBlocksDeletion(billing)) throw new TeamError(409, 'subscription-active');
 
-  for (const teamId of plan.leaveTeams) await store.deleteMember(teamId, uid);
+  for (const teamId of plan.leaveTeams) {
+    await store.deleteMember(teamId, uid);
+    await deps.teamBilling?.onMemberLeft?.(teamId, uid); // 좌석 해제·재배정(2026-11-01)
+  }
   for (const teamId of plan.deleteTeams) await store.deleteTeam(teamId);
   await store.deleteUserData(uid);
   if (billing && store.retainBilling) await store.retainBilling(uid, billingExpireAt(billing, new Date(deps.now?.() ?? Date.now())));

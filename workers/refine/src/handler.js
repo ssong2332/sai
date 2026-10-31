@@ -218,7 +218,7 @@ export function createHandler(deps = {}) {
         logger.error(`[team] 설정 누락: ${config.missing.join(',')}`);
         return json(500, { error: 'server misconfigured' });
       }
-      return handleTeam(request, { config, google: safeGoogle(google, env, logger), json, logger, jwks, now });
+      return handleTeam(request, { config, google: safeGoogle(google, env, logger), json, logger, jwks, now, env });
     }
 
     // 결제 — `billing.js` 헤더. 웹훅은 Paddle 서버가 부른다(Origin 없음 → 위 판정에서 통과).

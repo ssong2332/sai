@@ -51,6 +51,7 @@ PADDLE_PRICE_PRO_YEAR = "pri_01m691emykvm3xb27tdn7kwq92"
 # PADDLE_PRICE_TEAM_MONTH = ""
 # PADDLE_PRICE_TEAM_YEAR = ""
 # BILLING_ENFORCED = "1"   # 켜면 구독 없는 사용자 = free(하루 20 · 빠른만). 꺼져 있으면 beta(지금과 같음)
+# BILLING_ENFORCED_AT = "2026-12-01T00:00:00+09:00"   # 유료 출시 시각 — 이 전에 만든 팀은 30일 유예. 🔴 켤 때 반드시 함께(없으면 유예·잠금 판정 안 함)
 # 사고(thinking) — 2026-10-23부터 코어 기본이 **끔**이라 적지 않는다(L30 실측: 끔 건당 $0.00070·중앙값 2.4~2.5초 /
 # 켬 $0.00107·6.2~6.7초). 실험으로 켤 때만:
 # SAI_ANTHROPIC_THINKING = "adaptive"
