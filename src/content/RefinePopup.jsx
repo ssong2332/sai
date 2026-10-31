@@ -12,6 +12,7 @@ import { checkIntentDrift, intentDriftWarningText } from '../core/refine/intentD
 import { QUALITY_DOWNGRADE_NOTES, QUALITY_LABELS } from '../core/refine/quality.js';
 // L32 — 등록되지 않은 사람의 직급을 지어냈는지(「박 과장님」→ "Manager Park").
 import { checkInventedTitles, inventedTitleWarningText } from '../core/refine/titleCheck.js';
+import { checkLostNames, lostNameWarningText } from '../core/refine/nameLossCheck.js';
 import {
   checkBackTranslation,
   backFailMessage,
@@ -442,6 +443,20 @@ export default function RefinePopup({
   const inventedTitles = useMemo(
     () => checkInventedTitles(result, sourceText, { glossary: personalGlossary }),
     [result, sourceText, personalGlossary],
+  );
+
+  /**
+   * 🔴 **L28 ① — 원문의 제3자(「박 과장님」)가 통째로 사라졌는지** (`core/refine/nameLossCheck.js`, 2026-10-31).
+   *    실측(2026-10-29): 「박 과장님이 … 확인해야 합니다」 → "Could you check…?" — 이름 경고(수신자만)·
+   *    직급 경고(지어낸 직급만) 둘 다 못 잡았다. 교정문·역번역 둘 다 흔적이 없을 때만. 막지 않는다.
+   */
+  const lostNames = useMemo(
+    () =>
+      checkLostNames(result, sourceText, {
+        glossary: personalGlossary,
+        recipientNames: recipient?.name ? [recipient.name] : [],
+      }),
+    [result, sourceText, personalGlossary, recipient?.name],
   );
 
   /**
@@ -1383,6 +1398,16 @@ export default function RefinePopup({
                 직급 확인 필요 — {inventedTitles.map((f) => f.produced).join(' · ')}
               </span>
               <p className="sai-blank-text">{inventedTitleWarningText(inventedTitles)}</p>
+            </div>
+          )}
+
+          {/* L28 ① — 같은 자리·같은 무게. 🔴 고쳐 쓰지 않고 알리기만 한다. */}
+          {lostNames.length > 0 && (
+            <div className="sai-missing sai-blank" role="status">
+              <span className="sai-missing-head sai-blank-head">
+                이름 확인 필요 — {lostNames.map((item) => item.reference).join(' · ')}
+              </span>
+              <p className="sai-blank-text">{lostNameWarningText(lostNames)}</p>
             </div>
           )}
 

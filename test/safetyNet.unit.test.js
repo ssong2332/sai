@@ -195,3 +195,30 @@ test('B — 영어 원문·폴백·빈 역번역은 판정하지 않는다', () 
   assert.deepEqual(checkIntentDrift(null, '확인하겠습니다.'), []);
   assert.equal(intentDriftWarningText('unknown'), '');
 });
+
+test('🔴 L28 재현(2026-10-31) — 「공유드릴게요」(약속)가 정중한 요청 끝맺음 4가지로 바뀌어도 잡는다', () => {
+  const sourceText = '수정한 계획은 금요일까지 다시 공유드릴게요.';
+  for (const backTranslation of [
+    '수정된 계획을 금요일까지 다시 공유해 주실 수 있으실까요?',
+    '수정된 계획을 금요일까지 다시 공유 부탁드려도 될까요?',
+    '수정된 계획을 금요일까지 다시 공유해 주실 수 있으신지요?',
+    '금요일까지 업데이트된 계획을 다시 공유해 주실 수 있을지요?',
+  ]) {
+    assert.deepEqual(findIntentDrift({ sourceText, backTranslation }), ['commitment'], backTranslation);
+  }
+});
+
+test('L28 재현(2026-10-31) — 원문이 같은 끝맺음으로 부탁하면 경고 없음(새 끝맺음도 원문 요청 가드를 탄다)', () => {
+  for (const sourceText of [
+    '금요일까지 다시 공유해 주실 수 있으실까요?',
+    '금요일까지 다시 공유 부탁드려도 될까요?',
+    '금요일까지 다시 공유해 주실 수 있으신지요?',
+    '금요일까지 다시 공유해 주실 수 있을지요?',
+  ]) {
+    assert.deepEqual(
+      findIntentDrift({ sourceText, backTranslation: '금요일까지 다시 공유해 주실 수 있나요?' }),
+      [],
+      sourceText,
+    );
+  }
+});

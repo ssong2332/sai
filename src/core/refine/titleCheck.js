@@ -172,7 +172,7 @@ export function findTitledReferences(sourceText) {
 }
 
 /** 용어집 항목이 원문 참조와 겹치는가(판정표 행 5 — 원문 쪽). */
-function referenceRegistered(reference, keys) {
+export function referenceRegistered(reference, keys) {
   const ref = squash(reference);
   const core = ref.replace(/님$/, '');
   return keys.some((key) => {
@@ -189,7 +189,7 @@ function producedRegistered(produced, values) {
 }
 
 /** 용어집 항목들에서 원문 쪽 비교값·출력 쪽 비교값을 모은다. */
-function collectGlossaryKeys(glossary, appliedGlossary) {
+export function collectGlossaryKeys(glossary, appliedGlossary) {
   const sourceKeys = [];
   const targetValues = [];
   const push = (list, value) => {
