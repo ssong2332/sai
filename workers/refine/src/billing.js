@@ -115,6 +115,8 @@ export async function applySubscriptionEvent(db, event) {
         subscriptionId: String(sub.id ?? ''),
         customerId: String(sub.customer_id ?? ''),
         periodEnd: String(sub.current_billing_period?.ends_at ?? ''),
+        // 해지 예약(기간 끝에 끝남) — 계정 삭제를 허용하는 조건(`functions/account.js`, 2026-11-01).
+        cancelScheduled: sub.scheduled_change?.action === 'cancel',
         eventAt: occurredAt,
         updatedAt: new Date(),
       },
