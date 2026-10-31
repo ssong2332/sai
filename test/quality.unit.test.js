@@ -59,3 +59,12 @@ test('🔴 2026-10-31 월 $100 예산 — 기본값은 빠른, 상위 모드 하
   assert.deepEqual({ ...PREMIUM_DAILY_LIMITS }, { standard: 10, deep: 3 });
   assert.deepEqual(Object.keys(QUALITY_DOWNGRADE_NOTES).sort(), ['budget', 'daily', 'plan', 'unavailable']);
 });
+
+test('TP5 팀 기본 모드 — 내가 고른 것이 우선, 안 골랐을 때만 팀 기본, 표 밖 값은 기본값', async () => {
+  const { effectiveQuality } = await import('../src/core/refine/quality.js');
+  assert.equal(effectiveQuality(null, 'deep'), 'deep');
+  assert.equal(effectiveQuality(undefined, 'standard'), 'standard');
+  assert.equal(effectiveQuality('fast', 'deep'), 'fast', '내가 고르면 내 것');
+  assert.equal(effectiveQuality(null, null), DEFAULT_QUALITY);
+  assert.equal(effectiveQuality(null, 'claude-opus-5-5'), DEFAULT_QUALITY, '🔴 팀 값도 표 밖이면 기본값');
+});

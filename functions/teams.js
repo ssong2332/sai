@@ -16,6 +16,7 @@
  *    이 제품이 만들지 않기로 한 종류의 데이터다. 인증은 **쓸 자격 확인용으로만** 쓰고 버린다.
  */
 
+import { QUALITY_IDS } from '../src/core/refine/quality.js';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 // 🔴 `functions/package.json`은 `"type": "module"`이다 — `require`는 여기서 죽는다.
@@ -316,7 +317,20 @@ export async function listMembers(req, deps) {
   await requireOwner(db, teamId, uid);
 
   const snap = await db.collection('teams').doc(teamId).collection('members').get();
+  const team = await db.collection('teams').doc(teamId).get();
+  const billing = team.exists ? team.get('billing') ?? null : null;
   return {
+    // 팀 요금제 현황(2026-11-01) — 팀장 화면의 좌석 표시용. 결제 식별자는 싣지 않는다.
+    billing: billing
+      ? {
+          status: String(billing.status ?? ''),
+          seats: Number(billing.seats ?? 0),
+          used: snap.docs.length,
+          interval: String(billing.interval ?? ''),
+          cancelScheduled: billing.cancelScheduled === true,
+        }
+      : null,
+    defaultQuality: team.exists ? team.get('defaultQuality') ?? null : null,
     members: snap.docs.map((doc) => ({
       uid: doc.id,
       role: doc.get('role') ?? 'member',
@@ -361,6 +375,28 @@ export async function setMemberPermission(req, deps) {
  * 🔴 로컬(`chrome.storage`)의 값은 **참가 시점의 스냅샷**이라, 팀장이 나중에 권한을 바꿔도
  *    모른다. 대시보드를 열기 전에 서버에 다시 물어야 "권한이 없는데 열리는" 상태가 안 생긴다.
  */
+/** 팀 기본 품질 모드 — 표에 있는 이름만, 없으면 null. */
+const teamDefaultQuality = (team) => {
+  const value = team.exists ? team.get('defaultQuality') : null;
+  return QUALITY_IDS.includes(value) ? value : null;
+};
+
+/**
+ * 팀 기본 품질 모드를 정한다 (팀장 전용, 2026-11-01 사용자 결정 「팀원이 안 고른 때만」).
+ * `quality: null`이면 지운다. 🔴 모델이 아니라 모드 이름만 — 모델은 Worker 표가 정한다.
+ */
+export async function setDefaultQuality(req, deps) {
+  const uid = await requireUid(req, deps);
+  const teamId = String(req.body?.teamId ?? '').trim();
+  if (teamId === '') throw new TeamError(400, 'no-team');
+  const quality = req.body?.quality ?? null;
+  if (quality !== null && !QUALITY_IDS.includes(quality)) throw new TeamError(400, 'bad-request');
+  const db = deps.db();
+  await requireOwner(db, teamId, uid);
+  await db.collection('teams').doc(teamId).set({ defaultQuality: quality }, { merge: true });
+  return { defaultQuality: quality };
+}
+
 /** 팀 문서의 이름 — 없으면 null(클라이언트는 옛 이름을 유지한다). */
 const teamName = (team) => (team.exists && typeof team.get('name') === 'string' ? team.get('name') : null);
 
@@ -391,10 +427,12 @@ export async function whoAmI(req, deps) {
       { role: 'owner', canViewDashboard: true },
       { merge: true },
     );
-    return { role: 'owner', canViewDashboard: true, repaired: true, name: teamName(team) };
+    return { role: 'owner', canViewDashboard: true, repaired: true, name: teamName(team), defaultQuality: teamDefaultQuality(team) };
   }
 
   return {
+    // 팀 기본 품질 모드(2026-11-01) — 품질을 한 번도 안 고른 팀원에게만 적용(확장 refineClient).
+    defaultQuality: teamDefaultQuality(team),
     role,
     // 🔴 2026-10-26 L18 4-7 — 팀장이 이름을 바꿔도 팀원 화면은 참가 때 이름 그대로였다. 패널을 열 때 부르는 이 응답에 싣는다.
     name: teamName(team),
@@ -577,6 +615,7 @@ export const TEAM_ACTIONS = {
   transfer: transferOwnership,
   reinvite: regenerateInvite,
   rename: renameTeam,
+  defaultQuality: setDefaultQuality,
 };
 
 /** 기본 의존성. 테스트는 이 셋을 전부 대체해 네트워크 없이 돈다. */

@@ -83,3 +83,24 @@ test('TP4 — 유료 출시 뒤 미결제 팀(유예 끝·출시 뒤 생성)은 
   const graceEnv = { ...TEST_ENV, BILLING_ENFORCED: '1', BILLING_ENFORCED_AT: new Date(Date.now() - DAY).toISOString() };
   assert.equal((await call(bToken, { action: 'join', inviteCode }, graceEnv)).status, 200);
 });
+
+test('TP5·현황 — 팀장만 팀 기본 모드를 정하고, me에 실리며, 팀원 목록에 좌석 현황(식별자 없음)', async () => {
+  const { db, call } = setup();
+  const { teamId, inviteCode } = (await call(ownerToken, { action: 'create', name: '모드 팀' })).body;
+  await call(aToken, { action: 'join', inviteCode });
+
+  const denied = await call(aToken, { action: 'defaultQuality', teamId, quality: 'deep' });
+  assert.equal(denied.status, 403, '팀원은 못 정한다');
+  assert.equal((await call(ownerToken, { action: 'defaultQuality', teamId, quality: 'claude-opus-5-5' })).status, 400, '표 밖 값 거절');
+  assert.deepEqual((await call(ownerToken, { action: 'defaultQuality', teamId, quality: 'standard' })).body, { defaultQuality: 'standard' });
+  assert.equal((await call(aToken, { action: 'me', teamId })).body.defaultQuality, 'standard');
+
+  await db.collection('teams').doc(teamId).set({ billing: { status: 'active', seats: 5, interval: 'year', subscriptionId: 'sub_secret', customerId: 'ctm_secret' } }, { merge: true });
+  const list = (await call(ownerToken, { action: 'members', teamId })).body;
+  assert.deepEqual(list.billing, { status: 'active', seats: 5, used: 2, interval: 'year', cancelScheduled: false });
+  assert.equal(list.defaultQuality, 'standard');
+  assert.equal(JSON.stringify(list).includes('secret'), false, '🔴 결제 식별자는 싣지 않는다');
+
+  assert.deepEqual((await call(ownerToken, { action: 'defaultQuality', teamId, quality: null })).body, { defaultQuality: null });
+  assert.equal((await call(aToken, { action: 'me', teamId })).body.defaultQuality, null);
+});

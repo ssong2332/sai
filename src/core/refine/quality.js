@@ -48,6 +48,14 @@ export function resolveQuality(value) {
 }
 
 /**
+ * 요청에 실을 모드 — 내가 고른 것 → (안 골랐으면) 팀 기본 모드 → 기본값(2026-11-01 사용자 결정 「팀원이 안 고른 때만」).
+ * `mine`이 null/undefined면 「한 번도 안 고름」이다(저장값 없음).
+ */
+export function effectiveQuality(mine, teamDefault = null) {
+  return resolveQuality(mine ?? teamDefault ?? null);
+}
+
+/**
  * 한 provider 단계에 얹을 값. 🔴 anthropic 단계만 — 폴오버로 groq 등이 답하면 빈 객체(그 provider 기본값).
  * @returns {{model?: string, thinking?: string, effort?: string, timeoutMs?: number}}
  */

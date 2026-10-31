@@ -38,6 +38,9 @@ export const TEAM_ERRORS = {
   // L22 — 팀 나가기·계정 삭제 (`functions/account.js` 판정표).
   OWNER_MUST_TRANSFER: 'owner-must-transfer',
   SUBSCRIPTION_ACTIVE: 'subscription-active', // 2026-11-01 — 구독 중 계정 삭제 차단
+  // 팀 요금제(2026-11-01, `functions/teams.js` judgeTeamJoin)
+  TEAM_FULL: 'team-full',
+  TEAM_PLAN_REQUIRED: 'team-plan-required',
   NOT_CONFIRMED: 'not-confirmed',
   NETWORK: 'network-failed',
   UNKNOWN: 'unknown',
@@ -79,6 +82,11 @@ export function teamErrorMessage(reason, detail = '') {
     case TEAM_ERRORS.OWNER_MUST_TRANSFER:
       // 🔴 막는 이유와 할 일을 같이 말한다 — 팀장이 사라진 팀이 남으면 아무도 관리할 수 없다.
       return '다른 팀원이 있는 팀의 팀장이에요 — 먼저 「팀 관리」에서 팀장을 넘겨 주세요';
+    case TEAM_ERRORS.TEAM_FULL:
+      // 🔴 막는 이유와 할 일 — 좌석은 팀장이 늘린다(자동 추가 청구 없음).
+      return '이 팀의 좌석이 모두 찼어요 — 팀장에게 좌석 추가를 요청해 주세요';
+    case TEAM_ERRORS.TEAM_PLAN_REQUIRED:
+      return '이 팀은 팀 요금제가 필요해요 — 팀장이 팀 요금제를 구매하면 참가할 수 있어요';
     case TEAM_ERRORS.SUBSCRIPTION_ACTIVE:
       // 🔴 막는 이유와 할 일 — 결제가 계속 나가는데 계정만 사라지면 안 된다.
       return '사용 중인 Pro 구독이 있어요 — 결제 영수증 메일의 Paddle 링크(paddle.net)에서 먼저 구독을 해지해 주세요. 해지 예약이 되면 계정을 지울 수 있어요';
@@ -329,6 +337,8 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
           name: typeof me.name === 'string' && me.name.trim() !== '' ? me.name : team.name,
           role: me.role ?? team.role,
           canViewDashboard: me.role === 'owner' || me.canViewDashboard === true,
+          // 팀 기본 품질 모드(2026-11-01) — 품질을 안 고른 팀원에게만(refineClient).
+          defaultQuality: typeof me.defaultQuality === 'string' ? me.defaultQuality : null,
         };
       } catch (error) {
         // 🔴 서버가 「팀원이 아님」을 확정한 경우만 뺀다 — 네트워크·권한·알 수 없는 오류는 옛 값 유지.
@@ -353,11 +363,36 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
     (next, index) =>
       next.name !== teams[index].name ||
       next.role !== teams[index].role ||
-      next.canViewDashboard !== teams[index].canViewDashboard,
+      next.canViewDashboard !== teams[index].canViewDashboard ||
+      (next.defaultQuality ?? null) !== (teams[index].defaultQuality ?? null),
   );
   // 🔴 순서·활성 팀을 건드리지 않는다 — `upsertTeam`을 쓰지 않는 이유가 이것이다.
   if (changed) await setLocal(STORAGE_KEYS.TEAMS, results);
   return { teams: results, changed };
+}
+
+/**
+ * 팀원 목록 + 팀 요금제 현황 + 팀 기본 모드 (팀장 전용, 2026-11-01).
+ * @returns {Promise<{members: Array, billing: null|{status, seats, used, interval, cancelScheduled}, defaultQuality: string|null}>}
+ */
+export async function getTeamManagement({ fetchImpl = globalThis.fetch } = {}) {
+  const team = await getTeam();
+  if (!team) throw new TeamClientError(TEAM_ERRORS.NO_TEAM);
+  const result = await callTeamApi('members', { teamId: team.teamId }, fetchImpl);
+  return {
+    members: Array.isArray(result?.members) ? result.members : [],
+    billing: result?.billing ?? null,
+    defaultQuality: typeof result?.defaultQuality === 'string' ? result.defaultQuality : null,
+  };
+}
+
+/** 팀 기본 품질 모드를 정한다(팀장 전용). `null`이면 지운다. */
+export async function setTeamDefaultQuality(quality, { fetchImpl = globalThis.fetch } = {}) {
+  const team = await getTeam();
+  if (!team) throw new TeamClientError(TEAM_ERRORS.NO_TEAM);
+  const result = await callTeamApi('defaultQuality', { teamId: team.teamId, quality }, fetchImpl);
+  await upsertTeam({ ...team, defaultQuality: result.defaultQuality ?? null });
+  return result.defaultQuality ?? null;
 }
 
 /** 팀원 목록 (팀장 전용). */

@@ -3,6 +3,8 @@ import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
 import { FEATURES } from '../config.js';
+import { BillingClientError, billingErrorText, startCheckout } from '../lib/billingClient.js';
+import { QUALITY_IDS, QUALITY_LABELS } from '../core/refine/quality.js';
 import { dashboardPageUrl } from '../lib/dashboardPage.js';
 import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
 import {
@@ -112,7 +114,8 @@ import {
   removeTeamGlossaryEntry,
   uploadFriction,
   refreshAllMemberships,
-  listTeamMembers,
+  getTeamManagement,
+  setTeamDefaultQuality,
   setMemberDashboardAccess,
   removeTeamMember,
   transferOwnership,
@@ -1941,8 +1944,107 @@ const EMPTY_DRAFT = { sourceText: '', targetText: '', keepSource: false, languag
  * 🔴 **기본은 「못 봄」이다.** 대시보드는 팀 전체의 마찰이 보이는 화면이라, 참가하면 자동으로
  *    열리는 쪽이 아니라 팀장이 열어 주는 쪽이 기본이어야 한다.
  */
+/** 구독 상태 → 한 줄(팀장 화면). 결제 식별자는 서버가 싣지 않는다. */
+function teamPlanLine(billing) {
+  if (!billing) return '팀 요금제를 아직 쓰지 않아요.';
+  const paid = ['active', 'trialing', 'past_due'].includes(billing.status);
+  if (!paid) return '팀 요금제가 끝났어요 — 다시 구매하면 좌석이 열려요.';
+  const cycle = billing.interval === 'year' ? '연 결제' : '월 결제';
+  const end = billing.cancelScheduled ? ' · 해지 예약됨(기간 끝까지 사용)' : '';
+  return `팀 요금제 사용 중 · ${cycle} · 좌석 ${billing.used}/${billing.seats}${end}`;
+}
+
+/**
+ * 팀 요금제 — 현황(항상)·구매(🔴 `FEATURES.billing`일 때만) · 팀 기본 품질 모드 (2026-11-01, `docs/BillingDesign.md` 8절).
+ * 🔴 좌석은 팀장이 정한다 — 팀원이 늘어도 자동 추가 청구 없음. 최소 2석, 지금 팀원 수 이상(서버도 같은 판정).
+ */
+function TeamPlanSection({ team, plan, onToast, onChanged }) {
+  const minSeats = Math.max(2, plan.members.length);
+  const [seats, setSeats] = useState(minSeats);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const buy = async (interval) => {
+    setBusy(interval);
+    setError('');
+    try {
+      const url = await startCheckout(interval, { plan: 'team', teamId: team.teamId, seats: Number(seats) });
+      window.open(url, '_blank', 'noopener');
+    } catch (e) {
+      setError(billingErrorText(e instanceof BillingClientError ? e.reason : 'unknown'));
+    } finally {
+      setBusy('');
+    }
+  };
+  const pickDefault = async (quality) => {
+    setBusy('quality');
+    setError('');
+    try {
+      await setTeamDefaultQuality(quality);
+      onToast(quality ? `팀 기본 모드를 「${QUALITY_LABELS[quality]}」로 정했어요` : '팀 기본 모드를 지웠어요');
+      await onChanged?.();
+    } catch (e) {
+      setError(teamErrorMessage(e?.reason, e?.detail));
+    } finally {
+      setBusy('');
+    }
+  };
+  return (
+    <div className="card card-accent">
+      <p className="card-label">팀 요금제</p>
+      <p className="meta">{teamPlanLine(plan.billing)}</p>
+      {FEATURES.billing && (
+        <>
+          <p className="field-label">좌석 수 (1석당 연 $96 · 월 $10)</p>
+          <div className="github-suggest-form">
+            <input
+              className="form-input"
+              type="number"
+              min={minSeats}
+              max={100}
+              value={seats}
+              onChange={(event) => setSeats(event.target.value)}
+              aria-label="좌석 수"
+            />
+          </div>
+          <p className="meta">최소 {minSeats}석(2석 이상, 지금 팀원 수 이상). 좌석이 차면 새 팀원은 들어올 수 없어요.</p>
+          <div className="form-actions">
+            <button type="button" className="button" disabled={busy !== ''} onClick={() => buy('year')}>
+              {busy === 'year' ? '여는 중…' : '연 결제로 구매'}
+            </button>
+            <button type="button" className="button button-quiet" disabled={busy !== ''} onClick={() => buy('month')}>
+              {busy === 'month' ? '여는 중…' : '월 결제로 구매'}
+            </button>
+          </div>
+        </>
+      )}
+      <p className="field-label">팀 기본 품질 모드</p>
+      <div className="tag-row">
+        {QUALITY_IDS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            className={plan.defaultQuality === id ? 'chip chip-on' : 'chip'}
+            aria-pressed={plan.defaultQuality === id}
+            disabled={busy !== ''}
+            onClick={() => pickDefault(plan.defaultQuality === id ? null : id)}
+          >
+            {QUALITY_LABELS[id]}
+          </button>
+        ))}
+      </div>
+      <p className="meta">품질 모드를 직접 고른 적 없는 팀원에게만 적용돼요. 다시 누르면 지워요.</p>
+      {error && (
+        <p className="meta" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TeamMembersCard({ team, onToast, onChanged }) {
   const [members, setMembers] = useState(null);
+  const [plan, setPlan] = useState(null); // {members, billing, defaultQuality} — 2026-11-01
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [note, setNote] = useState('');
@@ -1952,7 +2054,9 @@ function TeamMembersCard({ team, onToast, onChanged }) {
 
   const load = async () => {
     try {
-      setMembers(await listTeamMembers());
+      const result = await getTeamManagement();
+      setMembers(result.members);
+      setPlan(result);
       setNote('');
     } catch (error) {
       setNote(teamErrorMessage(error?.reason, error?.detail));
@@ -2089,6 +2193,8 @@ function TeamMembersCard({ team, onToast, onChanged }) {
           초대 코드 새로 발급
         </button>
       )}
+
+      {open && plan && <TeamPlanSection team={team} plan={plan} onToast={onToast} onChanged={load} />}
 
       {open && (
         <>

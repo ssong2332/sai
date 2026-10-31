@@ -10,7 +10,7 @@
 import { REFINE_ENDPOINT } from '../config.js';
 import { listPersonalGlossary, toRefinePayloadGlossary } from '../lib/glossary.js';
 // Spec §3 — 팀 용어집. 🔴 팀이 없으면 빈 배열이라 아무것도 달라지지 않는다.
-import { listTeamGlossary, toRefinePayloadTeamGlossary } from '../lib/teamClient.js';
+import { getTeam, listTeamGlossary, toRefinePayloadTeamGlossary } from '../lib/teamClient.js';
 import { buildProfileForRefine } from '../lib/profile.js';
 import {
   getSelectedRecipient,
@@ -19,7 +19,7 @@ import {
 } from '../lib/recipients.js';
 import { buildCasualToneBlock } from '../core/meme/index.js';
 import { getLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
-import { resolveQuality } from '../core/refine/quality.js';
+import { effectiveQuality } from '../core/refine/quality.js';
 import { getOnboarding, languagePairFrom } from '../lib/onboarding.js';
 import { detectLanguage } from '../lib/detectLanguage.js';
 import { hasAppliedTeamGlossary } from '../lib/friction.js';
@@ -133,7 +133,9 @@ export async function requestRefine(request) {
     : [];
 
   // 2026-10-30 품질 모드 — 이름만 싣는다(모델은 서버 표). 호출자가 넘기면(「심층으로 다시」) 그 값이 이긴다.
-  const quality = resolveQuality(await getLocal(STORAGE_KEYS.QUALITY, null));
+  // 🔴 2026-11-01 팀 기본 모드 — 내가 품질을 한 번도 안 골랐을 때(저장값 없음)만 팀장이 정한 모드. 고르면 내 것.
+  const myQuality = await getLocal(STORAGE_KEYS.QUALITY, null);
+  const quality = effectiveQuality(myQuality, myQuality ? null : (await getTeam().catch(() => null))?.defaultQuality ?? null);
 
   const payload = {
     sourceLanguage: pair.sourceLanguage,
