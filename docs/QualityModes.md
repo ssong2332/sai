@@ -86,7 +86,34 @@
 | 빠른 모드로 다듬기 성공 · 「빠른 모드」 표시 | ✔ 2026-10-30 — 사용자가 설정에서 「빠른」 선택 → 같은 무대 문장 다듬기 성공("If it slips to Thursday, our test schedule gets tight…"), 팝업 아래 「… · 빠른 모드」 |
 | 심층 모드로 다듬기 성공 · 「심층 모드」 표시 | ✔ 2026-10-30 — 사용자가 「심층」 선택 → 같은 무대 문장 다듬기 성공("A slip to Thursday would tighten our test schedule…"), 팝업 아래 「… · 심층 모드」 |
 
+## 5. 월 $100 예산 — 기본값 빠른 + 상위 모드 허용량 (2026-10-31 사용자 결정 「추천안으로 진행」)
+전제: Claude API 비용은 월 $100 안. 모두 기본(Sonnet)·하루 100회면 매일 끝까지 쓰는 2명이 $100을 다 쓴다(1인 월 약 $47).
+
+| 항목 | 값 | 원본 |
+|---|---|---|
+| 기본값(없음·모르는 값·옛 확장) | **빠른** | `src/core/refine/quality.js` `DEFAULT_QUALITY` |
+| 1인 하루 상위 모드 | 기본 10 · 심층 3 — 넘으면 **빠른으로 다듬는다**(거절 아님), 응답 `qualityDowngrade:'daily'` | 같은 파일 `PREMIUM_DAILY_LIMITS` |
+| 이달(서울) 추정 비용 안전장치 | ≥ $90이면 기본·심층 → 빠른, `qualityDowngrade:'budget'` | `workers/refine/src/qualityAllowance.js` |
+| 추정 방법 | 받은 요청마다 그 모드 건당 실측값(빠른 $0.00075 · 기본 $0.0157 · 심층 $0.0382 · 그 밖 $0.0007)을 더함 — 캐시·실패도 셈(넘치게) | 같은 파일 |
+| 카운터 장애 | 다듬기는 계속, 상위 모드는 빠른(`unavailable`) | `handler.js` ⑥ |
+| 저장 | `refineQuota/{uid}_{날짜}.premium.*` · `budgetMonthly/{YYYY-MM}.micros`(uid 없음) — 본문·모델명 없음. 요청당 Firestore 쓰기 +1 | `usageStore.js` |
+| 마지막 방어선 | Anthropic 콘솔 지출 한도 **$100**(사용자 몫) — 넘으면 Claude가 거절, 폴오버로 Groq | — |
+
+### 5-1. 평가 기준 (구현 전 확정)
+| # | 기준 | 결과 | 근거 |
+|---|---|---|---|
+| B1 | 기본값 빠른 | ✔ | `workers/refine/test/qualityAllowance.test.js` B1 · `test/quality.unit.test.js` |
+| B2 | 기본 11번째·심층 4번째 → 빠른 + `daily`, 비싼 모델 안 부름 | ✔ | 같은 파일 B2 |
+| B3 | 이달 ≥ $90 → 상위 모드 빠른 + `budget`, 빠른·뜻 풀기 그대로 | ✔ | 같은 파일 B3(메모리·Firestore) |
+| B4 | 요청마다 추정치 누적, 달 경계 서울 | ✔ | 같은 파일 B4 |
+| B5 | 저장소·로그에 본문·모델명·uid(로그) 없음 | ✔ | 같은 파일 B4·B5 |
+| B6 | 카운터 장애 → 다듬기 계속, 상위 모드 빠른 | ✔ | 같은 파일 B6 |
+| B7 | 기존 동작(하루 100 상한 429·폴오버·quality 응답) 그대로 | ✔ | Worker 테스트 120/120 |
+| C1 | 확장: 설정 기본 칩 빠른·안내에 하루 횟수, 강등 시 팝업 문구, 0.1.58 | 🟡 단위 테스트 ✔ · 실확장은 배포 뒤 | `test/settingsPage.unit.test.js` · `npm test` 1156/1156 |
+| T1 | `npm test` · Worker 테스트 · `check:bundle` · `build` · site | ✔ | 1156/1156 · 120/120 · SDK 없음 · 빌드 0.1.58 · site 11/11 |
+| T2 | workerd `dev:mock`에서 강등 재현 | ✘ 미확인 | 2026-10-31 health 요청이 2회 시간 초과(이전 세션이 남긴 `wrangler dev` 정리 후에도) — 원인 미상, 2회 실패로 중단 |
+
 ## 4. 남은 것
 - 🟡 요금제별로 어느 모드를 열지(유료 출시 때) — Spec §0의 옛 「기본/정밀」·정밀 50회는 이 표 이전 기록.
-- 🟡 기본 모드가 Haiku → Sonnet이 되면서 건당 비용이 약 20배($0.0008 → $0.016). 사용자 결정(「비용은 지금 괜찮다」)에 따른 것. Anthropic 지출 한도(L16)를 같이 본다.
+- ~~기본 모드가 Haiku → Sonnet이 되면서 건당 비용 약 20배~~ → 2026-10-31 기본값을 빠른으로 되돌리고 5절 허용량을 둔다(월 $100).
 - 뜻 풀기·회신·결정 요약은 이번 범위 밖 — Haiku 5.5 사고 끔 그대로.
