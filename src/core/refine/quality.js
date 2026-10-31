@@ -3,7 +3,8 @@
  *
  * 🔴 **모델은 사용자가 고르지 않는다.** 확장은 모드 **이름**만 보내고, 모델·사고·effort는 서버가 이 표에서만
  *    정한다(Spec §0). 확장이 모델을 실으면 요청 조작으로 아무 모델이나 부를 수 있고 폴오버도 꺼진다.
- * 🔴 표 밖 값·없음은 `DEFAULT_QUALITY` — 옛 확장(이 필드를 모름)도 기본 모드로 다듬는다.
+ * 🔴 표 밖 값·없음은 `DEFAULT_QUALITY`(2026-10-31부터 **빠른** — 월 $100 예산, 사용자 결정). 옛 확장(이 필드를 모름)도 빠른으로 다듬는다.
+ * 🔴 기본·심층은 Worker가 1인 하루 횟수와 이달 추정 비용으로 빠른까지 낮출 수 있다 — `workers/refine/src/qualityAllowance.js`.
  * 🔴 anthropic 단계에만 적용한다. 폴오버로 다른 provider가 답하면 그 provider 기본값을 쓴다.
  *
  * | 모드 | 모델 | 사고 | effort | provider 제한 시간 | 회귀 21건 `--quality` 3회 평균 · 응답 중앙값/p90 · 건당 (2026-10-30 실측) |
@@ -25,7 +26,20 @@ export const QUALITY_MODES = {
 export const QUALITY_IDS = Object.keys(QUALITY_MODES);
 /** 화면 이름 — 설정 칩·팝업 표시가 같은 말을 쓴다. */
 export const QUALITY_LABELS = { fast: '빠른', standard: '기본', deep: '심층' };
-export const DEFAULT_QUALITY = 'standard';
+export const DEFAULT_QUALITY = 'fast';
+
+/**
+ * 1인 하루 상위 모드 횟수(2026-10-31 사용자 결정 — 월 $100 예산). 넘으면 Worker가 빠른 모드로 다듬는다(거절 아님).
+ * 판정은 Worker `qualityAllowance.js` — 설정 안내 문구도 이 숫자를 읽는다.
+ */
+export const PREMIUM_DAILY_LIMITS = Object.freeze({ standard: 10, deep: 3 });
+
+/** 서버가 모드를 낮췄을 때 팝업에 붙이는 말(응답 `qualityDowngrade`). 모르는 사유는 표시하지 않는다. */
+export const QUALITY_DOWNGRADE_NOTES = Object.freeze({
+  daily: '오늘 쓸 수 있는 횟수를 다 써서 빠른 모드로 다듬었어요',
+  budget: '이번 달은 빠른 모드로 다듬어요',
+  unavailable: '잠시 빠른 모드로 다듬었어요',
+});
 
 /** 표에 있는 이름이면 그 이름, 아니면 기본 모드. */
 export function resolveQuality(value) {

@@ -52,3 +52,10 @@ test('설정 저장값 — 품질 모드는 표의 이름만 받고 나머지는
   assert.equal(coerceDisplayValue('quality', 'deep'), 'deep');
   assert.equal(coerceDisplayValue('quality', 'claude-opus-5-5'), DEFAULT_QUALITY);
 });
+
+test('🔴 2026-10-31 월 $100 예산 — 기본값은 빠른, 상위 모드 하루 기본 10·심층 3, 낮춤 문구는 세 사유', async () => {
+  const { PREMIUM_DAILY_LIMITS, QUALITY_DOWNGRADE_NOTES } = await import('../src/core/refine/quality.js');
+  assert.equal(DEFAULT_QUALITY, 'fast');
+  assert.deepEqual({ ...PREMIUM_DAILY_LIMITS }, { standard: 10, deep: 3 });
+  assert.deepEqual(Object.keys(QUALITY_DOWNGRADE_NOTES).sort(), ['budget', 'daily', 'unavailable']);
+});

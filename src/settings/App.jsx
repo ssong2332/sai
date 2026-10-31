@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 import { writeDisplaySetting } from '../lib/displaySettings.js';
-import { QUALITY_LABELS } from '../core/refine/quality.js';
+import { PREMIUM_DAILY_LIMITS, QUALITY_LABELS } from '../core/refine/quality.js';
 import { setOnboardingFields, setProfileSyncingTone, MY_LANGUAGES, PARTNER_REGIONS, DEFAULT_TONES } from '../lib/onboarding.js';
 import { removeLearnedPattern, clearLearnedPatterns, SITUATION_TEMPLATES } from '../lib/profile.js';
 import { setIdentity, MAX_IDENTITY_FIELD } from '../lib/identity.js';
@@ -199,9 +199,17 @@ function TextRow({ label, hint, value, onSave, placeholder, maxLength }) {
 
 /** 다듬기 품질 모드 — 이름만 고른다. 모델은 서버가 정한다(`core/refine/quality.js`, 2026-10-30). */
 const QUALITY_OPTIONS = [
-  { id: 'fast', label: QUALITY_LABELS.fast, hint: '보통 3초 안에 돌아와요. 짧은 메시지에 좋아요.' },
-  { id: 'standard', label: QUALITY_LABELS.standard, hint: '보통 4초 안팎이에요. 속도와 꼼꼼함의 균형이에요.' },
-  { id: 'deep', label: QUALITY_LABELS.deep, hint: '보통 10초쯤 걸리는 대신 가장 꼼꼼하게 다듬어요.' },
+  { id: 'fast', label: QUALITY_LABELS.fast, hint: '보통 3초 안에 돌아와요. 처음 설정이에요.' },
+  {
+    id: 'standard',
+    label: QUALITY_LABELS.standard,
+    hint: `보통 4초 안팎이에요. 하루 ${PREMIUM_DAILY_LIMITS.standard}번까지 쓰고, 넘으면 빠른 모드로 다듬어요.`,
+  },
+  {
+    id: 'deep',
+    label: QUALITY_LABELS.deep,
+    hint: `보통 10초쯤 걸리는 대신 가장 꼼꼼해요. 하루 ${PREMIUM_DAILY_LIMITS.deep}번까지 쓰고, 넘으면 빠른 모드로 다듬어요.`,
+  },
 ];
 
 function GeneralPanel({ data, act }) {

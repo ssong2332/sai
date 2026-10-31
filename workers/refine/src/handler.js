@@ -256,17 +256,33 @@ export function createHandler(deps = {}) {
     const modeName = resolveMode(body.mode);
     const mode = MODES[modeName];
 
-    // ⑥ 일일 상한 — 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**(저장소를 못 만들어도 noop으로 통과).
+    // 🔴 2026-10-30 품질 모드 — 다듬기(refine)만. 확장은 이름만 보내고 모델·사고·effort는 `quality.js` 표가 정한다.
+    //    모르는 값·없음은 기본값(빠른). 2026-10-31부터 아래 ⑥이 상위 모드를 빠른으로 낮출 수 있다(`qualityAllowance.js`).
+    let quality = modeName === 'refine' ? resolveQuality(body.quality) : null;
+    let downgrade = null;
+
+    // ⑥ 일일 상한 + 품질 모드 허용량 — 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**(저장소를 못 만들어도 noop으로 통과).
     const store = resolveStore(storeFor, env, logger);
     try {
-      const quota = await store.consumeDailyQuota(uid);
+      const quota = store.admit ? await store.admit(uid, { quality }) : await store.consumeDailyQuota(uid);
       if (!quota.ok) {
         logger.warn(`[refine] 일일 상한 초과 used=${quota.used} limit=${quota.limit}`);
         return json(429, { error: 'daily-limit', limit: quota.limit });
       }
+      if (quota.downgrade) {
+        quality = quota.quality;
+        downgrade = quota.downgrade;
+        // 🔴 사유 코드만 — uid·본문 없음.
+        logger.log(`[refine] 품질 모드 낮춤 → ${quality} reason=${downgrade}`);
+      }
       if (quota.used === 1) await safeMetric(logger, () => store.recordDailyUser(uid));
     } catch (error) {
       logger.error(`[refine] 상한 확인 실패 — 통과시킴: ${error?.code ?? error?.name ?? 'unknown'}`);
+      // 🔴 셀 수 없을 때 비싼 모드를 열어 두지 않는다 — 다듬기는 빠른 모드로(안전한 쪽, 2026-10-31).
+      if (quality && quality !== 'fast') {
+        quality = 'fast';
+        downgrade = 'unavailable';
+      }
     }
 
     // ⑦ provider — 위 판정표. 명시 요청은 대체하지 않는다.
@@ -277,9 +293,7 @@ export function createHandler(deps = {}) {
     }
 
     const thinking = thinkingSwitch(config.thinking);
-    // 🔴 2026-10-30 품질 모드 — 다듬기(refine)만. 확장은 이름만 보내고 모델·사고·effort는 `quality.js` 표가 정한다.
-    //    모르는 값·없음은 기본 모드. 사슬 단계 모델(stepModel)이 있으면 그 단계는 표를 쓰지 않는다.
-    const quality = modeName === 'refine' ? resolveQuality(body.quality) : null;
+    // 사슬 단계 모델(stepModel)이 있으면 그 단계는 품질 모드 표를 쓰지 않는다.
 
     /** 한 단계 호출. 🔴 `ANTHROPIC_MODEL`은 anthropic 단계에만 — 사슬 단계 모델이 있으면 그게 이긴다. */
     const runStep = ({ provider, apiKey }, stepModel) => {
@@ -343,7 +357,10 @@ export function createHandler(deps = {}) {
     }
 
     // 다듬기 응답에 실제로 쓴 품질 모드 이름을 붙인다(화면 표시용 — 모델명은 싣지 않는다).
-    if (quality && result && typeof result === 'object') result = { ...result, quality };
+    // 낮췄으면 사유도 붙인다(`budget`·`daily`·`unavailable` — 팝업 문구용).
+    if (quality && result && typeof result === 'object') {
+      result = { ...result, quality, ...(downgrade ? { qualityDowngrade: downgrade } : {}) };
+    }
 
     // ⑨ 지표 — 모드·성공 여부·사유 코드·시간뿐.
     await safeMetric(logger, () =>
