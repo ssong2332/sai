@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '../router.jsx';
-import { prefersReducedMotion, useCountUp, useInView, useReducedMotion, useScrollFrame } from '../motion.js';
-import { bandPercent, pickScene } from '../liveClock.js';
+import { prefersReducedMotion, useCountUp, useInView, useReducedMotion, useScrollFrame, useVisible } from '../motion.js';
+import { bandPercent, msToNextMinute, pickScene } from '../liveClock.js';
 import SaiMark from '../components/SaiMark.jsx';
 import Segmented from '../components/Segmented.jsx';
 
@@ -472,8 +472,12 @@ const FIXED_SCENE = {
   send: { minutes: 9 * 60, theirLabel: '오전 9:00', myLabel: '서울 새벽 1:00' },
 };
 
-/** 방문자의 지금 시각으로 장면을 고른다(`liveClock.js` 판정표) — 1분마다 다시. 🔴 시간대는 어디에도 보내지 않는다. */
-function useLiveScene() {
+/**
+ * 방문자의 지금 시각으로 장면을 고른다(`liveClock.js` 판정표). 🔴 시간대는 어디에도 보내지 않는다.
+ * 2026-10-31: **분 경계(:00초)마다** 다시 — 분이 바뀌는 순간 숫자가 바뀐다. 화면 밖(`active` false)이면 타이머를 멈추고,
+ * 다시 보이면 바로 한 번 읽는다.
+ */
+function useLiveScene(active) {
   const read = () => {
     try {
       return pickScene(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone) ?? FIXED_SCENE;
@@ -483,14 +487,23 @@ function useLiveScene() {
   };
   const [scene, setScene] = useState(read);
   useEffect(() => {
-    const id = setInterval(() => setScene(read()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+    if (!active) return undefined;
+    setScene(read());
+    let id;
+    const tick = () => {
+      setScene(read());
+      id = setTimeout(tick, msToNextMinute(Date.now()));
+    };
+    id = setTimeout(tick, msToNextMinute(Date.now()));
+    return () => clearTimeout(id);
+  }, [active]);
   return scene;
 }
 
 function NightSection() {
-  const scene = useLiveScene();
+  const liveRef = useRef(null);
+  const live = useVisible(liveRef);
+  const scene = useLiveScene(live);
   const { me, them, send } = scene;
   const schedule = scene.mode === 'schedule';
   const ref = useRef(null);
@@ -510,7 +523,8 @@ function NightSection() {
             <span className="thin">{schedule ? '퇴근했을지도 몰라요' : '한창 일하는 중이에요'}</span>
           </h2>
         </Reveal>
-        <div className="clocks" ref={clocksRef}>
+        {/* 🔴 화면에 보일 때만 `live` — 콜론 깜빡임·분 갱신이 화면 밖에서 돌지 않게. */}
+        <div className={`clocks${live ? ' live' : ''}`} ref={(el) => { clocksRef.current = el; liveRef.current = el; }}>
           <Reveal className="clock me" delay={1}>
             <p className="city">나 · {me.city}</p>
             <p className="time num">

@@ -140,6 +140,11 @@ export function pickScene(now, myTimeZone) {
   };
 }
 
+/** 다음 분 경계(:00초)까지 남은 ms — 시계가 분이 바뀌는 그 순간에 바뀌게(2026-10-31). 0이 되지 않게 최소 1ms. */
+export function msToNextMinute(nowMs) {
+  return 60_000 - (((nowMs % 60_000) + 60_000) % 60_000) || 60_000;
+}
+
 /** 하루 띠 위 위치(%). */
 export function bandPercent(minutes) {
   return `${((((minutes % DAY) + DAY) % DAY) / DAY) * 100}%`;
