@@ -23,6 +23,9 @@ export const DEPLOYED_ENDPOINT = `${WORKER_ORIGIN}/v1/refine`;
  */
 export const TEAM_ENDPOINT = `${WORKER_ORIGIN}/v1/team`;
 
+/** 결제 시작(Paddle 거래 생성, 2026-10-31 `docs/BillingDesign.md`) — 같은 오리진이라 권한 추가 없음. */
+export const BILLING_CHECKOUT_ENDPOINT = `${WORKER_ORIGIN}/v1/billing/checkout`;
+
 /** 오프라인 로컬 개발용. `npm run proxy`가 이 주소로 뜬다. */
 export const LOCAL_PROXY_ENDPOINT = 'http://127.0.0.1:8787/v1/refine';
 
@@ -170,6 +173,13 @@ export const FEATURES = {
    *    다시 켤 조건: 구글 OAuth 검증 통과 + 처리방침에 캘린더 항목 추가.
    */
   calendar: false,
+  /**
+   * 🔴 **결제(「Pro로 업그레이드」) — 실판매 전까지 끈다** (2026-10-31, `docs/BillingDesign.md`).
+   *    Worker는 지금 Paddle **샌드박스**에 연결돼 있다 — 켜진 공개 빌드에서 누르면 실제 사용자가 테스트 결제창으로 간다.
+   *    샌드박스 실결제 확인(P7)은 이 값만 true로 바꾼 로컬 빌드로 한다(🔴 그 변경은 커밋하지 않는다).
+   *    다시 켤 조건: 실판매 전환(Paddle 도메인 승인 · `PADDLE_ENV=live` · 실판매 가격 ID·토큰) — 사용자 승인.
+   */
+  billing: false,
 };
 
 /**

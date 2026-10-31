@@ -39,6 +39,7 @@ export const QUALITY_DOWNGRADE_NOTES = Object.freeze({
   daily: '오늘 쓸 수 있는 횟수를 다 써서 빠른 모드로 다듬었어요',
   budget: '이번 달은 빠른 모드로 다듬어요',
   unavailable: '잠시 빠른 모드로 다듬었어요',
+  plan: '무료 요금제는 빠른 모드로 다듬어요 — 기본·심층은 Pro에서 쓸 수 있어요', // 2026-10-31 결제(`BILLING_ENFORCED`)
 });
 
 /** 표에 있는 이름이면 그 이름, 아니면 기본 모드. */
