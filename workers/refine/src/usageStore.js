@@ -40,6 +40,9 @@ export function createNoopUsageStore() {
     async admit(_uid, { quality = null } = {}) {
       return { ok: true, used: null, limit: null, quality, downgrade: null };
     },
+    async getBilling() {
+      return null;
+    },
     async recordDailyUser() {},
     async recordRequest() {},
   };
@@ -58,6 +61,7 @@ export function createMemoryUsageStore({
   const counts = new Map();
   const premium = new Map(); // `${날짜}:${uid}:${모드}` → 횟수
   const budget = new Map(); // 달 → 추정 비용(백만분의 1달러)
+  const billing = new Map(); // uid → billing 문서(테스트가 setBilling으로 넣는다)
   const requests = [];
   const dailyUsers = new Set();
   return {
@@ -71,20 +75,27 @@ export function createMemoryUsageStore({
       counts.set(key, used);
       return { ok: true, used, limit };
     },
-    async admit(uid, { quality = null } = {}) {
+    async admit(uid, { quality = null, limits = null } = {}) {
       const key = `${today()}:${uid}`;
       const used = (counts.get(key) ?? 0) + 1;
-      if (used > limit) return { ok: false, used: used - 1, limit };
+      const dailyLimit = limits?.daily ?? limit;
+      if (used > dailyLimit) return { ok: false, used: used - 1, limit: dailyLimit };
       const m = month();
       const monthMicros = budget.get(m) ?? startMicros;
       const premiumUsed = quality ? { [quality]: premium.get(`${key}:${quality}`) ?? 0 } : {};
-      const decided = decideQuality({ requested: quality, premiumUsed, monthMicros });
+      const decided = decideQuality({ requested: quality, premiumUsed, monthMicros, ...(limits ? { limits } : {}) });
       counts.set(key, used);
       if (decided.quality && !decided.downgrade && decided.quality !== 'fast') {
         premium.set(`${key}:${decided.quality}`, (premiumUsed[decided.quality] ?? 0) + 1);
       }
       budget.set(m, monthMicros + costMicros(decided.quality));
-      return { ok: true, used, limit, ...decided };
+      return { ok: true, used, limit: dailyLimit, ...decided };
+    },
+    async getBilling(uid) {
+      return billing.get(uid) ?? null;
+    },
+    setBilling(uid, doc) {
+      billing.set(uid, doc);
     },
     monthMicros: () => budget.get(month()) ?? startMicros,
     async recordDailyUser(uid) {
@@ -104,7 +115,13 @@ export function createFirestoreUsageStore({ db, limit = DAILY_REFINE_LIMIT, now 
   return {
     kind: 'firestore',
     consumeDailyQuota: (uid) => consumeDailyQuota(db, { uid, limit, now: now() }),
-    admit: (uid, { quality = null } = {}) => admitFirestore(db, { uid, quality, limit, now: now() }),
+    admit: (uid, { quality = null, limits = null } = {}) =>
+      admitFirestore(db, { uid, quality, limit: limits?.daily ?? limit, limits, now: now() }),
+    // 결제(`billing.js`) — 요금제 판정용 구독 문서. 요청당 읽기 1회.
+    getBilling: async (uid) => {
+      const snap = await db.collection('billing').doc(uid).get();
+      return snap.exists ? snap.data() ?? null : null;
+    },
     recordDailyUser: (uid) => recordDailyUser(db, uid, now()),
     recordRequest: (input) => recordRequest(db, input, now()),
   };
@@ -115,7 +132,7 @@ export function createFirestoreUsageStore({ db, limit = DAILY_REFINE_LIMIT, now 
  * 문서 2개: `refineQuota/{uid}_{날짜}`(기존 모양 + `premium.{standard|deep}`) · `budgetMonthly/{YYYY-MM}`(`micros`, uid 없음).
  * 🔴 쓰기가 요청당 1개 늘어난다(Spark 하루 쓰기 2만 — Spec §0 「비용 상한」).
  */
-async function admitFirestore(db, { uid, quality, limit, now }) {
+async function admitFirestore(db, { uid, quality, limit, limits = null, now }) {
   const dateKey = seoulDateKey(now);
   const monthKey = seoulMonthKey(now);
   const quotaRef = db.collection('refineQuota').doc(`${uid}_${dateKey}`);
@@ -128,7 +145,7 @@ async function admitFirestore(db, { uid, quality, limit, now }) {
     if (used >= limit) return { ok: false, used, limit };
     const premiumUsed = Object.fromEntries(Object.entries(q.premium ?? {}).map(([k, v]) => [k, Number(v ?? 0)]));
     const monthMicros = budgetSnap.exists ? Number(budgetSnap.data()?.micros ?? 0) : 0;
-    const decided = decideQuality({ requested: quality, premiumUsed, monthMicros });
+    const decided = decideQuality({ requested: quality, premiumUsed, monthMicros, ...(limits ? { limits } : {}) });
     const quotaDoc = { uid, dateKey, count: used + 1, updatedAt: now, expireAt: quotaExpireAt(dateKey) };
     if (decided.quality && !decided.downgrade && decided.quality !== 'fast') {
       quotaDoc.premium = { [decided.quality]: (premiumUsed[decided.quality] ?? 0) + 1 };

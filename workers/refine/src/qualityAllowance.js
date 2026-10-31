@@ -7,7 +7,8 @@
  * | 판정 순서 | 조건 | 결과 `quality` | `downgrade` |
  * |---|---|---|---|
  * | ① | 이달(서울) 추정 비용 ≥ `MONTHLY_BUDGET_GUARD_MICROS`($90) 이고 요청이 기본·심층 | `fast` | `budget` |
- * | ② | 오늘(서울) 그 모드를 이미 `PREMIUM_DAILY_LIMITS`만큼 썼다(기본 10 · 심층 3) | `fast` | `daily` |
+ * | ②' | 그 요금제에서 그 모드가 안 열렸다(`limits[모드]` 0 — 무료, 2026-10-31) | `fast` | `plan` |
+ * | ② | 오늘(서울) 그 모드를 이미 그 요금제 한도(`limits`, 기본값 `PREMIUM_DAILY_LIMITS` 기본 10 · 심층 3)만큼 썼다 | `fast` | `daily` |
  * | ③ | 그 밖 | 요청 그대로 | `null` |
  *
  * 🔴 **거절하지 않는다** — 넘친 상위 모드는 빠른 모드로 다듬는다(빠른도 품질 기준 통과, 회귀 평균 19.33/21).
@@ -41,10 +42,13 @@ export function seoulMonthKey(now = new Date()) {
  *   `requested` = `resolveQuality`를 거친 이름, 다듬기가 아니면 null.
  * @returns {{quality: string|null, downgrade: null|'budget'|'daily'}}
  */
-export function decideQuality({ requested, premiumUsed = {}, monthMicros = 0 }) {
+export function decideQuality({ requested, premiumUsed = {}, monthMicros = 0, limits = PREMIUM_DAILY_LIMITS }) {
   if (!requested || !(requested in PREMIUM_DAILY_LIMITS)) return { quality: requested ?? null, downgrade: null };
   if (monthMicros >= MONTHLY_BUDGET_GUARD_MICROS) return { quality: 'fast', downgrade: 'budget' };
-  if ((premiumUsed[requested] ?? 0) >= PREMIUM_DAILY_LIMITS[requested]) return { quality: 'fast', downgrade: 'daily' };
+  // 2026-10-31 요금제별 한도(`billing.js` PLAN_LIMITS) — 그 요금제에서 아예 안 열린 모드는 사유 `plan`.
+  const cap = limits[requested] ?? PREMIUM_DAILY_LIMITS[requested];
+  if (cap <= 0) return { quality: 'fast', downgrade: 'plan' };
+  if ((premiumUsed[requested] ?? 0) >= cap) return { quality: 'fast', downgrade: 'daily' };
   return { quality: requested, downgrade: null };
 }
 

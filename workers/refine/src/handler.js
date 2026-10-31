@@ -60,6 +60,7 @@ import { createNoopUsageStore } from './usageStore.js';
 import { handleTeam } from './teamRoute.js';
 import { resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
 import { googleClientsFromEnv } from './google/clients.js';
+import { PLAN_LIMITS, handleBilling, readBillingConfig, resolvePlan } from './billing.js';
 
 /**
  * 🔴 `mode` 라우팅 표 — `functions/index.js` `MODES`와 **같은 코어·같은 로그 필드**다(2026-10-24 이식).
@@ -206,6 +207,8 @@ export function createHandler(deps = {}) {
         usageStore: safeStoreKind(storeFor, env, logger),
         // 팀 API(/v1/team) — 서비스 계정 시크릿이 있어야 ready.
         team: safeGoogle(google, env, logger) ? 'ready' : 'unavailable',
+        // 결제(/v1/billing/*, 2026-10-31) — 값은 싣지 않고 준비 여부·모드만.
+        billing: billingStatus(readBillingConfig(env)),
       });
     }
 
@@ -216,6 +219,20 @@ export function createHandler(deps = {}) {
         return json(500, { error: 'server misconfigured' });
       }
       return handleTeam(request, { config, google: safeGoogle(google, env, logger), json, logger, jwks, now });
+    }
+
+    // 결제 — `billing.js` 헤더. 웹훅은 Paddle 서버가 부른다(Origin 없음 → 위 판정에서 통과).
+    if (url.pathname.startsWith('/v1/billing/')) {
+      return handleBilling(request, {
+        config,
+        billing: readBillingConfig(env),
+        db: safeGoogle(google, env, logger)?.db ?? null,
+        json,
+        logger,
+        jwks,
+        now,
+        ...(fetchImpl ? { fetchImpl } : {}),
+      });
     }
 
     if (url.pathname !== '/v1/refine') return json(404, { error: 'not found' });
@@ -264,7 +281,18 @@ export function createHandler(deps = {}) {
     // ⑥ 일일 상한 + 품질 모드 허용량 — 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**(저장소를 못 만들어도 noop으로 통과).
     const store = resolveStore(storeFor, env, logger);
     try {
-      const quota = store.admit ? await store.admit(uid, { quality }) : await store.consumeDailyQuota(uid);
+      // 2026-10-31 요금제별 한도 — 구독 문서가 없거나 못 읽으면 `beta`/`free`(`BILLING_ENFORCED`) 판정표 그대로.
+      let plan = 'beta';
+      try {
+        const billingDoc = store.getBilling ? await store.getBilling(uid) : null;
+        plan = resolvePlan(billingDoc, readBillingConfig(env));
+      } catch (error) {
+        plan = resolvePlan(null, readBillingConfig(env));
+        logger.error(`[billing] 구독 확인 실패 — ${plan}로 처리: ${error?.code ?? error?.name ?? 'unknown'}`);
+      }
+      // 🔴 `beta`(유료 출시 전 무료)는 한도를 넘기지 않는다 — 저장소의 원래 상한(`DAILY_REFINE_LIMIT`)·기본 표 그대로(P5).
+      const limits = plan === 'beta' ? null : PLAN_LIMITS[plan];
+      const quota = store.admit ? await store.admit(uid, { quality, limits }) : await store.consumeDailyQuota(uid);
       if (!quota.ok) {
         logger.warn(`[refine] 일일 상한 초과 used=${quota.used} limit=${quota.limit}`);
         return json(429, { error: 'daily-limit', limit: quota.limit });
@@ -373,6 +401,12 @@ export function createHandler(deps = {}) {
     );
     return json(200, result);
   };
+}
+
+/** `/health`용 — 값 없이 준비 여부만. */
+function billingStatus(billing) {
+  if (!billing.checkoutReady && !billing.webhookReady) return 'unavailable';
+  return { checkout: billing.checkoutReady, webhook: billing.webhookReady, enforced: billing.enforced };
 }
 
 /** env → 저장소. 만들다 실패하면(시크릿 형식·프로젝트 불일치) noop — 로그에는 사유 코드만. */
