@@ -13,6 +13,7 @@
  */
 
 import { verifyFirebaseIdToken, bearerToken, AuthError } from './auth.js';
+import { teamShouldLock } from '../../../functions/teams.js';
 
 /** 요금제별 하루 한도 — `docs/BillingDesign.md` 2절 · Spec §0(2026-10-31 확정). */
 export const PLAN_LIMITS = Object.freeze({
@@ -204,8 +205,43 @@ async function applyTeamEvent(db, teamId, sub, occurredAt) {
     );
     return 'saved';
   });
-  if (result === 'saved') await syncTeamSeats(db, teamId);
+  if (result === 'saved') {
+    // 결제되면 바로 잠금 해제(구매하면 다시 열린다). 잠그는 쪽은 매일 예약 작업(`lockOverdueTeams`)이 한다.
+    if (PAID_STATUSES.has(String(sub.status ?? ''))) await ref.set({ locked: false }, { merge: true });
+    await syncTeamSeats(db, teamId);
+  }
   return result;
+}
+
+function createdMillis(value) {
+  if (value && typeof value.toMillis === 'function') return value.toMillis();
+  return NaN;
+}
+
+/**
+ * 매일 예약 작업 — 팀 기능 잠금 표시(`teams/{teamId}.locked`)를 판정표(`teamShouldLock`)대로 맞춘다(2026-11-01).
+ * 🔴 바뀐 팀만 쓴다. 🔴 출시 전(`BILLING_ENFORCED` 꺼짐)이면 잠그지 않는다 — 잠겨 있던 팀이 있으면 푼다.
+ * @returns {Promise<{checked: number, locked: number, unlocked: number}>}
+ */
+export async function lockOverdueTeams(db, billing, nowMs = Date.now()) {
+  const teams = await db.collection('teams').get();
+  let locked = 0;
+  let unlocked = 0;
+  for (const doc of teams.docs) {
+    const should = teamShouldLock({
+      billing: doc.get('billing') ?? null,
+      createdAtMs: createdMillis(doc.get('createdAt')),
+      enforced: billing.enforced,
+      enforcedAtMs: billing.enforcedAtMs,
+      nowMs,
+    });
+    const now = doc.get('locked') === true;
+    if (should === now) continue;
+    await db.collection('teams').doc(doc.id).set({ locked: should }, { merge: true });
+    if (should) locked += 1;
+    else unlocked += 1;
+  }
+  return { checked: teams.docs.length, locked, unlocked };
 }
 
 /** 팀장인가 — 팀 문서 `ownerUid` 또는 팀원 문서 `role`(`functions/account.js` describe와 같은 판정). */

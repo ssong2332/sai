@@ -36,6 +36,10 @@ compatibility_flags = ["nodejs_compat"]
 "firebase-admin/auth" = "./src/shims/firebaseAdminAuth.js"
 
 # 🔴 공개 설정값만(비밀 아님). 로직에 하드코딩하지 않고 여기서 읽는다(`src/config.js`).
+# 매일 03:00(서울) 팀 기능 잠금 점검 — src/index.js scheduled · billing.js lockOverdueTeams (2026-11-01)
+[triggers]
+crons = ["0 18 * * *"]
+
 [vars]
 FIREBASE_PROJECT_ID = "sai-global-msg-2026"
 # `src/manifest.js`의 `key`가 고정한 확장 ID — `functions/index.js` `EXTENSION_ID`와 같은 값이어야 한다.

@@ -5,7 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { judgeTeamJoin, TEAM_GRACE_DAYS } from '../../../functions/teams.js';
+import { judgeTeamJoin, teamShouldLock, TEAM_GRACE_DAYS } from '../../../functions/teams.js';
+import { lockOverdueTeams, readBillingConfig } from '../src/billing.js';
 import { createHandler } from '../src/handler.js';
 import { RestFirestore } from '../src/google/firestoreRest.js';
 import { createNoopUsageStore } from '../src/usageStore.js';
@@ -103,4 +104,28 @@ test('TP5·현황 — 팀장만 팀 기본 모드를 정하고, me에 실리며,
 
   assert.deepEqual((await call(ownerToken, { action: 'defaultQuality', teamId, quality: null })).body, { defaultQuality: null });
   assert.equal((await call(aToken, { action: 'me', teamId })).body.defaultQuality, null);
+});
+
+test('팀 기능 잠금 — 매일 작업: 출시 전엔 안 잠그고(잠긴 팀은 풂), 출시 뒤 미결제만 잠금, 결제 팀은 안 잠금 · me에 locked', async () => {
+  assert.equal(teamShouldLock({ billing: null, enforced: false }), false);
+  assert.equal(teamShouldLock({ billing: { status: 'active', seats: 2 }, enforced: true, enforcedAtMs: LAUNCH, nowMs: LAUNCH + 99 * DAY }), false);
+
+  const { db, call } = setup();
+  const free = (await call(ownerToken, { action: 'create', name: '미결제 팀' })).body.teamId;
+  const paid = (await call(ownerToken, { action: 'create', name: '결제 팀' })).body.teamId;
+  await db.collection('teams').doc(paid).set({ billing: { status: 'active', seats: 2 } }, { merge: true });
+  await db.collection('teams').doc(free).set({ locked: true }, { merge: true });
+
+  // 출시 전 — 잠긴 팀이 있으면 푼다.
+  assert.deepEqual(await lockOverdueTeams(db, readBillingConfig(TEST_ENV)), { checked: 2, locked: 0, unlocked: 1 });
+  assert.equal((await db.collection('teams').doc(free).get()).get('locked'), false);
+
+  // 출시 뒤(팀 생성 10-26 > 출시 10-20 → 유예 없음) — 미결제만 잠금, 두 번 돌려도 같은 결과(바뀐 것만 씀).
+  const enforced = readBillingConfig({ ...TEST_ENV, BILLING_ENFORCED: '1', BILLING_ENFORCED_AT: '2026-10-20T00:00:00Z' });
+  assert.deepEqual(await lockOverdueTeams(db, enforced), { checked: 2, locked: 1, unlocked: 0 });
+  assert.deepEqual(await lockOverdueTeams(db, enforced), { checked: 2, locked: 0, unlocked: 0 });
+  assert.equal((await db.collection('teams').doc(free).get()).get('locked'), true);
+  assert.notEqual((await db.collection('teams').doc(paid).get()).get('locked'), true);
+  assert.equal((await call(ownerToken, { action: 'me', teamId: free })).body.locked, true);
+  assert.equal((await call(ownerToken, { action: 'me', teamId: paid })).body.locked, false);
 });
