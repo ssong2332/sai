@@ -9,6 +9,8 @@
  * | 팀장 + 다른 팀원 있음 | **거절(409)** — 먼저 팀장 이양 | **전체 거절(409)** — 아무것도 지우지 않는다 |
  * | 팀장 + 혼자 | 팀 전체 삭제(명부·용어집·지표) | 같음 |
  * | (계정 삭제만) 공통 | — | `users/{uid}`(설정·학습 통계·개인 용어집) · 사용 카운터 · 로그인 계정 삭제 |
+ * | (계정 삭제만) 유료 구독이 살아 있고 해지 예약도 없음 | — | **전체 거절(409 `subscription-active`)** — 먼저 Paddle에서 해지(2026-11-01 사용자 결정) |
+ * | (계정 삭제만) 결제 기록 `billing/{uid}`가 있음 | — | **지우지 않고 보관 표시** — 해지(또는 기간 끝) 후 5년 뒤 만료(`expireAt`, Firestore TTL). 2026-11-01 사용자 결정 「해지 후 5년 보관」 |
  *
  * 🔴 **팀장 판정은 명부의 `role`과 팀 문서의 `ownerUid` 둘 중 하나라도 맞으면 팀장이다.** 옛 버그로
  *    강등된 창설자(`whoAmI` 자동 복구 주석)를 팀원으로 보고 내보내면, `ownerUid`가 떠난 사람을 가리키는
@@ -34,6 +36,26 @@ function ownerMustTransfer(blocked) {
   const error = new TeamError(409, 'owner-must-transfer');
   error.extra = { blockedTeams: blocked.map(({ teamId, name }) => ({ teamId, name: name ?? null })) };
   return error;
+}
+
+/** 유료로 치는 구독 상태 — Worker `billing.js`와 같은 표(재청구 중 `past_due` 포함). */
+export const PAID_SUBSCRIPTION_STATUSES = ['active', 'trialing', 'past_due'];
+
+/** 결제 기록 보관 기간(년) — 2026-11-01 사용자 결정. 🔴 법률 검토 전(처리방침 4절). */
+export const BILLING_RETENTION_YEARS = 5;
+
+/** 이 구독이 계정 삭제를 막는가 — 유료 상태인데 해지 예약(`cancelScheduled`)이 없을 때만. */
+export function subscriptionBlocksDeletion(doc) {
+  return Boolean(doc && PAID_SUBSCRIPTION_STATUSES.includes(doc.status) && doc.cancelScheduled !== true);
+}
+
+/** 보관 만료 시각 — 지금과 구독 기간 끝 중 늦은 쪽 + 5년. */
+export function billingExpireAt(doc, now = new Date()) {
+  const end = Date.parse(doc?.periodEnd ?? '');
+  const base = Number.isFinite(end) && end > now.getTime() ? new Date(end) : now;
+  const out = new Date(base.getTime());
+  out.setUTCFullYear(out.getUTCFullYear() + BILLING_RETENTION_YEARS);
+  return out;
 }
 
 /** 한 배치에 넣는 삭제 수 — Firestore 배치 상한(500) 아래로 둔다. */
@@ -98,10 +120,14 @@ export async function deleteAccount(req, deps) {
   if (plan.blocked.length > 0) {
     throw ownerMustTransfer(memberships.filter((m) => plan.blocked.includes(m.teamId)));
   }
+  // 🔴 막히면 하나도 지우지 않는다 — 결제가 계속 나가는데 혜택 받을 계정만 사라지는 일을 막는다.
+  const billing = store.billing ? await store.billing(uid) : null;
+  if (subscriptionBlocksDeletion(billing)) throw new TeamError(409, 'subscription-active');
 
   for (const teamId of plan.leaveTeams) await store.deleteMember(teamId, uid);
   for (const teamId of plan.deleteTeams) await store.deleteTeam(teamId);
   await store.deleteUserData(uid);
+  if (billing && store.retainBilling) await store.retainBilling(uid, billingExpireAt(billing, new Date(deps.now?.() ?? Date.now())));
   await store.deleteAuthUser(uid); // 🔴 마지막 — 먼저 지우면 실패 시 재시도할 토큰이 없다.
 
   return { deleted: true, leftTeams: plan.leaveTeams.length, deletedTeams: plan.deleteTeams.length };
@@ -188,6 +214,15 @@ export function accountStore(db = getFirestore(), auth = getAuth()) {
     async deleteUserData(uid) {
       await db.recursiveDelete(db.collection('users').doc(uid));
       await deleteQuery(db.collection('refineQuota').where('uid', '==', uid));
+    },
+    /** 결제 기록 `billing/{uid}`(Worker 웹훅이 쓴다). 없으면 null. */
+    async billing(uid) {
+      const snap = await db.collection('billing').doc(uid).get();
+      return snap.exists ? snap.data() ?? null : null;
+    },
+    /** 🔴 지우지 않는다 — 보관 표시만(만료는 Firestore TTL이 `expireAt`으로). */
+    async retainBilling(uid, expireAt) {
+      await db.collection('billing').doc(uid).set({ accountDeletedAt: new Date(), expireAt }, { merge: true });
     },
     async deleteAuthUser(uid) {
       try {

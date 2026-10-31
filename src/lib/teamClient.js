@@ -37,6 +37,7 @@ export const TEAM_ERRORS = {
   NO_TEAM: 'no-team',
   // L22 — 팀 나가기·계정 삭제 (`functions/account.js` 판정표).
   OWNER_MUST_TRANSFER: 'owner-must-transfer',
+  SUBSCRIPTION_ACTIVE: 'subscription-active', // 2026-11-01 — 구독 중 계정 삭제 차단
   NOT_CONFIRMED: 'not-confirmed',
   NETWORK: 'network-failed',
   UNKNOWN: 'unknown',
@@ -78,6 +79,9 @@ export function teamErrorMessage(reason, detail = '') {
     case TEAM_ERRORS.OWNER_MUST_TRANSFER:
       // 🔴 막는 이유와 할 일을 같이 말한다 — 팀장이 사라진 팀이 남으면 아무도 관리할 수 없다.
       return '다른 팀원이 있는 팀의 팀장이에요 — 먼저 「팀 관리」에서 팀장을 넘겨 주세요';
+    case TEAM_ERRORS.SUBSCRIPTION_ACTIVE:
+      // 🔴 막는 이유와 할 일 — 결제가 계속 나가는데 계정만 사라지면 안 된다.
+      return '사용 중인 Pro 구독이 있어요 — 결제 영수증 메일의 Paddle 링크(paddle.net)에서 먼저 구독을 해지해 주세요. 해지 예약이 되면 계정을 지울 수 있어요';
     case TEAM_ERRORS.NOT_CONFIRMED:
       return '삭제 확인이 전달되지 않았어요 — 다시 시도해 주세요';
     case TEAM_ERRORS.NETWORK:

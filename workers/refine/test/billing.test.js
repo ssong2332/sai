@@ -241,3 +241,19 @@ test('서명 검증 함수 — 대문자 hex도 받는다', async () => {
   const sig = sign(raw).replace(/h1=(.*)$/, (_, h) => `h1=${h.toUpperCase()}`);
   assert.equal(await verifyPaddleSignature(raw, sig, SECRET, NOW), true);
 });
+
+test('해지 예약(scheduled_change.action=cancel)을 기록한다 — 계정 삭제 허용 조건(functions/account.js)', async () => {
+  const { handle, db } = setup();
+  const event = subEvent({ type: 'subscription.updated', occurred: '2026-10-31T12:00:00Z' });
+  event.data.scheduled_change = { action: 'cancel', effective_at: '2026-11-30T00:00:00Z' };
+  const raw = JSON.stringify(event);
+  assert.equal((await handle(webhook(raw, sign(raw)), BILLING_ENV)).status, 200);
+  const doc = await billingDoc(db);
+  assert.equal(doc.status, 'active');
+  assert.equal(doc.cancelScheduled, true);
+
+  const plain = setup();
+  const raw2 = JSON.stringify(subEvent());
+  await plain.handle(webhook(raw2, sign(raw2)), BILLING_ENV);
+  assert.equal((await billingDoc(plain.db)).cancelScheduled, false);
+});

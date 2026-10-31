@@ -292,3 +292,40 @@ test('🔴 myTeams — 내 소속·역할·이름만, 초대 코드·팀원 정�
 test('myTeams — 로그인하지 않으면 401', async () => {
   await assert.rejects(() => listMyTeams(req({}, ''), deps(fakeStore([]))), (e) => e.status === 401);
 });
+
+/* ── 결제 구독과 계정 삭제 (2026-11-01 사용자 결정) ───────────────────── */
+
+function billingStore(billing, memberships = []) {
+  const store = fakeStore(memberships);
+  store.billing = async () => billing;
+  store.retainBilling = async (_uid, expireAt) => store.calls.push(`retain:${expireAt.toISOString().slice(0, 10)}`);
+  return store;
+}
+
+test('🔴 유료 구독이 살아 있고 해지 예약이 없으면 계정 삭제 전체 거절(409 subscription-active) — 아무것도 안 지움', async () => {
+  for (const status of ['active', 'trialing', 'past_due']) {
+    const store = billingStore({ status, periodEnd: '2026-11-30T00:00:00Z' }, [member('a')]);
+    await assert.rejects(
+      () => deleteAccount(req({ confirm: 'DELETE' }), deps(store)),
+      (e) => e instanceof TeamError && e.status === 409 && e.reason === 'subscription-active',
+      status,
+    );
+    assert.deepEqual(store.calls, [], status);
+  }
+});
+
+test('해지 예약됐거나 해지된 구독은 삭제 허용 — 결제 기록은 지우지 않고 기간 끝 + 5년 보관 표시', async () => {
+  const scheduled = billingStore({ status: 'active', cancelScheduled: true, periodEnd: '2026-11-30T00:00:00Z' });
+  await deleteAccount(req({ confirm: 'DELETE' }), { ...deps(scheduled), now: () => Date.UTC(2026, 10, 1) });
+  assert.deepEqual(scheduled.calls, ['user', 'retain:2031-11-30', 'auth']);
+
+  const canceled = billingStore({ status: 'canceled', periodEnd: '2026-10-01T00:00:00Z' });
+  await deleteAccount(req({ confirm: 'DELETE' }), { ...deps(canceled), now: () => Date.UTC(2026, 10, 1) });
+  assert.deepEqual(canceled.calls, ['user', 'retain:2031-11-01', 'auth'], '기간이 이미 끝났으면 지금 + 5년');
+});
+
+test('결제 기록이 없으면 보관 표시도 없다(기존 순서 그대로)', async () => {
+  const store = billingStore(null, [member('a')]);
+  await deleteAccount(req({ confirm: 'DELETE' }), deps(store));
+  assert.deepEqual(store.calls, ['member:a', 'user', 'auth']);
+});
