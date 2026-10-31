@@ -39,6 +39,8 @@ export function readBillingConfig(env = {}) {
     apiKey: str(env.PADDLE_API_KEY),
     webhookSecret: str(env.PADDLE_WEBHOOK_SECRET),
     prices: { month: str(env.PADDLE_PRICE_PRO_MONTH), year: str(env.PADDLE_PRICE_PRO_YEAR) },
+    // 팀 요금제(2026-11-01, `docs/BillingDesign.md` 8절) — 1석당 가격, 수량 = 좌석.
+    teamPrices: { month: str(env.PADDLE_PRICE_TEAM_MONTH), year: str(env.PADDLE_PRICE_TEAM_YEAR) },
     enforced: str(env.BILLING_ENFORCED) === '1',
   };
   config.checkoutReady = Boolean(config.apiBase && config.apiKey && config.prices.month && config.prices.year);
@@ -52,9 +54,43 @@ export function readBillingConfig(env = {}) {
  * @param {{enforced: boolean, prices: {month: string|null, year: string|null}}} config
  */
 export function resolvePlan(doc, { enforced = false, prices = {} } = {}) {
+  // 팀 좌석이 개인 Pro보다 넉넉하다(200·20·5) — 둘 다 있으면 팀. 좌석 여부는 `syncTeamSeats`가 써 둔다.
+  if (doc?.teamSeat?.paid === true) return 'team';
   const proPrices = [prices.month, prices.year].filter(Boolean);
   if (doc && PAID_STATUSES.has(doc.status) && proPrices.includes(doc.priceId)) return 'pro';
   return enforced ? 'free' : 'beta';
+}
+
+/** 팀 최소·최대 좌석 — Paddle 가격의 수량 제한과 같은 값(2026-11-01 「최소 2석」). */
+export const TEAM_SEATS = Object.freeze({ min: 2, max: 100 });
+
+function millisOf(value) {
+  if (value && typeof value.toMillis === 'function') return value.toMillis();
+  const t = Date.parse(value ?? '');
+  return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * 팀 좌석 배정 — 결제 상태·좌석 수와 팀원 `joinedAt` 순서로, 앞에서 N명에게 `billing/{uid}.teamSeat.paid=true`.
+ * 🔴 요청마다 팀을 훑지 않도록 결과를 각 팀원 문서에 써 둔다. 웹훅·참가·나가기 때 부른다.
+ * 🔴 한계: 한 사람이 결제된 팀 두 곳에 있으면 마지막으로 동기화한 팀이 남는다(드문 경우 — 기록).
+ * @returns {Promise<{seated: number, unseated: number}>}
+ */
+export async function syncTeamSeats(db, teamId) {
+  const team = await db.collection('teams').doc(teamId).get();
+  const billing = team.exists ? team.get('billing') ?? null : null;
+  const paid = Boolean(billing && PAID_STATUSES.has(billing.status));
+  const seats = paid ? Number(billing.seats ?? 0) : 0;
+  const members = (await db.collection('teams').doc(teamId).collection('members').get()).docs
+    .map((d) => ({ uid: d.id, joined: millisOf(d.get('joinedAt')) }))
+    .sort((a, b) => a.joined - b.joined || a.uid.localeCompare(b.uid));
+  let seated = 0;
+  for (const [i, m] of members.entries()) {
+    const has = i < seats;
+    if (has) seated += 1;
+    await db.collection('billing').doc(m.uid).set({ teamSeat: { teamId, paid: has } }, { merge: true });
+  }
+  return { seated, unseated: members.length - seated };
 }
 
 function hexOf(buffer) {
@@ -98,9 +134,11 @@ export async function verifyPaddleSignature(rawBody, header, secret, nowMs = Dat
 export async function applySubscriptionEvent(db, event) {
   if (!String(event?.event_type ?? '').startsWith('subscription.')) return 'ignored';
   const sub = event.data ?? {};
+  const occurredAt = String(event.occurred_at ?? '');
+  const teamId = typeof sub.custom_data?.teamId === 'string' ? sub.custom_data.teamId : null;
+  if (teamId) return applyTeamEvent(db, teamId, sub, occurredAt);
   const uid = typeof sub.custom_data?.uid === 'string' ? sub.custom_data.uid : null;
   if (!uid || uid.length > 128) return 'ignored';
-  const occurredAt = String(event.occurred_at ?? '');
   const ref = db.collection('billing').doc(uid);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -126,12 +164,58 @@ export async function applySubscriptionEvent(db, event) {
   });
 }
 
+/** 팀 구독 이벤트 → `teams/{teamId}.billing` 갱신 + 좌석 재배정. 옛 이벤트는 덮지 않는다. */
+async function applyTeamEvent(db, teamId, sub, occurredAt) {
+  if (teamId.length > 128) return 'ignored';
+  const ref = db.collection('teams').doc(teamId);
+  const result = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return 'ignored';
+    const prev = snap.get('billing') ?? {};
+    if (prev.eventAt && occurredAt && String(prev.eventAt) > occurredAt) return 'stale';
+    tx.set(
+      ref,
+      {
+        billing: {
+          status: String(sub.status ?? ''),
+          priceId: String(sub.items?.[0]?.price?.id ?? ''),
+          seats: Number(sub.items?.[0]?.quantity ?? 0),
+          interval: String(sub.billing_cycle?.interval ?? ''),
+          subscriptionId: String(sub.id ?? ''),
+          customerId: String(sub.customer_id ?? ''),
+          periodEnd: String(sub.current_billing_period?.ends_at ?? ''),
+          cancelScheduled: sub.scheduled_change?.action === 'cancel',
+          eventAt: occurredAt,
+        },
+      },
+      { merge: true },
+    );
+    return 'saved';
+  });
+  if (result === 'saved') await syncTeamSeats(db, teamId);
+  return result;
+}
+
+/** 팀장인가 — 팀 문서 `ownerUid` 또는 팀원 문서 `role`(`functions/account.js` describe와 같은 판정). */
+async function teamOwnerCheck(db, teamId, uid) {
+  const team = await db.collection('teams').doc(teamId).get();
+  if (!team.exists) return { ok: false, memberCount: 0 };
+  const members = await db.collection('teams').doc(teamId).collection('members').get();
+  const me = members.docs.find((d) => d.id === uid);
+  const isOwner = team.get('ownerUid') === uid || me?.get('role') === 'owner';
+  return { ok: isOwner, memberCount: members.docs.length };
+}
+
 /** Paddle 거래 생성 → `{transactionId, checkoutUrl}`. 🔴 실패 시 상태 코드만 담은 오류(본문·키 없음). */
-export async function createCheckout({ fetchImpl = globalThis.fetch, apiBase, apiKey, priceId, uid }) {
+export async function createCheckout({ fetchImpl = globalThis.fetch, apiBase, apiKey, priceId, uid, teamId = null, quantity = 1 }) {
   const res = await fetchImpl(`${apiBase}/transactions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items: [{ price_id: priceId, quantity: 1 }], custom_data: { uid }, collection_mode: 'automatic' }),
+    body: JSON.stringify({
+      items: [{ price_id: priceId, quantity }],
+      custom_data: teamId ? { uid, teamId } : { uid },
+      collection_mode: 'automatic',
+    }),
   });
   if (!res.ok) throw Object.assign(new Error('paddle-error'), { code: `http-${res.status}` });
   const body = await res.json();
@@ -186,10 +270,27 @@ export async function handleBilling(request, { config, billing, db, json, logger
     } catch {
       return json(400, { error: 'bad request' });
     }
-    const priceId = body?.plan === 'pro' ? billing.prices[body?.interval] : null;
+    let priceId = null;
+    let teamId = null;
+    let quantity = 1;
+    if (body?.plan === 'pro') priceId = billing.prices[body?.interval] ?? null;
+    if (body?.plan === 'team') {
+      priceId = billing.teamPrices[body?.interval] ?? null;
+      teamId = typeof body?.teamId === 'string' && body.teamId.length <= 128 ? body.teamId : null;
+      quantity = Number(body?.seats);
+      if (!priceId) return json(400, { error: 'unknown plan' });
+      if (!teamId || !db) return json(400, { error: 'bad request' });
+      if (!Number.isInteger(quantity) || quantity < TEAM_SEATS.min || quantity > TEAM_SEATS.max) {
+        return json(400, { error: 'bad seats', min: TEAM_SEATS.min, max: TEAM_SEATS.max });
+      }
+      const owner = await teamOwnerCheck(db, teamId, uid);
+      if (!owner.ok) return json(403, { error: 'not-owner' });
+      // 구매 때 좌석은 지금 팀원 수 이상(2026-11-01).
+      if (quantity < owner.memberCount) return json(400, { error: 'bad seats', min: owner.memberCount, max: TEAM_SEATS.max });
+    }
     if (!priceId) return json(400, { error: 'unknown plan' });
     try {
-      const out = await createCheckout({ fetchImpl, apiBase: billing.apiBase, apiKey: billing.apiKey, priceId, uid });
+      const out = await createCheckout({ fetchImpl, apiBase: billing.apiBase, apiKey: billing.apiKey, priceId, uid, teamId, quantity });
       if (!out.checkoutUrl) {
         logger.error('[billing] 결제 주소 없음 — Paddle 기본 결제 링크 설정 확인');
         return json(502, { error: 'no checkout url' });

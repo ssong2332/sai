@@ -47,6 +47,9 @@ EXTENSION_ID = "gdipbmakeghjecpenebjlfhgcajbikkg"
 PADDLE_ENV = "sandbox"
 PADDLE_PRICE_PRO_MONTH = "pri_01m691c650td0gbxbh224ykhda"
 PADDLE_PRICE_PRO_YEAR = "pri_01m691emykvm3xb27tdn7kwq92"
+# 팀(1석당, 2026-11-01) — 사용자가 샌드박스에 SAI Team 상품을 만든 뒤 채운다. 비어 있으면 팀 결제 시작은 400 unknown plan.
+# PADDLE_PRICE_TEAM_MONTH = ""
+# PADDLE_PRICE_TEAM_YEAR = ""
 # BILLING_ENFORCED = "1"   # 켜면 구독 없는 사용자 = free(하루 20 · 빠른만). 꺼져 있으면 beta(지금과 같음)
 # 사고(thinking) — 2026-10-23부터 코어 기본이 **끔**이라 적지 않는다(L30 실측: 끔 건당 $0.00070·중앙값 2.4~2.5초 /
 # 켬 $0.00107·6.2~6.7초). 실험으로 켤 때만:
