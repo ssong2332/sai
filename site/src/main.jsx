@@ -13,6 +13,7 @@ import Landing from './pages/Landing.jsx';
 import Settings from './pages/Settings.jsx';
 import Legal from './pages/Legal.jsx';
 import Pricing from './pages/Pricing.jsx';
+import Checkout from './pages/Checkout.jsx';
 
 function NotFound() {
   return (
@@ -46,6 +47,7 @@ function App() {
   else if (path === '/privacy') page = <Legal doc="privacy" />;
   else if (path === '/terms') page = <Legal doc="terms" />;
   else if (path === '/refund') page = <Legal doc="refund" />;
+  else if (path === '/checkout') page = <Checkout search={search} />;
   else page = <NotFound />;
 
   return (

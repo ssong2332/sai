@@ -25,6 +25,8 @@ import {
   MAX_BLOCKED_HOSTS,
 } from '../lib/siteGate.js';
 import { useSettingsData } from './useSettingsData.js';
+import { FEATURES } from '../config.js';
+import { BillingClientError, billingErrorText, startCheckout } from '../lib/billingClient.js';
 
 /**
  * 확장 설정 페이지 — `chrome-extension://<id>/src/settings/index.html` (2026-10-25 사용자 결정).
@@ -212,6 +214,47 @@ const QUALITY_OPTIONS = [
   },
 ];
 
+/**
+ * 요금제 — 「Pro로 업그레이드」(2026-10-31, `docs/BillingDesign.md`). 🔴 `FEATURES.billing`이 꺼져 있으면 그리지 않는다.
+ * 결제창은 새 탭의 소개 사이트(`/checkout`)에서 열린다. 가격 표시는 Spec §0 확정값.
+ */
+function PlanGroup() {
+  const [busy, setBusy] = useState(null);
+  const [error, setError] = useState('');
+  const open = async (interval) => {
+    setBusy(interval);
+    setError('');
+    try {
+      const url = await startCheckout(interval);
+      window.open(url, '_blank', 'noopener');
+    } catch (e) {
+      setError(billingErrorText(e instanceof BillingClientError ? e.reason : 'unknown'));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Group
+      title="요금제"
+      note={`Pro는 하루 200번까지 다듬고, 기본 모드 하루 ${PREMIUM_DAILY_LIMITS.standard}번 · 심층 모드 하루 ${PREMIUM_DAILY_LIMITS.deep}번을 쓸 수 있어요. 결제일로부터 14일 안에는 전액 환불돼요.`}
+    >
+      <div className="plan-actions">
+        <button type="button" className="btn primary press" disabled={busy !== null} onClick={() => open('year')}>
+          {busy === 'year' ? '여는 중…' : 'Pro 연 결제 · $48 (월 $4 꼴)'}
+        </button>
+        <button type="button" className="btn press" disabled={busy !== null} onClick={() => open('month')}>
+          {busy === 'month' ? '여는 중…' : 'Pro 월 결제 · $6'}
+        </button>
+      </div>
+      {error && (
+        <p className="row-hint" role="alert">
+          {error}
+        </p>
+      )}
+    </Group>
+  );
+}
+
 function GeneralPanel({ data, act }) {
   const d = data.display;
   const toggle = (field) => (next) => act(() => writeDisplaySetting(field, next));
@@ -228,6 +271,8 @@ function GeneralPanel({ data, act }) {
           onChange={toggle('threadContext')}
         />
       </Group>
+
+      {FEATURES.billing && <PlanGroup />}
 
       <Group
         title="다듬기 품질"
