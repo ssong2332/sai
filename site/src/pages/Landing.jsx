@@ -12,6 +12,12 @@ import Segmented from '../components/Segmented.jsx';
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
+/**
+ * Chrome 웹 스토어 설치 링크(2026-10-31 사용자 결정 — 미등록 항목을 소개 사이트에 공개, 「베타 체험」).
+ * 🔴 짧은 형태(ID만) — 스토어가 이름 붙은 주소로 넘긴다. 근거·한도 안내는 `docs/BetaInvite.md`.
+ */
+const STORE_URL = 'https://chromewebstore.google.com/detail/gdipbmakeghjecpenebjlfhgcajbikkg';
+
 /* ── 작은 부품 ─────────────────────────────────────────── */
 
 /** f: 바뀌지 않는 사실(빨강) · t: 용어집 단어(초록) · b: 굵게 */
@@ -156,10 +162,10 @@ function Hero() {
           쓰지 않고, 그대로인지 확인만 해요.
         </p>
         <div className="ctas">
-          <p className="btn primary soon" role="status">
+          <a href={STORE_URL} className="btn primary press" target="_blank" rel="noopener noreferrer">
             <span className="soon-dot" aria-hidden="true" />
-            Chrome 웹 스토어 · 출시 준비 중
-          </p>
+            Chrome에 추가 · 베타 체험하기
+          </a>
           <a href="#write" className="btn ghost press">
             어떻게 동작하나요
           </a>
@@ -889,11 +895,11 @@ function Start() {
               1
             </b>
             <h3>설치</h3>
-            <p>Chrome 웹 스토어 출시를 준비하고 있어요. 공개되면 이 자리에 설치 링크를 둡니다.</p>
-            <span className="soon-pill">
+            <p>Chrome 웹 스토어에서 추가하세요. 지금은 베타라 하루에 쓸 수 있는 횟수에 한도가 있어요.</p>
+            <a href={STORE_URL} className="soon-pill press" target="_blank" rel="noopener noreferrer">
               <span className="soon-dot" aria-hidden="true" />
-              출시 준비 중
-            </span>
+              베타 체험하기
+            </a>
           </Reveal>
           <Reveal as="li" className="start-card" delay={2}>
             <b className="num" aria-hidden="true">

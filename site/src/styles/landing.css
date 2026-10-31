@@ -1378,6 +1378,10 @@ kbd {
   font-size: 13.5px;
   font-weight: 700;
 }
+/* 2026-10-31 — 설치 카드의 알약은 스토어 링크다(밑줄 없이). */
+a.soon-pill {
+  text-decoration: none;
+}
 .start-cta {
   display: flex;
   flex-wrap: wrap;
