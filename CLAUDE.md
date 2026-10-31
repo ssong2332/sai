@@ -66,6 +66,8 @@
 | 웹사이트 dev 서버 | `npm --prefix site run dev` → `http://localhost:5180` (strictPort — 확장 externally_connectable 개발 매치가 이 포트) · 미리보기 `/settings?demo=1` | 2026-10-24 |
 | Worker 배포 (🔴 사용자가 실행 — 에이전트 배포는 막혀 있다) | `workers/refine/` 안에서 `npx wrangler deploy` | 2026-10-24 |
 | Worker 배포 확인 | `curl https://sai-refine.aiisgod.workers.dev/health` → `"thinking":"disabled"` | 2026-10-24 |
+| Paddle 시크릿 등록(🔴 사용자, PowerShell, `workers/refine/`) | `Get-Clipboard \| npx wrangler secret put PADDLE_WEBHOOK_SECRET` — 🔴 **명령을 터미널에 먼저 붙여 넣고(Enter 금지) → Paddle에서 비밀값 복사 → Enter.** 순서가 바뀌면 명령어 문장이 비밀값으로 들어가 웹훅이 전부 401(2026-10-31 실측). `PADDLE_API_KEY`도 같은 방식 | 2026-10-31 |
+| 결제 웹훅 로그 보기(🔴 원본에 토큰 — 필터 필수) | `workers/refine/` 안에서 `npx wrangler tail --format json 2>/dev/null \| node <필터.mjs>` — 필터는 `/v1/billing/*`의 경로·상태·`[billing]` 로그만 출력 → `subscription.created → saved` | 2026-10-31 |
 | Worker 실제 cpuTime 수집 (🔴 원본에 로그인 토큰이 있다 — 반드시 숫자만 거르는 필터를 거친다) | `workers/refine/` 안에서 `npx wrangler tail --format json 2>/dev/null \| node <필터.mjs>` — 필터는 path·method·status·outcome·cpuTime·wallTime만 출력, 원문은 버린다 | 2026-10-24 |
 
 > 🔴 **`.env`는 git 워크트리마다 따로 있다** (untracked 파일은 공유되지 않는다). 워크트리에서
