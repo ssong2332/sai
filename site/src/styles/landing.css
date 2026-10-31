@@ -947,6 +947,18 @@ button.step.on:hover {
   display: inline-block;
   line-height: 1;
 }
+/* 2026-10-31 — 살아 있는 시계: 화면에 보일 때만 콜론이 1초마다 깜빡인다(투명도만 — 그래픽 처리 쪽에서 돈다).
+   움직임 줄이기를 켠 사용자에게는 깜빡이지 않는다. */
+@media (prefers-reduced-motion: no-preference) {
+  .clocks.live .time .roll-sep {
+    animation: colonBlink 1s steps(1, end) infinite;
+  }
+}
+@keyframes colonBlink {
+  50% {
+    opacity: 0.25;
+  }
+}
 
 .band-wrap {
   margin-top: 64px;

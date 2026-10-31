@@ -92,6 +92,26 @@ export function useInView(ref, { threshold = 0.25, rootMargin = '0px' } = {}) {
 }
 
 /**
+ * 지금 화면에 보이는지 — `useInView`와 달리 **나가면 다시 false**(1회성 아님). 화면 밖에서 타이머·깜빡임을 멈출 때 쓴다.
+ * IntersectionObserver가 없으면 항상 true.
+ */
+export function useVisible(ref, { threshold = 0 } = {}) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    if (typeof window.IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return undefined;
+    }
+    const io = new window.IntersectionObserver((entries) => setVisible(entries.some((e) => e.isIntersecting)), { threshold });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, threshold]);
+  return visible;
+}
+
+/**
  * 숫자 굴리기 — `run`이 true가 되면 0 → target으로 감속하며 올라간다(ease-out quart).
  * 모션 줄이기면 바로 target. 반환값은 지금 보여 줄 숫자.
  */

@@ -65,3 +65,10 @@ test('표시 도우미', () => {
   assert.equal(gapLabel(-210), '3시간 30분');
   assert.equal(bandPercent(9 * 60), '37.5%');
 });
+
+test('분 경계까지 남은 시간 — 분이 바뀌는 순간에 갱신', async () => {
+  const { msToNextMinute } = await import('../src/liveClock.js');
+  assert.equal(msToNextMinute(Date.UTC(2026, 9, 31, 11, 52, 40)), 20_000);
+  assert.equal(msToNextMinute(Date.UTC(2026, 9, 31, 11, 52, 59, 999)), 1);
+  assert.equal(msToNextMinute(Date.UTC(2026, 9, 31, 11, 53, 0)), 60_000, '정확히 경계면 다음 분까지 1분');
+});
