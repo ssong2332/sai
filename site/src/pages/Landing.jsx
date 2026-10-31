@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '../router.jsx';
 import { prefersReducedMotion, useCountUp, useInView, useReducedMotion, useScrollFrame } from '../motion.js';
+import { bandPercent, pickScene } from '../liveClock.js';
 import SaiMark from '../components/SaiMark.jsx';
 import Segmented from '../components/Segmented.jsx';
 
@@ -461,10 +462,37 @@ function ReadSection() {
 
 /* ── 보낼 때 — 유일하게 어두운 장면 ───────────────────── */
 
-/** 예시 시각(고정): 서울 19:35(UTC+9) = 샌프란시스코 03:35(2026-10-24 PDT, UTC−7) — 16시간 차.
- *  띠 위 핀은 각자 현지 시각(03:35 → 14.93%, 19:35 → 81.6%), 보내기 점은 Dana의 09:00(37.5%) = 서울 다음 날 01:00. */
+/** 시간대를 모를 때의 고정 예시: 서울 19:35(UTC+9) = 샌프란시스코 03:35(PDT, UTC−7) — 16시간 차.
+ *  띠 위 핀은 각자 현지 시각, 보내기 점은 Dana의 09:00(37.5%) = 서울 다음 날 01:00. */
+const FIXED_SCENE = {
+  mode: 'schedule',
+  gap: '16시간',
+  me: { city: '서울', time: '19:35', minutes: 19 * 60 + 35, state: '저녁' },
+  them: { city: '샌프란시스코', time: '03:35', minutes: 3 * 60 + 35, state: '자는 시간' },
+  send: { minutes: 9 * 60, theirLabel: '오전 9:00', myLabel: '서울 새벽 1:00' },
+};
+
+/** 방문자의 지금 시각으로 장면을 고른다(`liveClock.js` 판정표) — 1분마다 다시. 🔴 시간대는 어디에도 보내지 않는다. */
+function useLiveScene() {
+  const read = () => {
+    try {
+      return pickScene(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone) ?? FIXED_SCENE;
+    } catch {
+      return FIXED_SCENE;
+    }
+  };
+  const [scene, setScene] = useState(read);
+  useEffect(() => {
+    const id = setInterval(() => setScene(read()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return scene;
+}
 
 function NightSection() {
+  const scene = useLiveScene();
+  const { me, them, send } = scene;
+  const schedule = scene.mode === 'schedule';
   const ref = useRef(null);
   const bandRef = useRef(null);
   const clocksRef = useRef(null);
@@ -479,41 +507,43 @@ function NightSection() {
           <h2 className="h2" id="send-title">
             상대는 지금
             <br />
-            <span className="thin">퇴근했을지도 몰라요</span>
+            <span className="thin">{schedule ? '퇴근했을지도 몰라요' : '한창 일하는 중이에요'}</span>
           </h2>
         </Reveal>
         <div className="clocks" ref={clocksRef}>
           <Reveal className="clock me" delay={1}>
-            <p className="city">나 · 서울</p>
+            <p className="city">나 · {me.city}</p>
             <p className="time num">
-              <Roll text="19:35" run={clocksOn && on} />
+              <Roll text={me.time} run={clocksOn && on} />
             </p>
-            <span className="state">저녁</span>
+            <span className="state">{me.state}</span>
           </Reveal>
           <Reveal className="mid" delay={2}>
-            <span aria-hidden="true">⟷</span> 16시간
+            <span aria-hidden="true">⟷</span> {scene.gap}
           </Reveal>
           <Reveal className="clock them" delay={3}>
-            <p className="city">Dana · 샌프란시스코</p>
+            <p className="city">Dana · {them.city}</p>
             <p className="time num">
-              <Roll text="03:35" run={clocksOn && on} delay={180} />
+              <Roll text={them.time} run={clocksOn && on} delay={180} />
             </p>
-            <span className="state">자는 시간</span>
+            <span className="state">{them.state}</span>
           </Reveal>
         </div>
         <div className="band-wrap" ref={bandRef}>
           <div
             className="band"
             role="img"
-            aria-label="하루 24시간 띠: Dana는 새벽 3시 35분, 나는 19시 35분. Dana의 오전 9시가 보내기 좋은 때예요."
+            aria-label={`하루 24시간 띠: Dana는 ${them.time}, 나는 ${me.time}. ${
+              schedule ? `Dana의 ${send.theirLabel}가 보내기 좋은 때예요.` : 'Dana는 지금 업무 시간이에요.'
+            }`}
           >
-            <span className="pin-rail" style={{ '--x': bandOn ? '14.93%' : '0%' }}>
-              <span className="pin them">Dana 03:35</span>
+            <span className="pin-rail" style={{ '--x': bandOn ? bandPercent(them.minutes) : '0%' }}>
+              <span className="pin them">Dana {them.time}</span>
             </span>
-            <span className="pin-rail me" style={{ '--x': bandOn ? '81.6%' : '0%' }}>
-              <span className="pin me">나 19:35</span>
+            <span className="pin-rail me" style={{ '--x': bandOn ? bandPercent(me.minutes) : '0%' }}>
+              <span className="pin me">나 {me.time}</span>
             </span>
-            <span className="send-rail">
+            <span className="send-rail" style={{ '--x': bandPercent(send.minutes) }}>
               <span className="send" />
             </span>
           </div>
@@ -528,7 +558,15 @@ function NightSection() {
         <Reveal className="sendcard">
           <span className="send-mini" aria-hidden="true" />
           <span>
-            <b>Dana의 오전 9:00</b>(서울 새벽 1:00)에 알림으로 다시 알려 드려요 — 보내기는 직접 해요
+            {schedule ? (
+              <>
+                <b>Dana의 {send.theirLabel}</b>({send.myLabel})에 알림으로 다시 알려 드려요 — 보내기는 직접 해요
+              </>
+            ) : (
+              <>
+                <b>Dana는 업무 시간이에요</b> — 지금 보내도 돼요
+              </>
+            )}
           </span>
         </Reveal>
       </div>
