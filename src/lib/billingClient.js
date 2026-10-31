@@ -13,6 +13,8 @@ export const BILLING_ERRORS = {
   NOT_SIGNED_IN: 'not-signed-in',
   NETWORK: 'network',
   UNAVAILABLE: 'billing-unavailable',
+  NOT_OWNER: 'not-owner', // 팀 결제는 팀장만(2026-11-01)
+  BAD_SEATS: 'bad-seats', // 좌석 2~100 · 지금 팀원 수 이상
   UNKNOWN: 'unknown',
 };
 
@@ -23,9 +25,14 @@ export class BillingClientError extends Error {
   }
 }
 
-/** @returns {Promise<string>} 결제 주소 */
-export async function startCheckout(interval, { fetchImpl = globalThis.fetch } = {}) {
+/**
+ * @param {'month'|'year'} interval
+ * @param {{plan?: 'pro'|'team', teamId?: string, seats?: number, fetchImpl?: Function}} [options] 팀이면 teamId·seats(2026-11-01)
+ * @returns {Promise<string>} 결제 주소
+ */
+export async function startCheckout(interval, { plan = 'pro', teamId, seats, fetchImpl = globalThis.fetch } = {}) {
   if (interval !== 'month' && interval !== 'year') throw new BillingClientError(BILLING_ERRORS.UNKNOWN);
+  if (plan !== 'pro' && plan !== 'team') throw new BillingClientError(BILLING_ERRORS.UNKNOWN);
   const token = await getIdToken({ fetchImpl });
   if (!token) throw new BillingClientError(BILLING_ERRORS.NOT_SIGNED_IN);
   let response;
@@ -33,7 +40,7 @@ export async function startCheckout(interval, { fetchImpl = globalThis.fetch } =
     response = await fetchImpl(BILLING_CHECKOUT_ENDPOINT, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan: 'pro', interval }),
+      body: JSON.stringify(plan === 'team' ? { plan, interval, teamId, seats } : { plan, interval }),
     });
   } catch {
     throw new BillingClientError(BILLING_ERRORS.NETWORK);
@@ -41,6 +48,8 @@ export async function startCheckout(interval, { fetchImpl = globalThis.fetch } =
   const payload = await response.json().catch(() => ({}));
   if (response.status === 401) throw new BillingClientError(BILLING_ERRORS.NOT_SIGNED_IN);
   if (response.status === 503) throw new BillingClientError(BILLING_ERRORS.UNAVAILABLE);
+  if (response.status === 403) throw new BillingClientError(BILLING_ERRORS.NOT_OWNER);
+  if (response.status === 400 && payload?.error === 'bad seats') throw new BillingClientError(BILLING_ERRORS.BAD_SEATS);
   if (!response.ok || typeof payload?.checkoutUrl !== 'string') throw new BillingClientError(BILLING_ERRORS.UNKNOWN);
   return payload.checkoutUrl;
 }
@@ -50,5 +59,7 @@ export function billingErrorText(reason) {
   if (reason === BILLING_ERRORS.NOT_SIGNED_IN) return '먼저 로그인해 주세요 — 결제는 로그인한 계정에 적용돼요.';
   if (reason === BILLING_ERRORS.NETWORK) return '서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
   if (reason === BILLING_ERRORS.UNAVAILABLE) return '지금은 결제를 받을 수 없어요. 잠시 뒤 다시 시도해 주세요.';
+  if (reason === BILLING_ERRORS.NOT_OWNER) return '팀 요금제는 팀장만 구매할 수 있어요.';
+  if (reason === BILLING_ERRORS.BAD_SEATS) return '좌석은 2석 이상, 지금 팀원 수 이상이어야 해요.';
   return '결제창을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.';
 }
