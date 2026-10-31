@@ -121,7 +121,7 @@ export const STORAGE_KEYS = {
   SNIPPETS: 'sai.snippets',
   /**
    * boolean — 교정문 하이라이트(용어 초록 · 위험 노란 밑줄) 표시 여부. S19.
-   * 기본 true. 🔴 끄면 **표시만** 사라지고 판정 자체는 그대로다 — 이모지 자동 교체(권장 4)는
+   * 기본 true(`displaySettings.js` — 2026-10-31부터 실제로도 true). 🔴 끄면 **표시만** 사라지고 판정 자체는 그대로다 — 이모지 자동 교체(권장 4)는
    *    문장을 실제로 바꾸는 동작이라 이 토글과 무관하게 계속 적용된다.
    */
   HIGHLIGHT_HINTS: 'sai.highlightHints',
@@ -190,7 +190,7 @@ export const STORAGE_KEYS = {
   DECISION_LOGS: 'sai.decisionLogs',
   /**
    * 'replace' | 'append' — 저장 문구를 넣을 때 기존 내용을 지울지 뒤에 붙일지 (S20 후속).
-   * 기본 'replace'. 🔴 사용자가 쓰던 초안을 말없이 지우는 일이 없도록 선택지를 준다.
+   * 기본 'append'(2026-10-31 — 기본값이 쓰던 글을 지우지 않게, `displaySettings.js`). 🔴 사용자가 쓰던 초안을 말없이 지우는 일이 없도록 선택지를 준다.
    */
   SNIPPET_INSERT_MODE: 'sai.snippetInsertMode',
   /**
@@ -200,7 +200,7 @@ export const STORAGE_KEYS = {
    */
   THREAD_CONTEXT: 'sai.threadContext',
   /**
-   * boolean — 팝업에서 참고한 문장 **미리보기**를 보여줄지. 기본 true.
+   * boolean — 팝업에서 참고한 문장 **미리보기**를 보여줄지. 기본 true(`displaySettings.js` — 2026-10-31부터 실제로도 true).
    * 🔴 `THREAD_CONTEXT`(참고 자체를 켜고 끔)와 **다른 축**이다(2026-08-13 사용자 요청) — 참고는
    *    계속 쓰면서 화면에 원문만 안 보이게 하고 싶을 수 있다(옆에서 볼 때 남의 메시지가 그대로
    *    뜨는 게 부담스러운 경우 등). 꺼도 서버로 나가는 것은 그대로다 — **표시만** 가린다.

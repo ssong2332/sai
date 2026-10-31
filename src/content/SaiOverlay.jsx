@@ -49,6 +49,7 @@ import {
 import { hasConsent as hasDecisionsConsent } from '../lib/decisions.js';
 import { FEATURES } from '../config.js';
 import { STORAGE_KEYS, THREAD_CONTEXT_DEFAULT, getLocal, setLocal } from '../lib/storage.js';
+import { DISPLAY_SETTINGS } from '../lib/displaySettings.js';
 import {
   listRecipients,
   updateRecipient,
@@ -235,7 +236,7 @@ export default function SaiOverlay({ autoButton = true }) {
   /** 팝업 안에서 보여주는 긴급도 변경 안내 (Spec 권장 2). */
   const [urgencyNotice, setUrgencyNotice] = useState('');
   /** S20 후속 — 저장 문구를 기존 내용 **대신** 넣을지, **뒤에** 붙일지 (2026-08-13 사용자 요청). */
-  const [snippetMode, setSnippetMode] = useState('replace');
+  const [snippetMode, setSnippetMode] = useState(DISPLAY_SETTINGS.snippetInsertMode.fallback);
 
   /**
    * S21 / Spec 권장 8 — 직전 대화 맥락.
@@ -254,7 +255,7 @@ export default function SaiOverlay({ autoButton = true }) {
   const threadContextRef = useRef([]);
 
   useEffect(() => {
-    getLocal(STORAGE_KEYS.SNIPPET_INSERT_MODE, 'replace').then(setSnippetMode);
+    getLocal(STORAGE_KEYS.SNIPPET_INSERT_MODE, DISPLAY_SETTINGS.snippetInsertMode.fallback).then(setSnippetMode);
     getLocal(STORAGE_KEYS.THREAD_CONTEXT, THREAD_CONTEXT_DEFAULT).then(setThreadContextOn);
 
     // 사이드패널 설정에서 껐다 켰다 하면 페이지 쪽도 즉시 따라간다(스니펫과 같은 방식).

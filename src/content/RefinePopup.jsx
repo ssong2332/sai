@@ -32,6 +32,7 @@ import { verifyMissingElements } from '../core/refine/missing.js';
 // S41 — 자리표시자 판정은 회신 초안과 **같은 함수**를 쓴다. 두 벌이면 대괄호 규칙이 갈린다.
 import { collectPlaceholders } from '../core/reply/verify.js';
 import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
+import { DISPLAY_SETTINGS } from '../lib/displaySettings.js';
 import { listPersonalGlossary } from '../lib/glossary.js';
 // S26 / Spec 부가 5·8
 import DualClock from './DualClock.jsx';
@@ -297,10 +298,10 @@ export default function RefinePopup({
    *    켜면 저장되어 계속 유지된다. 🔴 **강조(색·물결) 자체는 이 토글과 무관하게 항상 켜져 있다**
    *    — 안전망이라 끌 수 없다.
    */
-  const [hintsOn, setHintsOn] = useState(false);
+  const [hintsOn, setHintsOn] = useState(DISPLAY_SETTINGS.highlightHints.fallback);
   useEffect(() => {
     let cancelled = false;
-    getLocal(STORAGE_KEYS.HIGHLIGHT_HINTS, false).then((stored) => {
+    getLocal(STORAGE_KEYS.HIGHLIGHT_HINTS, DISPLAY_SETTINGS.highlightHints.fallback).then((stored) => {
       if (!cancelled) setHintsOn(stored);
     });
     return () => {
@@ -568,10 +569,10 @@ export default function RefinePopup({
    *    요구하는 것은 "N개 참고함" **노출**이고 목록은 우리가 더한 투명성 장치이므로, 한 번의
    *    클릭 뒤로 물리되 셰브런으로 항상 보이게 둔다. **설정은 저장되므로 한 번 펼치면 유지된다.**
    */
-  const [previewOn, setPreviewOn] = useState(false);
+  const [previewOn, setPreviewOn] = useState(DISPLAY_SETTINGS.threadContextPreview.fallback);
   useEffect(() => {
     let cancelled = false;
-    getLocal(STORAGE_KEYS.THREAD_CONTEXT_PREVIEW, false).then((stored) => {
+    getLocal(STORAGE_KEYS.THREAD_CONTEXT_PREVIEW, DISPLAY_SETTINGS.threadContextPreview.fallback).then((stored) => {
       if (!cancelled) setPreviewOn(stored);
     });
     return () => {

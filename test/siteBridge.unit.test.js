@@ -100,11 +100,11 @@ test('site:get — 기본값은 그 설정이 효과를 내는 화면의 기본�
     theme: 'light',
     backTranslation: true,
     refineReasoning: false,
-    highlightHints: false, // 팝업(RefinePopup) 기본값
+    highlightHints: true, // 2026-10-31 기본값 변경 — 팝업도 같은 값(displaySettings)
     threadContext: false, // THREAD_CONTEXT_DEFAULT
-    threadContextPreview: false, // 팝업 기본값
+    threadContextPreview: true, // 2026-10-31
     replyAuto: false,
-    snippetInsertMode: 'replace',
+    snippetInsertMode: 'append', // 2026-10-31
   });
   assert.deepEqual(settings.language, { myLanguage: null, partnerRegion: null, tone: null });
   assert.deepEqual(settings.profile, { situationId: null, collabStyleId: null });
@@ -133,14 +133,14 @@ test('site:set display — 쓰고 갱신된 settings를 돌려준다', async () 
   const response = await send({
     type: 'site:set',
     section: 'display',
-    patch: { theme: 'dark', highlightHints: true, snippetInsertMode: 'append' },
+    patch: { theme: 'dark', highlightHints: false, snippetInsertMode: 'replace' }, // 기본값의 반대로 — 정말 썼는지 보이게
   });
   assert.equal(response.ok, true);
   assert.equal(response.settings.display.theme, 'dark');
-  assert.equal(response.settings.display.highlightHints, true);
-  assert.equal(response.settings.display.snippetInsertMode, 'append');
+  assert.equal(response.settings.display.highlightHints, false);
+  assert.equal(response.settings.display.snippetInsertMode, 'replace');
   assert.equal(await getLocal(STORAGE_KEYS.THEME), 'dark');
-  assert.equal(await getLocal(STORAGE_KEYS.HIGHLIGHT_HINTS), true);
+  assert.equal(await getLocal(STORAGE_KEYS.HIGHLIGHT_HINTS), false);
 });
 
 test('🔴 site:set — 값 하나만 틀려도 아무것도 쓰지 않는다', async () => {

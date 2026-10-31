@@ -79,21 +79,21 @@ export const MAX_GLOSSARY_STRING = 200;
  * | theme | 'light' | 사이드패널 `App.jsx` — 저장값 없으면 라이트(2026-08-20 결정) |
  * | backTranslation | true | 팝업·사이드패널 둘 다 true |
  * | refineReasoning | false | 팝업·사이드패널 둘 다 false |
- * | highlightHints | **false** | 🔴 사이드패널 시트는 true로 읽지만 **설명이 실제로 뜨는 곳은 팝업**(`RefinePopup.jsx`)이고 팝업은 false로 읽는다 |
+ * | highlightHints | **true** (2026-10-31 기본값 변경) | `displaySettings.js`와 같은 값 — 팝업도 그 값을 읽는다 |
  * | threadContext | `THREAD_CONTEXT_DEFAULT` | 공용 상수(false) |
- * | threadContextPreview | **false** | 🔴 `storage.js` 주석은 「기본 true」지만 **미리보기를 그리는 팝업**은 false로 읽는다 |
+ * | threadContextPreview | **true** (2026-10-31 기본값 변경) | 같음 |
  * | replyAuto | false | `SaiOverlay.jsx` |
- * | snippetInsertMode | 'replace' | 오버레이·사이드패널 둘 다 'replace' |
+ * | snippetInsertMode | **'append'** (2026-10-31 기본값 변경) | 같음 — 오버레이도 그 값을 읽는다 |
  */
 const DISPLAY_FIELDS = {
   theme: { key: STORAGE_KEYS.THEME, fallback: 'light', values: ['light', 'dark'] },
   backTranslation: { key: STORAGE_KEYS.BACK_TRANSLATION, fallback: true },
   refineReasoning: { key: STORAGE_KEYS.REFINE_REASONING, fallback: false },
-  highlightHints: { key: STORAGE_KEYS.HIGHLIGHT_HINTS, fallback: false },
+  highlightHints: { key: STORAGE_KEYS.HIGHLIGHT_HINTS, fallback: true },
   threadContext: { key: STORAGE_KEYS.THREAD_CONTEXT, fallback: THREAD_CONTEXT_DEFAULT },
-  threadContextPreview: { key: STORAGE_KEYS.THREAD_CONTEXT_PREVIEW, fallback: false },
+  threadContextPreview: { key: STORAGE_KEYS.THREAD_CONTEXT_PREVIEW, fallback: true },
   replyAuto: { key: STORAGE_KEYS.REPLY_AUTO, fallback: false },
-  snippetInsertMode: { key: STORAGE_KEYS.SNIPPET_INSERT_MODE, fallback: 'replace', values: ['replace', 'append'] },
+  snippetInsertMode: { key: STORAGE_KEYS.SNIPPET_INSERT_MODE, fallback: 'append', values: ['replace', 'append'] },
 };
 
 /** 검증 실패 — 바깥에서 `bad_request`로 바뀐다. 🔴 사유 문구·값을 담지 않는다. */
