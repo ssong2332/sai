@@ -661,3 +661,45 @@ test('🔴 첫 시도가 12초를 넘겼으면 다시 부르지 않는다(확장
   assert.equal(out.fallback, true);
   assert.equal(fetchImpl.calls.count, 1);
 });
+
+/* ── 역번역 재호출 (2026-11-01 통합 실측) ─────────────────────────────── */
+
+const COPY_BACK = goodRaw({ backTranslation: 'Could you review this by tomorrow morning?' });
+
+test('🔴 역번역이 교정문 복사면 한 번 더 부르고, 두 번째가 온전하면 그 결과를 준다', async () => {
+  const fetchImpl = seqFetch(COPY_BACK, goodRaw());
+  const events = [];
+  const out = await refine(BASE_REQUEST, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.equal(out.fallback, false);
+  assert.equal(out.backTranslation, '내일 오전까지 검토해 주실 수 있을까요?');
+  assert.equal(fetchImpl.calls.count, 2);
+  assert.ok(events.at(-1).issues.includes('back-retried'));
+});
+
+test('🔴 두 번 다 역번역이 깨지면 첫 결과를 준다 — 교정문은 버리지 않는다(폴백 아님)', async () => {
+  const fetchImpl = seqFetch(COPY_BACK);
+  const events = [];
+  const out = await refine(BASE_REQUEST, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.equal(out.fallback, false);
+  assert.equal(out.refined, 'Could you review this by tomorrow morning?');
+  assert.equal(fetchImpl.calls.count, 2);
+  assert.ok(events.at(-1).issues.includes('back-retry-failed'));
+  // 🔴 로그에 본문 없음 (Zero Retention).
+  assert.ok(!JSON.stringify(events).includes('review this'));
+});
+
+test('역번역 재호출이 형식 위반·내용 검사에 걸리면 첫 결과를 준다', async () => {
+  for (const second of [{ nope: true }, goodRaw({ refined: '내일 오전까지 리뷰 부탁드립니다' })]) {
+    const fetchImpl = seqFetch(COPY_BACK, second);
+    const out = await refine(BASE_REQUEST, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+    assert.equal(out.fallback, false);
+    assert.equal(out.refined, 'Could you review this by tomorrow morning?');
+    assert.equal(fetchImpl.calls.count, 2);
+  }
+});
+
+test('같은 언어쌍(ko→ko)은 역번역이 교정문과 같아도 다시 부르지 않는다', async () => {
+  const fetchImpl = seqFetch(goodRaw({ refined: '내일 오전까지 검토 부탁드립니다.', backTranslation: '내일 오전까지 검토 부탁드립니다.' }));
+  await refine({ ...BASE_REQUEST, targetLanguage: 'ko' }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+  assert.equal(fetchImpl.calls.count, 1);
+});

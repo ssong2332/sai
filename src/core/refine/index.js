@@ -13,7 +13,7 @@ import { buildRefinePayload, REFINE_PROMPT_VERSION, URGENCY_LEVELS } from './pro
 import { normalizeRefineResponse } from './schema.js';
 import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
-import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent } from './backcheck.js';
+import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, checkBackTranslation } from './backcheck.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -232,6 +232,12 @@ export async function refine(request, deps = {}) {
   const canRetry = () => now() - startedAt <= RETRY_ELAPSED_LIMIT_MS;
   let contentAttempts = 0;
   let transientRetried = false;
+  /**
+   * 🔴 역번역만 깨진 결과(교정문은 정상) — 한 번 더 불러 보고, 두 번째도 온전하지 않으면 **이것을 준다**
+   *    (2026-11-01 통합 실측: 역번역이 교정문 복사·다른 언어, 76건 중 1~3건). 교정문까지 버리지 않는다 —
+   *    화면은 역번역 실패 안내를 띄우고, 확장의 자동 재시도 한 번이 남아 있다(`SaiOverlay.jsx`).
+   */
+  let brokenBackResult = null;
   let result;
   let issues;
   for (let attempt = 1; ; attempt += 1) {
@@ -253,6 +259,11 @@ export async function refine(request, deps = {}) {
         transientRetried = true;
         continue;
       }
+      if (brokenBackResult) {
+        ({ result, issues } = brokenBackResult);
+        issues = [...issues, 'back-retry-failed'];
+        break;
+      }
       const fallbackResult = buildFallbackResponse(input, reason);
       // 🔴 진단용 상세(HTTP 상태·분류 코드). 메시지 본문은 담기지 않는다(providers/*가 보장).
       fallbackResult.fallbackDetail = error?.message ?? String(error);
@@ -263,6 +274,11 @@ export async function refine(request, deps = {}) {
 
     ({ result, issues } = normalizeRefineResponse(raw, { userUrgency: input.userUrgency }));
 
+    if (result === null && brokenBackResult) {
+      ({ result, issues } = brokenBackResult);
+      issues = [...issues, 'back-retry-failed'];
+      break;
+    }
     if (result === null) {
       const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
       logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues, attempt, latencyMs: now() - startedAt });
@@ -271,8 +287,30 @@ export async function refine(request, deps = {}) {
 
     const contentIssue = findContentIssue(result, input);
     if (contentIssue === null) {
+      const backUsable = checkBackTranslation({
+        backTranslation: result.backTranslation,
+        refined: result.refined,
+        sourceLanguage: input.sourceLanguage,
+        targetLanguage: input.targetLanguage,
+      }).usable;
+      if (!backUsable && !brokenBackResult && canRetry()) {
+        brokenBackResult = { result, issues: [...issues, 'back-broken'] };
+        continue;
+      }
+      if (!backUsable && brokenBackResult) {
+        ({ result, issues } = brokenBackResult);
+        issues = [...issues, 'back-retry-failed'];
+        break;
+      }
+      if (brokenBackResult) issues = [...issues, 'back-retried'];
       if (contentAttempts > 0) issues = [...issues, 'content-retried'];
       if (transientRetried) issues = [...issues, 'transient-retried'];
+      break;
+    }
+    // 역번역 재호출이 내용 검사에 걸리면 — 교정문이 정상이던 첫 결과를 준다.
+    if (brokenBackResult) {
+      ({ result, issues } = brokenBackResult);
+      issues = [...issues, 'back-retry-failed'];
       break;
     }
     // 🔴 끝까지 걸리면 `invalid` 폴백 — 캐시하지 않고, 확장의 `invalid` 자동 재시도 한 번을 탄다.
