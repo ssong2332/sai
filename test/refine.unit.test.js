@@ -569,3 +569,23 @@ test('🔴 실측 — 교정문이 통째로 한국어면 invalid 폴백으로 �
   assert.equal(second.fallback, false);
   assert.equal(fetchImpl.calls.count, 1, '실패 응답이 캐시에 남으면 안 된다');
 });
+
+/* ── 교정문 잘림 검사 (2026-11-01 통합 실측) ─────────────────────────────── */
+
+test('🔴 실측 — 교정문이 말줄임표로 끊겨 오면 invalid 폴백으로 돌리고 캐시하지 않는다', async () => {
+  const cache = new MemoryCacheStore();
+  const request = { ...BASE_REQUEST, targetLanguage: 'zh' };
+  const cut = goodRaw({ refined: '您好,交货日期将从3月14日顺延至3月21日,延后一周。报价仍为人民币... ' });
+  const events = [];
+  const first = await refine(request, { apiKey: 'k', cache, fetchImpl: stubFetch(cut), logger: (e) => events.push(e) });
+  assert.equal(first.fallback, true);
+  assert.equal(first.fallbackReason, FALLBACK_REASONS.INVALID);
+  assert.ok(events.at(-1).issues.includes('refined-truncated'));
+  // 🔴 로그에 교정문이 실리지 않는다 (Zero Retention).
+  assert.ok(!JSON.stringify(events).includes('人民币'));
+
+  const fetchImpl = stubFetch(goodRaw({ refined: '报价仍为1,250万韩元，数量300个保持不变。' }));
+  const second = await refine(request, { apiKey: 'k', cache, fetchImpl });
+  assert.equal(second.fallback, false);
+  assert.equal(fetchImpl.calls.count, 1, '실패 응답이 캐시에 남으면 안 된다');
+});

@@ -145,6 +145,36 @@ export function isRefinedInTargetScript(refined, sourceLanguage, targetLanguage)
   return true;
 }
 
+/**
+ * 교정문이 **말줄임표로 끊기거나 머뭇거리지 않았는지** 본다 (2026-11-01 통합 실측).
+ *
+ * 🔴 **실측한 결함**: 한국어 → 중국어 빠른 모드에서 `refined`가 「…报价仍为人民币... 」로 **문장 중간에서 끊겨** 왔다
+ *    (같은 문장 5회 중 2회). `stop_reason`은 `max_tokens`가 아니었다 — 모델이 스스로 줄였다. 역번역은 비어 있었고
+ *    폴백도 아니어서 잘린 문장이 「상대에게 보낼 문장」 칸에 그대로 들어갔다.
+ * 🔴 **문장 중간도 본다**: 2026-11-01 실측(프롬프트 조정 실험 중 15회에 2회) — 「报价仍为人民币... 不对，报价为韩元…」처럼 모델이 말줄임표로
+ *    머뭇거린 뒤 스스로 고친 문장이 교정문에 그대로 남았다. 끝만 보면 이걸 놓친다.
+ * 🔴 **고쳐 쓰지 않는다.** `isRefinedInTargetScript`와 같은 길 — 코어가 `invalid` 폴백으로 돌리고, 확장이 한 번 자동 재시도한다.
+ *
+ * 판정표 (위에서부터 처음 맞는 행 하나만 적용한다)
+ * | 순서 | 조건 | 결과 |
+ * |---|---|---|
+ * | 1 | 교정문이 비었다 | 통과 |
+ * | 2 | 원문에 말줄임표(`...`·`…`·`。。。`·`⋯`)가 어디든 있다 | 통과 — 원문의 말투를 옮긴 것 |
+ * | 3 | 교정문에 말줄임표가 어디든 있다 | 🔴 실패 |
+ * | 4 | 그 밖 | 통과 |
+ *
+ * 🔴 행 2가 있어서 「음… 확인해 볼게요」 같은 원문의 말줄임표는 그대로 옮겨도 지우지 않는다.
+ *
+ * @returns {boolean} 끊기지 않았다고 볼 수 있으면 true.
+ */
+export function isRefinedComplete(refined, sourceText) {
+  const value = String(refined ?? '').trim();
+  if (value === '') return true;
+  const ellipsis = /\.{2,}|…|。{2,}|⋯/u;
+  if (ellipsis.test(String(sourceText ?? ''))) return true;
+  return !ellipsis.test(value);
+}
+
 /** 화면 문구. 🔴 무엇이 실패했는지 말하고, 사용자가 할 수 있는 일을 알린다. */
 export function backFailMessage(reason) {
   if (reason === BACK_FAIL.SAME_AS_REFINED) {
