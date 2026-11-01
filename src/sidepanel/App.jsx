@@ -1994,10 +1994,11 @@ function TeamPlanSection({ team, plan, onToast, onChanged }) {
   };
   return (
     <div className="card card-accent">
-      <p className="card-label">팀 요금제</p>
-      <p className="meta">{teamPlanLine(plan.billing)}</p>
+      {/* 2026-11-01 사용자 결정 「숨기고 올림」 — 유료화 전(`FEATURES.billing` 꺼짐)에는 요금제 문구를 보이지 않는다. */}
+      <p className="card-label">{FEATURES.billing ? '팀 요금제' : '팀 기본 품질 모드'}</p>
       {FEATURES.billing && (
         <>
+          <p className="meta">{teamPlanLine(plan.billing)}</p>
           <p className="field-label">좌석 수 (1석당 연 $96 · 월 $10)</p>
           <div className="github-suggest-form">
             <input
@@ -2021,7 +2022,7 @@ function TeamPlanSection({ team, plan, onToast, onChanged }) {
           </div>
         </>
       )}
-      <p className="field-label">팀 기본 품질 모드</p>
+      {FEATURES.billing && <p className="field-label">팀 기본 품질 모드</p>}
       <div className="tag-row">
         {QUALITY_IDS.map((id) => (
           <button
