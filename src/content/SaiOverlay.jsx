@@ -617,6 +617,13 @@ export default function SaiOverlay({ autoButton = true }) {
    *    원문이 그대로 나간다. 그 구멍을 만들지 않으려고 ref 하나로 좁혔다.
    */
   const sendTextRef = useRef('');
+  /**
+   * 🔴 화면 검사(숫자·이름·이모지·빠진 요소 등)가 비교할 원문 = **실제로 보낸 텍스트** (2026-11-01 실브라우저에서 발견).
+   *    민감정보를 가리고 보냈는데 원문(`selectedText`)과 비교해서, 가린 카드번호를 「교정문에서 빠진 숫자」로
+   *    경고하며 그 숫자를 화면에 다시 보여 줬다. 모델이 받은 것은 가린 문장이니 그것과 비교한다.
+   *    `sendTextRef`와 같은 값이다 — ref는 렌더를 일으키지 않아 화면용으로 따로 둔다.
+   */
+  const [sentText, setSentText] = useState('');
 
   /**
    * 🔴 **받는 사람이 없을 때 고른 문체** (2026-11-01 실브라우저에서 발견). 문체는 그 사람 기록에 저장되는데
@@ -995,6 +1002,7 @@ export default function SaiOverlay({ autoButton = true }) {
     }
     setGuard(null);
     sendTextRef.current = text;
+    setSentText(text);
     dispatch(recipientOverride);
   };
 
@@ -1408,6 +1416,7 @@ export default function SaiOverlay({ autoButton = true }) {
     const masked = guard?.maskedText;
     if (!masked) return;
     sendTextRef.current = masked;
+    setSentText(masked);
     dispatch();
   };
 
@@ -1903,10 +1912,10 @@ export default function SaiOverlay({ autoButton = true }) {
               }
               onSchedule={acceptSchedule}
               onSaveSnippet={saveSnippet}
-              // 🔴 원문을 넘기는 이유는 하나뿐 — 원문에 있던 위험 이모지가 교정문에서
-              //    사라졌을 때 그 사실을 알리기 위해서다(권장 4 안내). 화면 표시용이며
+              // 🔴 화면 검사(숫자·이름·위험 이모지 등)가 교정문과 비교할 원문이다. 화면 표시용이며
               //    저장·전송되지 않는다(전송 대상은 `sendTextRef` 하나로 좁혀져 있다).
-              sourceText={selectedText}
+              //    **실제로 보낸 텍스트**(가렸으면 가린 문장)를 쓴다 — 위 `sentText` 주석.
+              sourceText={sentText || selectedText}
               onRegenerate={regenerateBackTranslation}
               regenerating={regenerating}
               threadContext={threadContext}
