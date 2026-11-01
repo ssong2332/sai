@@ -703,3 +703,38 @@ test('같은 언어쌍(ko→ko)은 역번역이 교정문과 같아도 다시 �
   await refine({ ...BASE_REQUEST, targetLanguage: 'ko' }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
   assert.equal(fetchImpl.calls.count, 1);
 });
+
+/* ── 문체 수위 전달 (2026-11-01 실브라우저에서 발견 — register가 정리 단계에서 버려졌다) ── */
+
+function captureFetch() {
+  const bodies = [];
+  const impl = async (url, init) => {
+    bodies.push(String(init?.body ?? ''));
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(goodRaw()) } }] }) };
+  };
+  impl.bodies = bodies;
+  return impl;
+}
+
+test('🔴 확장이 보낸 register가 프롬프트까지 간다 — casual·formal·없음', async () => {
+  const cases = [
+    [undefined, 'DEFAULT REGISTER'],
+    ['casual', 'CASUAL: write'],
+    ['formal', 'FORMAL: write'],
+    ['shouting', 'DEFAULT REGISTER'], // 모르는 값은 기본
+  ];
+  for (const [register, marker] of cases) {
+    const fetchImpl = captureFetch();
+    await refine({ ...BASE_REQUEST, register }, { apiKey: 'k', provider: 'openai', cache: new MemoryCacheStore(), fetchImpl });
+    assert.ok(fetchImpl.bodies[0].includes(marker), `${register} → ${marker}`);
+  }
+});
+
+test('🔴 문체만 다른 같은 문장은 캐시를 같이 쓰지 않는다', async () => {
+  const cache = new MemoryCacheStore();
+  const fetchImpl = captureFetch();
+  await refine({ ...BASE_REQUEST }, { apiKey: 'k', provider: 'openai', cache, fetchImpl });
+  const formal = await refine({ ...BASE_REQUEST, register: 'formal' }, { apiKey: 'k', provider: 'openai', cache, fetchImpl });
+  assert.equal(formal.cached ?? false, false);
+  assert.equal(fetchImpl.bodies.length, 2);
+});
