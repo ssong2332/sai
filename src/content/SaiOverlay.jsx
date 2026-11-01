@@ -618,6 +618,19 @@ export default function SaiOverlay({ autoButton = true }) {
    */
   const sendTextRef = useRef('');
 
+  /**
+   * 🔴 **받는 사람이 없을 때 고른 문체** (2026-11-01 실브라우저에서 발견). 문체는 그 사람 기록에 저장되는데
+   *    (`rememberRegister`), 받는 사람이 없으면 저장할 곳이 없어 버려졌고 요청에도 실리지 않았다 —
+   *    가볍게·격식을 눌러도 결과는 늘 기본이었다(연락처가 없는 첫 사용자 전부).
+   * 🔴 전역 저장으로 되돌리지 않는다(`refineClient.js` 「전역 저장을 없앴다」). **이번 팝업에서만** 쓰고,
+   *    팝업이 내려갈 때(`stage`가 refine이 아니게 될 때 — 팝업의 문체 표시도 그때 초기화된다)·받는 사람
+   *    변경에서 비운다. `undefined` = 고른 적 없음 → 요청에 싣지 않는다.
+   */
+  const adhocRegisterRef = useRef(undefined);
+  useEffect(() => {
+    if (stage !== 'refine') adhocRegisterRef.current = undefined;
+  }, [stage]);
+
   const runRefine = useCallback(
     async (userUrgency, routeIntent = false) => {
       const text = sendTextRef.current;
@@ -630,6 +643,8 @@ export default function SaiOverlay({ autoButton = true }) {
           text,
           userUrgency,
           threadContext: threadContextRef.current,
+          // 받는 사람이 있으면 그 사람 기록의 값을 `refineClient`가 읽는다 — 여기서 덮지 않는다.
+          ...(adhocRegisterRef.current !== undefined ? { register: adhocRegisterRef.current } : {}),
         });
         setResult(response);
         /**
@@ -1097,7 +1112,11 @@ export default function SaiOverlay({ autoButton = true }) {
    *    없는 사람에게 저장하려다 오류를 내는 것보다 낫다.
    */
   const rememberRegister = async (next) => {
-    if (!recipient?.id) return;
+    if (!recipient?.id) {
+      adhocRegisterRef.current = next;
+      return;
+    }
+    adhocRegisterRef.current = undefined;
     await updateRecipient(recipient.id, { register: next });
     const list = await listRecipients();
     setRecipients(list);
@@ -1142,6 +1161,7 @@ export default function SaiOverlay({ autoButton = true }) {
   };
 
   const changeRecipient = async (id) => {
+    adhocRegisterRef.current = undefined;
     const next = recipients.find((entry) => entry.id === id) ?? null;
     setRecipient(next);
     await setSelectedRecipientId(id);
