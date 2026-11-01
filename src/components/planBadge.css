@@ -1,0 +1,22 @@
+/**
+ * 요금제 배지(2026-11-01) — 글자만으로 뜻이 통한다(색은 보조). 버튼처럼 보이지 않게 테두리·그림자 없이 옅은 바탕만.
+ */
+.plan-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--radius-pill);
+}
+
+.plan-badge-pro {
+  background: var(--seam-tint);
+  color: var(--seam-deep);
+}
+
+.plan-badge-team {
+  background: var(--dusk-tint);
+  color: var(--dusk-deep);
+}

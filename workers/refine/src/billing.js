@@ -15,14 +15,10 @@
 import { verifyFirebaseIdToken, bearerToken, AuthError } from './auth.js';
 import { teamShouldLock } from '../../../functions/teams.js';
 import { billingExpireAt } from '../../../functions/account.js';
+import { PLAN_LIMITS } from '../../../src/core/refine/quality.js';
 
-/** 요금제별 하루 한도 — `docs/BillingDesign.md` 2절 · Spec §0(2026-10-31 확정). */
-export const PLAN_LIMITS = Object.freeze({
-  beta: Object.freeze({ daily: 100, standard: 10, deep: 3 }),
-  free: Object.freeze({ daily: 20, standard: 0, deep: 0 }),
-  pro: Object.freeze({ daily: 200, standard: 10, deep: 3 }),
-  team: Object.freeze({ daily: 200, standard: 20, deep: 5 }),
-});
+/** 요금제별 하루 한도 — 표는 코어(`src/core/refine/quality.js`) 한 곳. 확장 설정 안내가 같은 표를 읽는다. */
+export { PLAN_LIMITS };
 
 /** 유료로 치는 구독 상태 — `past_due`는 Paddle이 재청구하는 동안이라 유지한다. */
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);

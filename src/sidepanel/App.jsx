@@ -3,7 +3,9 @@ import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
 import { FEATURES } from '../config.js';
-import { BillingClientError, billingErrorText, getMyPlan, planBadgeLabel, startCheckout } from '../lib/billingClient.js';
+import { BillingClientError, billingErrorText, startCheckout } from '../lib/billingClient.js';
+import { useMyPlan } from '../lib/useMyPlan.js';
+import PlanBadge from '../components/PlanBadge.jsx';
 import { QUALITY_IDS, QUALITY_LABELS } from '../core/refine/quality.js';
 import { dashboardPageUrl } from '../lib/dashboardPage.js';
 import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
@@ -200,36 +202,8 @@ export default function App() {
   /** 설정 시트를 열 때 바로 보여줄 묶음 — 'tone'이면 「보내는 글 기본값」으로 내려간다(2026-10-26 프로필 톤 링크). */
   const [settingsFocus, setSettingsFocus] = useState(null);
   const [toast, setToast] = useState('');
-  /** 로고 옆 요금제 배지(2026-11-01 사용자 결정) — `pro`·`team`일 때만 보인다. */
-  const [plan, setPlan] = useState(null);
-
-  /**
-   * 🔴 유료화 전(`FEATURES.billing` 꺼짐)에는 묻지도 않는다 — 요금제 문구를 숨긴 것과 같은 이유(「숨기고 올림」).
-   * 패널을 열 때·다시 보일 때(결제 탭에서 돌아옴)·로그인 상태가 바뀔 때 다시 묻는다.
-   */
-  useEffect(() => {
-    if (!FEATURES.billing) return undefined;
-    let cancelled = false;
-    const refresh = () => {
-      getMyPlan().then((next) => {
-        if (!cancelled) setPlan(next);
-      });
-    };
-    refresh();
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh();
-    };
-    const onStorage = (changes, area) => {
-      if (area === 'local' && changes[STORAGE_KEYS.AUTH]) refresh();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    globalThis.chrome?.storage?.onChanged?.addListener(onStorage);
-    return () => {
-      cancelled = true;
-      document.removeEventListener('visibilitychange', onVisible);
-      globalThis.chrome?.storage?.onChanged?.removeListener(onStorage);
-    };
-  }, []);
+  /** 로고 옆 요금제 배지(2026-11-01 사용자 결정) — `pro`·`team`일 때만 보인다(`useMyPlan`). */
+  const plan = useMyPlan();
 
   /**
    * 저장된 테마를 복원한다.
@@ -515,12 +489,7 @@ export default function App() {
         <span className="brand-block">
           <span className="brand-row">
             <span className="brand-name">S·AI</span>
-            {/* 요금제 배지 — 이름의 일부로 읽히지 않게 작은 알약으로 떨어뜨린다. 누르는 것이 아니라 표시만. */}
-            {planBadgeLabel(plan) && (
-              <span className={`plan-badge plan-badge-${plan}`} title={plan === 'team' ? '팀 요금제 사용 중' : 'Pro 요금제 사용 중'}>
-                {planBadgeLabel(plan)}
-              </span>
-            )}
+            <PlanBadge plan={plan} />
           </span>
           {/* 🔴 사이드패널에만 둔다 — 팝업은 남의 페이지 위 좁은 오버레이라 한 줄이 늘면
               본문이 밀린다(사용자 결정). */}

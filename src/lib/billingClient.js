@@ -8,6 +8,7 @@
 
 import { BILLING_CHECKOUT_ENDPOINT, BILLING_ME_ENDPOINT } from '../config.js';
 import { getIdToken } from './authClient.js';
+import { PLAN_LIMITS } from '../core/refine/quality.js';
 
 export const BILLING_ERRORS = {
   NOT_SIGNED_IN: 'not-signed-in',
@@ -79,6 +80,26 @@ export function planBadgeLabel(plan) {
   if (plan === 'team') return 'TEAM';
   if (plan === 'pro') return 'PRO';
   return null;
+}
+
+/**
+ * 설정 「지금 플랜」 문구(2026-11-01 사용자 결정 「지금 수정하자」) — 결제한 사람에게 「무료 · 출시 기간」이 보이지 않게.
+ * | 요금제 | 플랜 | 하루 횟수 |
+ * |---|---|---|
+ * | team | 팀 요금제 | 200회 · 기본 20 · 심층 5 |
+ * | pro | Pro | 200회 · 기본 10 · 심층 3 |
+ * | free | 무료 | 20회 · 빠른 모드만 |
+ * | beta · 모름(`null`) | `null` — 화면이 지금 문구(출시 기간) 그대로 |
+ * 숫자는 `PLAN_LIMITS`(Worker 판정과 같은 표)에서 읽는다.
+ */
+export function planSummary(plan) {
+  const limits = PLAN_LIMITS[plan];
+  if (!limits || plan === 'beta') return null;
+  const modes = limits.standard + limits.deep > 0 ? ` · 기본 ${limits.standard} · 심층 ${limits.deep}` : ' · 빠른 모드만';
+  const daily = `${limits.daily}회${modes}`;
+  if (plan === 'team') return { name: '팀 요금제', daily, note: '팀장이 산 좌석으로 써요. 좌석은 팀 탭에서 팀장이 관리해요.' };
+  if (plan === 'pro') return { name: 'Pro', daily, note: '바꾸거나 해지하려면 영수증 메일의 Paddle 링크(paddle.net)를 열어 주세요.' };
+  return { name: '무료', daily, note: '다 쓰면 다음 날(한국 시간 자정) 다시 채워져요.' };
 }
 
 /** 화면 문구 — 사유 코드 → 한 줄. */

@@ -908,6 +908,12 @@ a {
 }
 
 /* ── 요금제 ── */
+/* 「지금 플랜」 — 배지 + 요금제 이름 한 줄(2026-11-01). */
+.plan-now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .plan-link {
   justify-self: start;
   margin-top: 12px;
