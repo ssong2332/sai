@@ -549,3 +549,23 @@ test('refine 요청의 profile/recipient/casualTone이 프롬프트와 캐시 �
   assert.ok(casualBody.includes('LGTM'), '캐주얼 표현이 프롬프트 payload에 실려야 한다');
   assert.ok(!JSON.stringify(captured[0]).includes('LGTM'), '캐주얼 OFF에는 실리면 안 된다');
 });
+
+/* ── 교정문 언어 검사 (2026-11-01 refine-v25) ─────────────────────────────── */
+
+test('🔴 실측 — 교정문이 통째로 한국어면 invalid 폴백으로 돌리고 캐시하지 않는다', async () => {
+  const cache = new MemoryCacheStore();
+  const request = { ...BASE_REQUEST, targetLanguage: 'zh' };
+  const korean = goodRaw({ refined: '금요일까지 처리 가능한지 확인 부탁드립니다.' });
+  const events = [];
+  const first = await refine(request, { apiKey: 'k', cache, fetchImpl: stubFetch(korean), logger: (e) => events.push(e) });
+  assert.equal(first.fallback, true);
+  assert.equal(first.fallbackReason, FALLBACK_REASONS.INVALID);
+  assert.ok(events.at(-1).issues.includes('refined-wrong-script'));
+  // 🔴 로그에 교정문이 실리지 않는다 (Zero Retention).
+  assert.ok(!JSON.stringify(events).includes('금요일까지'));
+
+  const fetchImpl = stubFetch(goodRaw({ refined: '请问能否在周五前处理？' }));
+  const second = await refine(request, { apiKey: 'k', cache, fetchImpl });
+  assert.equal(second.fallback, false);
+  assert.equal(fetchImpl.calls.count, 1, '실패 응답이 캐시에 남으면 안 된다');
+});

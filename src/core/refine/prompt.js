@@ -71,7 +71,11 @@ import { conventionRules } from './conventions.js';
  *   ④ **「결론 먼저」 태그 무시**: 수신자 규칙이 방향 규칙 앞에 있고 「HOW만 바꿔라」라 순서 바꾸기가
  *      허용되는지 모호했다. 문장 순서도 바꿀 수 있다고 적고 문체 규칙 뒤로 옮겼다.
  */
-export const REFINE_PROMPT_VERSION = 'refine-v24';
+/**
+ * v25 (2026-11-01) — 사람 용어집에 출력 언어 호칭이 없으면 원문 대신 등록된 영어 표기를 쓴다(음역 금지).
+ *   교정문이 통째로 한국어로 오는 경우는 코드가 잡는다(`backcheck.js` `isRefinedInTargetScript`).
+ */
+export const REFINE_PROMPT_VERSION = 'refine-v25';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];
@@ -216,6 +220,9 @@ const PRESERVATION_AND_MISREAD_RULE =
   'mentioned. A person the original talks ABOUT in the third person (for example the one who made ' +
   'a request, or who has to do something) stays a third person in the output — never greet them, ' +
   'never address the message or the question to them, and never make them the one who is asked. ' +
+  // 🔴 v25 — 이 규칙 뒤로 ja 교정문에서 그 사람이 아예 사라졌다(8건 중 2건). 빼는 것도 실패라고 적는다.
+  'Keeping them in the third person never means removing them: they must still be named in the ' +
+  'output, in the same role. ' +
   'Only a person the original itself addresses directly may appear as the addressee; if the original ' +
   'addresses no one by name, any greeting you add must not contain a name. ' +
   'Step 2 — rewrite the message tone only; every locked item from step 1 must still be present (in ' +
@@ -370,8 +377,16 @@ function glossaryRules(glossary) {
     'language verbatim. An entry that carries "matchedInOriginal" is ALREADY confirmed to be referenced ' +
     'by exactly that phrase in the original (the app checked it) — treat it as a match, replace that phrase, ' +
     'and list it in "appliedGlossary". ' +
-    'If the matched honorific for the output language is null, do NOT guess one — ' +
-    'keep the original reference unchanged. For any other person mentioned who does NOT match a ' +
+    /**
+     * 🔴 v25 — 출력 언어 호칭이 없을 때 「원문 그대로」였더니 ja·zh 교정문에 한국어 호칭이 박혔고, 같은 문장에서
+     *    교정문이 통째로 한국어가 되거나(20건 중 3건) 이름이 사라졌다(8건 중 3건). 음역은 추측이다 — zh에서 한자가
+     *    매번 달랐다(金秀珍·金秀真). 그래서 사용자가 등록한 영어 표기를 쓰고, 그것도 없을 때만 원문 그대로 둔다.
+     */
+    'If the matched honorific for the output language is null, do NOT guess one and do NOT ' +
+    'transliterate the name yourself (no invented Chinese characters or kana): if the entry has an ' +
+    '"en" form, write exactly that registered "en" form in its place, with no title added; only if ' +
+    'there is no "en" form either, keep the original reference unchanged. Either way the person ' +
+    'must still appear in the output. For any other person mentioned who does NOT match a ' +
     'registered entry, do NOT invent or guess an honorific or title — in particular, never ' +
     'manufacture a form like "Manager Kim" by literally translating a job title and attaching it to ' +
     'a name. Keep that reference exactly as in the original and list the exact phrase you kept in ' +
