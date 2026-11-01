@@ -60,6 +60,7 @@ test('판정표 — 소속이 아니면 403', () => {
 test('계정 삭제 판정은 소속별로 나눈다', () => {
   assert.deepEqual(planAccountDeletion([member('a'), ownerAlone('b'), ownerWithOthers('c')]), {
     blocked: ['c'],
+    blockedSubscription: [],
     deleteTeams: ['b'],
     leaveTeams: ['a'],
   });
@@ -209,8 +210,8 @@ test('어댑터 — 소속을 찾고 팀장 여부·인원을 판정한다', asy
   const store = accountStore(fakeAdminDb(SEED), { deleteUser: async () => {} });
   const found = (await store.memberships('u1')).sort((a, b) => a.teamId.localeCompare(b.teamId));
   assert.deepEqual(found, [
-    { teamId: 'mine', name: '내 팀', isOwner: true, canViewDashboard: false, memberCount: 1 },
-    { teamId: 'shared', name: '같이 쓰는 팀', isOwner: false, canViewDashboard: false, memberCount: 2 },
+    { teamId: 'mine', name: '내 팀', isOwner: true, canViewDashboard: false, memberCount: 1, teamBilling: null },
+    { teamId: 'shared', name: '같이 쓰는 팀', isOwner: false, canViewDashboard: false, memberCount: 2, teamBilling: null },
   ]);
 });
 
@@ -328,4 +329,59 @@ test('결제 기록이 없으면 보관 표시도 없다(기존 순서 그대로
   const store = billingStore(null, [member('a')]);
   await deleteAccount(req({ confirm: 'DELETE' }), deps(store));
   assert.deepEqual(store.calls, ['member:a', 'user', 'auth']);
+});
+
+/* ── 팀 구독과 팀 삭제·계정 삭제 (2026-11-01 코드 검토 B2) ───────────────── */
+
+const paidTeam = (teamId, extra = {}) => ({
+  teamId,
+  isOwner: true,
+  memberCount: 1,
+  teamBilling: { status: 'active', seats: 2, periodEnd: '2026-12-01T00:00:00Z', ...extra },
+});
+
+test('🔴 B2 — 혼자인 팀장이 결제 중인 팀을 나가면 409 team-subscription-active, 아무것도 안 지움', async () => {
+  const store = fakeStore([paidTeam('t1')]);
+  await assert.rejects(
+    () => leaveTeamOnServer(req({ teamId: 't1' }), deps(store)),
+    (e) => e instanceof TeamError && e.status === 409 && e.reason === 'team-subscription-active',
+  );
+  assert.deepEqual(store.calls, []);
+  assert.equal(planLeave(paidTeam('t1', { cancelScheduled: true })), 'delete-team', '해지 예약이면 지울 수 있다');
+  assert.equal(planLeave(paidTeam('t1', { status: 'canceled' })), 'delete-team');
+});
+
+test('🔴 B2 — 계정 삭제도 결제 중인 팀이 남으면 전체 거절', async () => {
+  const store = billingStore(null, [member('a'), paidTeam('t1')]);
+  await assert.rejects(
+    () => deleteAccount(req({ confirm: 'DELETE' }), deps(store)),
+    (e) => e.status === 409 && e.reason === 'team-subscription-active',
+  );
+  assert.deepEqual(store.calls, []);
+});
+
+test('🔴 B2 — 팀장을 넘긴 결제자도 계정 삭제 거절(teamPurchase가 살아 있음), 해지 예약이면 허용', async () => {
+  const live = billingStore({ teamPurchase: { teamId: 't9', status: 'active' } }, [member('t9')]);
+  await assert.rejects(
+    () => deleteAccount(req({ confirm: 'DELETE' }), deps(live)),
+    (e) => e.status === 409 && e.reason === 'subscription-active',
+  );
+  assert.deepEqual(live.calls, []);
+  const scheduled = billingStore({ teamPurchase: { teamId: 't9', status: 'active', cancelScheduled: true } }, []);
+  await deleteAccount(req({ confirm: 'DELETE' }), { ...deps(scheduled), now: () => Date.UTC(2026, 10, 1) });
+  assert.ok(scheduled.calls.includes('auth'));
+});
+
+test('B2 — 결제 기록이 있는 팀을 지우면 기록을 먼저 보관(5년)하고, 지운 뒤 내 좌석을 푼다', async () => {
+  const store = fakeStore([paidTeam('t1', { status: 'canceled', periodEnd: '2026-10-01T00:00:00Z' })]);
+  store.retainTeamBilling = async (teamId, billing, expireAt) =>
+    store.calls.push(`retainTeam:${teamId}:${billing.status}:${expireAt.toISOString().slice(0, 10)}`);
+  const released = [];
+  await leaveTeamOnServer(req({ teamId: 't1' }), {
+    ...deps(store),
+    now: () => Date.UTC(2026, 10, 1),
+    teamBilling: { onMemberLeft: async (teamId, uid) => released.push(`${teamId}:${uid}`) },
+  });
+  assert.deepEqual(store.calls, ['retainTeam:t1:canceled:2031-11-01', 'team:t1']);
+  assert.deepEqual(released, ['t1:u1']);
 });

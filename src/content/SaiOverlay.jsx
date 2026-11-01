@@ -963,7 +963,7 @@ export default function SaiOverlay({ autoButton = true }) {
    *    둘이 됐고, 검사를 복사해 두면 한쪽에만 빠뜨리는 사고가 난다(단축키 경로에서 같은 이유로
    *    이미 한 번 정리한 적이 있다 — `openPopupRef` 주석).
    */
-  const beginSend = (text) => {
+  const beginSend = (text, recipientOverride) => {
     const { findings, hasSensitive } = detectSensitive(text);
     if (hasSensitive) {
       setGuard({ summary: summarize(findings), maskedText: redact(text, findings) });
@@ -980,11 +980,14 @@ export default function SaiOverlay({ autoButton = true }) {
     }
     setGuard(null);
     sendTextRef.current = text;
-    dispatch();
+    dispatch(recipientOverride);
   };
 
-  /** 검사를 통과한 텍스트를 현재 모드(작성/해독)에 맞는 호출로 보낸다. */
-  const dispatch = () => {
+  /**
+   * 검사를 통과한 텍스트를 현재 모드(작성/해독)에 맞는 호출로 보낸다.
+   * @param {object|null} [recipientOverride] 팝업을 열며 방금 판정한 받는 사람 — state는 아직 옛 값이라 직접 받는다(2026-11-01).
+   */
+  const dispatch = (recipientOverride) => {
     if (modeRef.current === 'decode') {
       setDecodeResult(null);
       setStage('decode');
@@ -993,7 +996,7 @@ export default function SaiOverlay({ autoButton = true }) {
     }
     setStage('refine');
     runRefine(null, true);
-    runSchedule(recipient);
+    runSchedule(recipientOverride !== undefined ? recipientOverride : recipient);
   };
 
   /**
@@ -1282,7 +1285,13 @@ export default function SaiOverlay({ autoButton = true }) {
      *    실제 LLM payload는 `refineClient`가 저장소에서 매번 새로 읽으므로 전송 자체는 안전했지만,
      *    **화면이 "공개"라고 보여주는데 실제로는 비공개인** 불일치가 생겨 사용자를 오해시킨다.
      */
-    (async () => {
+    /**
+     * 🔴 2026-11-01 코드 검토 — 받는 사람 판정·저장이 **끝난 뒤** 다듬기를 시작한다. 예전엔 판정(비동기)과
+     *    `beginSend`가 동시에 돌아, 다듬기가 저장소의 **옛 받는 사람**을 먼저 읽을 수 있었다
+     *    (미등록 Mei 대화가 Daniel 설정으로 다듬어지는 경로). 저장소 읽기 몇 ms만 늦어진다.
+     * @returns {Promise<object|null|undefined>} 판정된 받는 사람(없음 null) — 실패하면 undefined(state 값을 쓴다)
+     */
+    const decideRecipient = (async () => {
       const [list, selected] = await Promise.all([listRecipients(), getSelectedRecipient()]);
       setRecipients(list);
 
@@ -1311,15 +1320,22 @@ export default function SaiOverlay({ autoButton = true }) {
         const matched = list.find((entry) => entry.id === decision.id) ?? selected;
         setRecipient(matched);
         await setSelectedRecipientId(decision.id);
-      } else if (decision.action === 'clear') {
+        return matched;
+      }
+      if (decision.action === 'clear') {
         setRecipient(null);
         await setSelectedRecipientId(NO_RECIPIENT_ID);
-      } else {
-        setRecipient(selected);
+        return null;
       }
+      setRecipient(selected);
+      return selected;
     })();
 
-    beginSend(selectedText);
+    const text = selectedText;
+    decideRecipient.then(
+      (chosen) => beginSend(text, chosen),
+      () => beginSend(text),
+    );
   };
 
   /**

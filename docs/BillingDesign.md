@@ -112,6 +112,23 @@
 | 확장 | `me.locked` → 팀 탭 「팀 요금제가 필요해요」, 다듬기에 팀 용어집 안 실음 |
 | 데이터 | 지우지 않는다 — 구매하면 바로 풀림 |
 
+### 8-4. 코드 검토 보강 (2026-11-01 「전부 고쳐」)
+| # | 조건 | 처리 | 위치 |
+|---|---|---|---|
+| B1 | 웹훅 `custom_data`에 서버 서명(`sig`)이 없거나 틀림 | `unsigned` — 쓰기 0. 🔴 클라이언트 토큰은 공개라 누구나 결제창을 열어 남의 uid·teamId를 넣을 수 있었다. 키 = API 키에서 용도를 붙여 만든 HMAC(새 시크릿 없음) | `billing.js` `signCustomData` |
+| B1 | 팀 이벤트인데 팀 가격이 아님 / 개인 이벤트인데 Pro 가격이 아님 | `wrong-price` — 쓰기 0 | `applySubscriptionEvent` |
+| B2 | 혼자인 팀장이 결제 중(해지 예약 없음)인 팀을 지우려 함(나가기·계정 삭제) | 409 `team-subscription-active` | `account.js` `planLeave` |
+| B2 | 팀 결제자(팀장을 넘긴 뒤 포함)가 계정 삭제 | 409 `subscription-active` — 웹훅이 `billing/{결제자}.teamPurchase`에 상태를 적는다 | `subscriptionBlocksDeletion` |
+| B2 | 결제 기록이 있는 팀을 지움 | `billing/team_{teamId}`로 옮겨 5년 보관 + 내 좌석 해제 | `deleteTeamKeepingBilling` |
+| C1 | 결제 중(해지 예약 없음)인데 또 결제 시작 | 409 `already-subscribed`(Paddle 거래 안 만듦) | `handleBilling` |
+| C1 | 다른 구독의 미결제 이벤트가 결제 중 기록을 덮으려 함 | `other-subscription` — 무시 | `otherLiveSubscription` |
+| D1 | 동시 참가로 결제 팀 좌석을 넘음 | 들어온 뒤 좌석 순서 밖이면 되돌리고 409 `team-full` · 좌석 동기화 중 결제가 바뀌면 한 번 더 | `joinTeam` · `syncTeamSeats` |
+| D2 | 유료 출시 뒤 새 팀 | 처음부터 `locked: true` | `createTeam` |
+| D3 | 팀장 자동 복구 응답 | `locked` 포함 | `whoAmI` |
+| D4 | 개인 구독이 미결제·해지 | `expireAt` = 기간 끝 + 5년, 다시 결제하면 `null` | `applySubscriptionEvent` |
+
+🔴 서명 도입 전에 만든 샌드박스 구독(P7·TP6)은 `sig`가 없어 이후 이벤트가 `unsigned`로 무시된다 — 시험은 새로 결제한다.
+
 ## 5. 범위 밖 (이번 PR)
 - 팀 요금제(좌석·팀원 연결) — 2단계
 - 확장의 업그레이드 버튼·「무료 요금제는 빠른 모드만」 팝업 문구 — 결제 엔드포인트가 샌드박스에서 확인된 뒤

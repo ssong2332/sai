@@ -37,7 +37,8 @@ export const TEAM_ERRORS = {
   NO_TEAM: 'no-team',
   // L22 — 팀 나가기·계정 삭제 (`functions/account.js` 판정표).
   OWNER_MUST_TRANSFER: 'owner-must-transfer',
-  SUBSCRIPTION_ACTIVE: 'subscription-active', // 2026-11-01 — 구독 중 계정 삭제 차단
+  SUBSCRIPTION_ACTIVE: 'subscription-active', // 2026-11-01 — 구독 중 계정 삭제 차단(Pro 또는 내가 결제한 팀 요금제)
+  TEAM_SUBSCRIPTION_ACTIVE: 'team-subscription-active', // 2026-11-01 코드 검토 — 결제 중인 팀은 지우지 않는다
   // 팀 요금제(2026-11-01, `functions/teams.js` judgeTeamJoin)
   TEAM_FULL: 'team-full',
   TEAM_PLAN_REQUIRED: 'team-plan-required',
@@ -89,7 +90,10 @@ export function teamErrorMessage(reason, detail = '') {
       return '이 팀은 팀 요금제가 필요해요 — 팀장이 팀 요금제를 구매하면 참가할 수 있어요';
     case TEAM_ERRORS.SUBSCRIPTION_ACTIVE:
       // 🔴 막는 이유와 할 일 — 결제가 계속 나가는데 계정만 사라지면 안 된다.
-      return '사용 중인 Pro 구독이 있어요 — 결제 영수증 메일의 Paddle 링크(paddle.net)에서 먼저 구독을 해지해 주세요. 해지 예약이 되면 계정을 지울 수 있어요';
+      return '사용 중인 구독(Pro 또는 내가 결제한 팀 요금제)이 있어요 — 결제 영수증 메일의 Paddle 링크(paddle.net)에서 먼저 구독을 해지해 주세요. 해지 예약이 되면 계정을 지울 수 있어요';
+    case TEAM_ERRORS.TEAM_SUBSCRIPTION_ACTIVE:
+      // 🔴 팀이 지워지면 청구만 계속 나간다 — 먼저 해지(예약)하게 한다.
+      return '이 팀은 팀 요금제를 결제 중이에요 — 결제 영수증 메일의 Paddle 링크(paddle.net)에서 먼저 해지해 주세요. 해지 예약이 되면 팀을 지울 수 있어요';
     case TEAM_ERRORS.NOT_CONFIRMED:
       return '삭제 확인이 전달되지 않았어요 — 다시 시도해 주세요';
     case TEAM_ERRORS.NETWORK:

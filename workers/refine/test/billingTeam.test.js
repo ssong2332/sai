@@ -90,19 +90,24 @@ test('TP1 — 팀장만 팀 결제 시작, 좌석은 max(2, 팀원 수) 이상, 
   assert.equal(ok.status, 200);
   const sent = paddle.seen.at(-1).body;
   assert.deepEqual(sent.items, [{ price_id: 'pri_team_y', quantity: 3 }]);
-  assert.deepEqual(sent.custom_data, { uid: UID, teamId: 'team-1' });
+  assert.deepEqual(sent.custom_data, { uid: UID, teamId: 'team-1', sig: cdSig(UID, 'team-1') });
 });
 
-function teamEvent({ status = 'active', seats = 2, occurred = '2026-11-01T01:00:00Z', teamId = 'team-1' } = {}) {
+/** `custom_data` 서명 — 코드와 따로 node:crypto로 만든다. */
+function cdSig(uid, teamId = null) {
+  return createHmac('sha256', ENV.PADDLE_API_KEY).update(`sai-custom-data|v1|${uid}|${teamId ?? ''}`).digest('hex');
+}
+
+function teamEvent({ status = 'active', seats = 2, occurred = '2026-11-01T01:00:00Z', teamId = 'team-1', id = 'sub_team', priceId = 'pri_team_m', uid = UID } = {}) {
   return {
     event_type: 'subscription.created',
     occurred_at: occurred,
     data: {
-      id: 'sub_team',
+      id,
       status,
       customer_id: 'ctm_team',
-      custom_data: { uid: UID, teamId },
-      items: [{ price: { id: 'pri_team_m' }, quantity: seats }],
+      custom_data: { uid, teamId, sig: cdSig(uid, teamId) },
+      items: [{ price: { id: priceId }, quantity: seats }],
       billing_cycle: { interval: 'month' },
       current_billing_period: { ends_at: '2026-12-01T00:00:00Z' },
     },
@@ -173,4 +178,32 @@ test('팀 기능 잠금 — 결제 웹훅(유료 상태)이 잠금을 바로 푼
   await db.collection('teams').doc('team-1').set({ locked: true }, { merge: true });
   assert.equal((await webhook(handle, teamEvent({ seats: 3 }))).status, 200);
   assert.equal((await db.collection('teams').doc('team-1').get()).get('locked'), false);
+});
+
+/* ── 2026-11-01 코드 검토 B1·B2·C1 ─────────────────────────────────────── */
+
+test('🔴 B1 — 팀 이벤트에 Pro 가격·위조 서명이면 팀 결제 기록 없음 · 정상이면 결제자 teamPurchase 기록', async () => {
+  const { handle, db } = setup();
+  await seedTeam(db);
+  await webhook(handle, teamEvent({ priceId: 'pri_pro_cheap' }));
+  const forged = teamEvent();
+  forged.data.custom_data.sig = cdSig('someone-else', 'team-1');
+  await webhook(handle, forged);
+  assert.equal((await db.collection('teams').doc('team-1').get()).data().billing ?? null, null, '팀 결제 기록이 생기면 안 된다');
+
+  await webhook(handle, teamEvent({ seats: 3 }));
+  const team = (await db.collection('teams').doc('team-1').get()).data();
+  assert.equal(team.billing.payerUid, UID);
+  const purchase = (await db.collection('billing').doc(UID).get()).data().teamPurchase;
+  assert.deepEqual([purchase.teamId, purchase.status], ['team-1', 'active']);
+});
+
+test('C1 — 결제 중인 팀은 다시 결제를 시작하지 못한다(409, Paddle 거래 없음)', async () => {
+  const paddle = fakePaddle();
+  const { handle, db } = setup({ fetchImpl: paddle });
+  await seedTeam(db);
+  await webhook(handle, teamEvent({ seats: 3 }));
+  const res = await handle(checkout({ plan: 'team', interval: 'month', teamId: 'team-1', seats: 3 }), ENV);
+  assert.deepEqual([res.status, (await res.json()).error], [409, 'already-subscribed']);
+  assert.equal(paddle.seen.length, 0, 'Paddle에 두 번째 거래를 만들지 않는다');
 });

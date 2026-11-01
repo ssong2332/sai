@@ -15,6 +15,7 @@ export const BILLING_ERRORS = {
   UNAVAILABLE: 'billing-unavailable',
   NOT_OWNER: 'not-owner', // 팀 결제는 팀장만(2026-11-01)
   BAD_SEATS: 'bad-seats', // 좌석 2~100 · 지금 팀원 수 이상
+  ALREADY_SUBSCRIBED: 'already-subscribed', // 2026-11-01 코드 검토 — 결제 중이면 두 번째 구독을 만들지 않는다
   UNKNOWN: 'unknown',
 };
 
@@ -50,6 +51,7 @@ export async function startCheckout(interval, { plan = 'pro', teamId, seats, fet
   if (response.status === 503) throw new BillingClientError(BILLING_ERRORS.UNAVAILABLE);
   if (response.status === 403) throw new BillingClientError(BILLING_ERRORS.NOT_OWNER);
   if (response.status === 400 && payload?.error === 'bad seats') throw new BillingClientError(BILLING_ERRORS.BAD_SEATS);
+  if (response.status === 409 && payload?.error === 'already-subscribed') throw new BillingClientError(BILLING_ERRORS.ALREADY_SUBSCRIBED);
   if (!response.ok || typeof payload?.checkoutUrl !== 'string') throw new BillingClientError(BILLING_ERRORS.UNKNOWN);
   return payload.checkoutUrl;
 }
@@ -61,5 +63,6 @@ export function billingErrorText(reason) {
   if (reason === BILLING_ERRORS.UNAVAILABLE) return '지금은 결제를 받을 수 없어요. 잠시 뒤 다시 시도해 주세요.';
   if (reason === BILLING_ERRORS.NOT_OWNER) return '팀 요금제는 팀장만 구매할 수 있어요.';
   if (reason === BILLING_ERRORS.BAD_SEATS) return '좌석은 2석 이상, 지금 팀원 수 이상이어야 해요.';
+  if (reason === BILLING_ERRORS.ALREADY_SUBSCRIBED) return '이미 결제 중인 구독이 있어요 — 바꾸려면 영수증 메일의 Paddle 링크(paddle.net)에서 관리해 주세요.';
   return '결제창을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.';
 }
