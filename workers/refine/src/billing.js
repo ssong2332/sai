@@ -15,14 +15,10 @@
 import { verifyFirebaseIdToken, bearerToken, AuthError } from './auth.js';
 import { teamShouldLock } from '../../../functions/teams.js';
 import { billingExpireAt } from '../../../functions/account.js';
+import { PLAN_LIMITS } from '../../../src/core/refine/quality.js';
 
-/** 요금제별 하루 한도 — `docs/BillingDesign.md` 2절 · Spec §0(2026-10-31 확정). */
-export const PLAN_LIMITS = Object.freeze({
-  beta: Object.freeze({ daily: 100, standard: 10, deep: 3 }),
-  free: Object.freeze({ daily: 20, standard: 0, deep: 0 }),
-  pro: Object.freeze({ daily: 200, standard: 10, deep: 3 }),
-  team: Object.freeze({ daily: 200, standard: 20, deep: 5 }),
-});
+/** 요금제별 하루 한도 — 표는 코어(`src/core/refine/quality.js`) 한 곳. 확장 설정 안내가 같은 표를 읽는다. */
+export { PLAN_LIMITS };
 
 /** 유료로 치는 구독 상태 — `past_due`는 Paddle이 재청구하는 동안이라 유지한다. */
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
@@ -391,6 +387,24 @@ export async function handleBilling(request, { config, billing, db, json, logger
       logger.error(`[billing] 기록 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
       // Paddle이 다시 보내도록 5xx.
       return json(500, { error: 'store failed' });
+    }
+  }
+
+  // 내 요금제(2026-11-01) — 사이드패널 로고 옆 배지. 판정은 한도와 같은 `resolvePlan` 한 곳. 결제 키가 없어도 읽기는 된다.
+  if (path === '/v1/billing/me') {
+    if (!db) return json(503, { error: 'billing-unavailable' });
+    let uid;
+    try {
+      ({ uid } = await verifyFirebaseIdToken(bearerToken(request), { projectId: config.projectId, ...(jwks ? { jwks } : {}), now }));
+    } catch (error) {
+      return json(401, { error: 'unauthorized', reason: error instanceof AuthError ? error.reason : 'bad-token' });
+    }
+    try {
+      const snap = await db.collection('billing').doc(uid).get();
+      return json(200, { plan: resolvePlan(snap.exists ? snap.data() ?? null : null, billing) });
+    } catch (error) {
+      logger.error(`[billing] 요금제 조회 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+      return json(503, { error: 'billing-unavailable' });
     }
   }
 

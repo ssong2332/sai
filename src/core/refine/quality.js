@@ -34,6 +34,17 @@ export const DEFAULT_QUALITY = 'fast';
  */
 export const PREMIUM_DAILY_LIMITS = Object.freeze({ standard: 10, deep: 3 });
 
+/**
+ * 요금제별 하루 한도 — `docs/BillingDesign.md` 2절 · Spec §0(2026-10-31 확정).
+ * 🔴 한 곳에만 둔다 — Worker `billing.js`가 판정에, 확장 설정 「지금 플랜」이 안내에 같은 표를 읽는다(2026-11-01 코어로 옮김).
+ */
+export const PLAN_LIMITS = Object.freeze({
+  beta: Object.freeze({ daily: 100, standard: 10, deep: 3 }),
+  free: Object.freeze({ daily: 20, standard: 0, deep: 0 }),
+  pro: Object.freeze({ daily: 200, standard: 10, deep: 3 }),
+  team: Object.freeze({ daily: 200, standard: 20, deep: 5 }),
+});
+
 /** 서버가 모드를 낮췄을 때 팝업에 붙이는 말(응답 `qualityDowngrade`). 모르는 사유는 표시하지 않는다. */
 export const QUALITY_DOWNGRADE_NOTES = Object.freeze({
   daily: '오늘 쓸 수 있는 횟수를 다 써서 빠른 모드로 다듬었어요',

@@ -26,6 +26,9 @@ export const TEAM_ENDPOINT = `${WORKER_ORIGIN}/v1/team`;
 /** 결제 시작(Paddle 거래 생성, 2026-10-31 `docs/BillingDesign.md`) — 같은 오리진이라 권한 추가 없음. */
 export const BILLING_CHECKOUT_ENDPOINT = `${WORKER_ORIGIN}/v1/billing/checkout`;
 
+/** 내 요금제(2026-11-01) — 사이드패널 로고 옆 배지(`pro`·`team`). 같은 오리진. */
+export const BILLING_ME_ENDPOINT = `${WORKER_ORIGIN}/v1/billing/me`;
+
 /** 오프라인 로컬 개발용. `npm run proxy`가 이 주소로 뜬다. */
 export const LOCAL_PROXY_ENDPOINT = 'http://127.0.0.1:8787/v1/refine';
 

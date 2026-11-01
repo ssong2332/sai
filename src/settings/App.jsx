@@ -26,7 +26,9 @@ import {
 } from '../lib/siteGate.js';
 import { useSettingsData } from './useSettingsData.js';
 import { FEATURES } from '../config.js';
-import { BillingClientError, billingErrorText, startCheckout } from '../lib/billingClient.js';
+import { BillingClientError, billingErrorText, planSummary, startCheckout } from '../lib/billingClient.js';
+import { useMyPlan } from '../lib/useMyPlan.js';
+import PlanBadge from '../components/PlanBadge.jsx';
 
 /**
  * 확장 설정 페이지 — `chrome-extension://<id>/src/settings/index.html` (2026-10-25 사용자 결정).
@@ -1032,9 +1034,28 @@ function DataPanel({ data, toast }) {
  */
 const PRICING_URL = 'https://sai-global-msg-2026.web.app/pricing';
 
-function PlanPanel() {
+function PlanPanel({ plan }) {
+  // 2026-11-01 — 결제한 사람에게는 그 요금제를(`planSummary` 표). 유료화 전·모름은 아래 출시 기간 문구 그대로.
+  const paid = FEATURES.billing ? planSummary(plan) : null;
   return (
     <>
+      {paid ? (
+        <Group title="지금 플랜" note={paid.note}>
+          <dl className="conn">
+            <div>
+              <dt>플랜</dt>
+              <dd className="plan-now">
+                <PlanBadge plan={plan} />
+                {paid.name}
+              </dd>
+            </div>
+            <div>
+              <dt>하루 횟수</dt>
+              <dd className="num">{paid.daily}</dd>
+            </div>
+          </dl>
+        </Group>
+      ) : (
       <Group title="지금 플랜" note="출시 기간에는 개인 기능과 팀 기능을 모두 무료로 써요. 결제 수단을 등록하는 곳도 없어요.">
         <dl className="conn">
           <div>
@@ -1051,6 +1072,7 @@ function PlanPanel() {
           용어집 · 예약 알림은 그대로 쓸 수 있어요.
         </p>
       </Group>
+      )}
 
       <Group title="유료 플랜" note="개인 Pro(연 결제 시 월 $4 · 월 결제 $6 예정)와 팀 플랜을 준비하고 있어요. 유료 플랜이 나와도 무료 플랜은 남아요.">
         <a className="btn press plan-link" href={PRICING_URL} target="_blank" rel="noopener noreferrer">
@@ -1112,6 +1134,9 @@ export default function App() {
     window.location.hash = id;
   };
 
+  /** 로고 옆 요금제 배지(2026-11-01) — 사이드패널과 같은 훅·같은 배지. */
+  const plan = useMyPlan();
+
   const current = PANELS.find((p) => p.id === panel);
   const props = { data, act, toast: setToastText };
 
@@ -1121,6 +1146,7 @@ export default function App() {
         <span className="brand">
           <SaiMark size={34} />
           <span className="brand-name">S·AI</span>
+          <PlanBadge plan={plan} />
           <span className="brand-sub">설정</span>
         </span>
         <span className="head-note">바꾸면 바로 저장되고, 열려 있는 사이드 패널·팝업에도 적용돼요.</span>
@@ -1174,7 +1200,7 @@ export default function App() {
               {panel === 'glossary' && <GlossaryPanel {...props} />}
               {panel === 'learned' && <LearnedPanel {...props} />}
               {panel === 'data' && <DataPanel {...props} />}
-              {panel === 'plan' && <PlanPanel />}
+              {panel === 'plan' && <PlanPanel plan={plan} />}
             </div>
           </main>
         </div>

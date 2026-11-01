@@ -4,6 +4,8 @@ import SaiMark from '../assets/SaiMark.jsx';
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
 import { FEATURES } from '../config.js';
 import { BillingClientError, billingErrorText, startCheckout } from '../lib/billingClient.js';
+import { useMyPlan } from '../lib/useMyPlan.js';
+import PlanBadge from '../components/PlanBadge.jsx';
 import { QUALITY_IDS, QUALITY_LABELS } from '../core/refine/quality.js';
 import { dashboardPageUrl } from '../lib/dashboardPage.js';
 import { getLocal, setLocal, STORAGE_KEYS } from '../lib/storage.js';
@@ -200,6 +202,8 @@ export default function App() {
   /** 설정 시트를 열 때 바로 보여줄 묶음 — 'tone'이면 「보내는 글 기본값」으로 내려간다(2026-10-26 프로필 톤 링크). */
   const [settingsFocus, setSettingsFocus] = useState(null);
   const [toast, setToast] = useState('');
+  /** 로고 옆 요금제 배지(2026-11-01 사용자 결정) — `pro`·`team`일 때만 보인다(`useMyPlan`). */
+  const plan = useMyPlan();
 
   /**
    * 저장된 테마를 복원한다.
@@ -483,7 +487,10 @@ export default function App() {
           *    보내지는 않아요") — 그건 워드마크가 아니라 **문장**이고, 바꾸면 어색해진다.
           */}
         <span className="brand-block">
-          <span className="brand-name">S·AI</span>
+          <span className="brand-row">
+            <span className="brand-name">S·AI</span>
+            <PlanBadge plan={plan} />
+          </span>
           {/* 🔴 사이드패널에만 둔다 — 팝업은 남의 페이지 위 좁은 오버레이라 한 줄이 늘면
               본문이 밀린다(사용자 결정). */}
           <span className="brand-tagline">Bridging People, Time, and Space</span>
