@@ -174,6 +174,67 @@ test('둘 중 하나라도 비면 판정하지 않는다', () => {
   assert.deepEqual(dropped('200ms', ''), []);
 });
 
+// ── 공백 천 단위 묶음 (2026-11-01 실측 오탐) ─────────────────────────────
+const KO_SRC_1250 =
+  '납품이 3월 14일에서 3월 21일로 1주일 밀립니다. 견적은 1,250만 원 그대로이고, 수량 300개는 변동 없습니다.';
+
+test('🔴 실측 오탐 — 「1,250만 원」 → 불어 「12 500 000 KRW」는 통과', () => {
+  assert.deepEqual(
+    dropped(
+      KO_SRC_1250,
+      "La livraison est reportée d'une semaine, du 14 mars au 21 mars. Le devis reste inchangé à 12 500 000 KRW et la quantité de 300 unités ne change pas.",
+      { sourceLanguage: 'ko', targetLanguage: 'fr' },
+    ),
+    [],
+  );
+});
+
+test('불어 좁은 공백(U+202F)·줄바꿈 없는 공백(U+00A0)·스위스 아포스트로피 묶음도 통과', () => {
+  const fr = { sourceLanguage: 'ko', targetLanguage: 'fr' };
+  const rest = 'du 14 mars au 21 mars, une semaine, 300 unités.';
+  assert.deepEqual(dropped(KO_SRC_1250, `Devis : 12 500 000 KRW, ${rest}`, fr), []);
+  assert.deepEqual(dropped(KO_SRC_1250, `Devis : 12 500 000 KRW, ${rest}`, fr), []);
+  assert.deepEqual(
+    dropped(KO_SRC_1250, "Angebot: 12'500'000 KRW, vom 14. März auf den 21. März, eine Woche, 300 Stück.", {
+      sourceLanguage: 'ko',
+      targetLanguage: 'de',
+    }),
+    [],
+  );
+});
+
+test('독일식 마침표·소수점 쉼표 환산은 그대로 통과', () => {
+  const de = { sourceLanguage: 'ko', targetLanguage: 'de' };
+  const rest = 'vom 14. März auf den 21. März, eine Woche, 300 Stück.';
+  assert.deepEqual(dropped(KO_SRC_1250, `Angebot: 12.500.000 KRW, ${rest}`, de), []);
+  assert.deepEqual(dropped(KO_SRC_1250, `Angebot: 12,5 Mio. KRW, ${rest}`, de), []);
+});
+
+test('🔴 진짜 누락은 여전히 잡는다 — 금액이 없거나 다른 값이면 경고', () => {
+  const fr = { sourceLanguage: 'ko', targetLanguage: 'fr' };
+  assert.deepEqual(
+    dropped(KO_SRC_1250, 'Du 14 mars au 21 mars, une semaine. Le devis reste inchangé, 300 unités.', fr),
+    ['1,250'],
+  );
+  assert.deepEqual(
+    dropped(KO_SRC_1250, 'Du 14 mars au 21 mars, une semaine. Devis à 12 000 000 KRW, 300 unités.', fr),
+    ['1,250'],
+  );
+  // 공백 묶음이 다른 숫자(300)의 누락을 가리지 않는다.
+  assert.deepEqual(
+    dropped(KO_SRC_1250, 'Du 14 mars au 21 mars, une semaine. Devis à 12 500 000 KRW.', fr),
+    ['300개'],
+  );
+});
+
+test('원문 쪽 공백 묶음 — 값으로 환산되면 통과, 없으면 묶음 그대로 경고', () => {
+  const frEn = { sourceLanguage: 'fr', targetLanguage: 'en' };
+  const src = 'Le devis reste à 12 500 000 KRW pour 300 unités.';
+  assert.deepEqual(dropped(src, 'The quote stays at KRW 12.5 million for 300 units.', frEn), []);
+  assert.deepEqual(dropped(src, 'The quote stays at KRW 12,500,000 for 300 units.', frEn), []);
+  assert.deepEqual(dropped(src, 'The quote stays the same for 300 units.', frEn), ['12 500 000']);
+});
+
 // ── ③ 화면 진입점 ────────────────────────────────────────────────────────
 test('🔴 폴백 결과는 검사하지 않는다', () => {
   const result = { fallback: true, refined: '원문 그대로', sourceLanguage: 'ko', targetLanguage: 'en' };

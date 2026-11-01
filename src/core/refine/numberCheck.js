@@ -19,7 +19,8 @@
  * | 원문의 숫자 형태                              | 교정문에 이것 중 하나가 있으면 통과                     |
  * |---|---|
  * | 정수·소수 `200`·`3.5`                          | 같은 값(`3,5` 유럽식 소수 포함)                        |
- * | 쉼표 묶음 `3,000`                              | `3000`·`3,000`·`3.000`(독일식)                          |
+ * | 쉼표 묶음 `3,000`                              | `3000`·`3,000`·`3.000`(독일식)·`3 000`(불어 공백·U+00A0·U+202F)·`3'000`(스위스) |
+ * | 공백 묶음 `12 500 000`(2026-11-01)             | 묶음 전체 값(`12.5 million`) **또는** 각 묶음 숫자 전부 |
  * | 배수 단위 `3,000만`·`5천만`·`3M`·`3k`          | 원래 수 **또는** 곱한 값(`30,000,000`·`30 million`·`3천만`) |
  * | 한국어 복합 `3억 5천만`                        | 합계(`350 million`) **또는** 각 숫자 전부              |
  * | 시간 단위 `200ms`·`3초`·`5분`·`2시간`           | 같은 값 **또는** 단위 환산값(`0.2 s`·`3000 ms`·`300 seconds`) |
@@ -171,6 +172,24 @@ function readCjkCompound(src, start) {
 }
 
 /**
+ * 공백·아포스트로피 천 단위 묶음 `12 500 000`(불어, U+00A0·U+202F 포함)·`12'500'000`(스위스).
+ * 🔴 실측(2026-11-01): 「1,250만 원」 → 불어 「12 500 000 KRW」가 `12`·`500`·`000` 세 토큰으로
+ *    잘려 멀쩡한 환산이 「빠짐」으로 떴다. 묶음 전체 값 **또는** 각 묶음 숫자 전부로 받는다 —
+ *    「21 300」이 두 수일 수도 있어서 한 값으로만 좁히지 않는다(헤더의 비대칭 원칙).
+ * @returns {{end: number, text: string, value: number, parts: number[]}|null}
+ */
+const SPACE_GROUPED = /^\d{1,3}(?:[    '’]\d{3})+(?:,\d+)?(?![\d.,]\d)/;
+
+function readSpaceGrouped(src, start) {
+  const m = src.slice(start).match(SPACE_GROUPED);
+  if (!m) return null;
+  const text = m[0];
+  const value = Number(text.replace(/[    '’]/g, '').replace(',', '.'));
+  if (!Number.isFinite(value)) return null;
+  return { end: start + text.length, text, value, parts: splitParts(text.replace(/[    '’]/g, ',')) };
+}
+
+/**
  * 🔴 기간 복합 `1시간 30분`·`2분 30초` — 검사하지 않는다(판정표). "an hour and a half"처럼
  *    숫자가 하나도 안 남는 정상 번역이 흔해서, 받아 줄 표기를 다 셀 자신이 없다.
  */
@@ -216,6 +235,21 @@ function scanNumbers(text) {
         skip: false,
       });
       re.lastIndex = compound.end;
+      continue;
+    }
+
+    const grouped = readSpaceGrouped(src, start);
+    if (grouped) {
+      const values = [grouped.value];
+      for (const mul of readMultipliers(src.slice(grouped.end))) values.push(grouped.value * mul);
+      items.push({
+        kind: 'compound',
+        label: labelOf(grouped.text, src.slice(grouped.end)),
+        values,
+        parts: grouped.parts,
+        skip: false,
+      });
+      re.lastIndex = grouped.end;
       continue;
     }
 
