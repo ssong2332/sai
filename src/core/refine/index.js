@@ -82,6 +82,9 @@ function normalizeRequest(request) {
     profile: request.profile ?? null,          // S13 / Spec 필수 2
     recipient: request.recipient ?? null,      // S17 / Spec 필수 9
     casualTone: request.casualTone ?? null,    // S16 / Spec 필수 8
+    // 🔴 문체 수위(가볍게·기본·격식). 2026-11-01 실브라우저에서 발견 — 이 줄이 없어 확장이 보낸 값이 버려지고
+    //    프롬프트가 늘 「DEFAULT REGISTER」였다(가볍게·격식 토글 무효). 모르는 값은 기본(null).
+    register: request.register === 'casual' || request.register === 'formal' ? request.register : null,
     /**
      * S21 / Spec 권장 8 — 직전 대화 최대 5개.
      * 🔴 서버에서도 상한을 다시 강제한다. 클라이언트만 믿으면 상한이 없는 것과 같다(호출 비용·
