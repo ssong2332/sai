@@ -18,7 +18,7 @@
 - Name: 사이 (Sai) — 글로벌 업무 메시지 AI 교정 크롬 확장
 - 🔴 **상태: 해커톤(2026-08-12 ~ 08-21) 종료 후, 실제 서비스 출시를 목표로 계속 개발 중 (2026-09-30~, 1인 개발).** 결정·우선순위는 `docs/Spec.md` §0, 태스크는 `docs/Tasks.md` 「출시 v1.0」(L01~). 판단 기준은 「시연이 되는가」가 아니라 **「누구나·매일·안전하게 쓸 수 있는가」**.
 - Stack: React 18 + JavaScript(ES6+) + Vite 5 + @crxjs/vite-plugin / Firebase (Auth·Firestore·Hosting · Functions는 2026-10-28 삭제 — GCP 결제 연결 후 사용자 승인) / Cloudflare Workers(교정·팀 서버, 확장 0.1.30부터 전환 완료) / **Anthropic Claude API** (단일 통합 호출 `POST /v1/refine`) — 2026-10-23 사용자 결정으로 기본. **다듬기는 품질 모드 3단**(2026-10-30 사용자 결정 — `src/core/refine/quality.js` 표·`docs/QualityModes.md`): 빠른 = Haiku 5.5 사고 끔 · 기본 = Sonnet 5.5 · 심층 = Opus 5.5. 확장은 모드 이름만 보내고 모델은 서버 표가 정한다. **월 $100 예산(2026-10-31)**: 기본값 빠른 · 1인 하루 기본 10·심층 3 · 이달 추정 $90 이상이면 상위 모드 빠른(`workers/refine/src/qualityAllowance.js`). 뜻 풀기·회신·결정은 Haiku 5.5 사고 끔 그대로. 폴오버 예비는 Groq(Spec §0). Gemini(2026-09-30~10-22 기본)·OpenAI는 명시 요청으로만 남는다. 아래 명령 절의 옛 provider 기록(2026-08-17 OpenAI, 10-01 Gemini)보다 이 줄이 우선한다
-- 범위 밖(출시 v1.0): 캘린더 빈 시간(`calendar.readonly`) · 유료화. 팀 기능은 무료 공개
+- 범위 밖(출시 v1.0): 캘린더 빈 시간(`calendar.readonly`). 🔴 유료화는 2026-10-31 사용자 결정으로 **범위 안** — 유료화 전환 후 스토어 공개(Paddle 샌드박스까지 완료, 실판매 전환은 사용자 승인 건 · `docs/BillingDesign.md`). 그 전까지 팀 기능 포함 전부 무료로 열려 있다
 - 해커톤 기간 기록: 2026-08-12 ~ 08-21 (컷 규칙은 `docs/Tasks.md`의 「컷 규칙 (해커톤)」)
 
 ## Verified Commands
@@ -64,7 +64,7 @@
 | 웹사이트 빌드 | `npm --prefix site run build` | 2026-10-24 |
 | 웹사이트 브리지 단위 테스트 | `npm --prefix site test` | 2026-10-24 |
 | 웹사이트 dev 서버 | `npm --prefix site run dev` → `http://localhost:5180` (strictPort — 확장 externally_connectable 개발 매치가 이 포트) · 미리보기 `/settings?demo=1` | 2026-10-24 |
-| Worker 배포 (🔴 사용자가 실행 — 에이전트 배포는 막혀 있다) | `workers/refine/` 안에서 `npx wrangler deploy` | 2026-10-24 |
+| Worker 배포 (🔴 배포는 사용자 승인 건 — 2026-11-01부터 에이전트 실행도 됨, 예전 「막혀 있다」는 옛 기록) | `workers/refine/` 안에서 `npx wrangler deploy` | 2026-11-01 |
 | Worker 배포 확인 | `curl https://sai-refine.aiisgod.workers.dev/health` → `"thinking":"disabled"` | 2026-10-24 |
 | Paddle 시크릿 등록(🔴 사용자, PowerShell, `workers/refine/`) | `Get-Clipboard \| npx wrangler secret put PADDLE_WEBHOOK_SECRET` — 🔴 **명령을 터미널에 먼저 붙여 넣고(Enter 금지) → Paddle에서 비밀값 복사 → Enter.** 순서가 바뀌면 명령어 문장이 비밀값으로 들어가 웹훅이 전부 401(2026-10-31 실측). `PADDLE_API_KEY`도 같은 방식 | 2026-10-31 |
 | 결제 웹훅 로그 보기(🔴 원본에 토큰 — 필터 필수) | `workers/refine/` 안에서 `npx wrangler tail --format json 2>/dev/null \| node <필터.mjs>` — 필터는 `/v1/billing/*`의 경로·상태·`[billing]` 로그만 출력 → `subscription.created → saved` | 2026-10-31 |

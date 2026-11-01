@@ -168,6 +168,19 @@ export async function createTeam(req, deps) {
    */
   const teamRef = db.collection('teams').doc();
   let inviteCode = '';
+  // 🔴 2026-11-01 코드 검토 D2 — 유료 출시 뒤 만든 팀은 처음부터 잠근다(무료 팀 없음, 구매하면 풀림).
+  //    예전엔 다음 03:00 예약 작업까지 열려 있었다. 출시 전·Functions(`teamBilling` 없음)는 잠그지 않는다.
+  const nowMs = deps.teamBilling?.now?.() ?? Date.now();
+  const lockedAtBirth = Boolean(
+    deps.teamBilling &&
+      teamShouldLock({
+        billing: null,
+        createdAtMs: nowMs,
+        enforced: deps.teamBilling.enforced === true,
+        enforcedAtMs: deps.teamBilling.enforcedAtMs ?? NaN,
+        nowMs,
+      }),
+  );
   await db.runTransaction(async (tx) => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const candidate = generateCode(deps.randomInt);
@@ -184,6 +197,7 @@ export async function createTeam(req, deps) {
       inviteCode,
       ownerUid: uid,
       createdAt: FieldValue.serverTimestamp(),
+      ...(lockedAtBirth ? { locked: true } : {}),
     });
     tx.set(teamRef.collection('members').doc(uid), {
       role: 'owner',
@@ -198,7 +212,7 @@ export async function createTeam(req, deps) {
     });
   });
 
-  return { teamId: teamRef.id, name, inviteCode, role: 'owner', canViewDashboard: true };
+  return { teamId: teamRef.id, name, inviteCode, role: 'owner', canViewDashboard: true, locked: lockedAtBirth };
 }
 
 /** 베타 팀 유예 — 유료 출시(`BILLING_ENFORCED_AT`) 전에 만든 팀은 이 기간 동안 미결제여도 참가를 받는다(2026-11-01). */
@@ -298,6 +312,22 @@ export async function joinTeam(req, deps) {
         },
     { merge: true },
   );
+
+  // 🔴 2026-11-01 코드 검토 D1 — 위 좌석 확인은 트랜잭션 밖이라 동시에 들어오면 좌석을 넘을 수 있다.
+  //    들어온 뒤 다시 세어 좌석 순서(`joinedAt`, 좌석 배정과 같은 순서) 밖이면 되돌리고 `team-full`.
+  if (!existing.exists && deps.teamBilling) {
+    const fresh = await team.ref.get();
+    const billing = fresh.get('billing') ?? null;
+    if (billing && PAID_TEAM_STATUSES.includes(billing.status)) {
+      const order = (await team.ref.collection('members').get()).docs
+        .map((d) => ({ uid: d.id, joined: toMillis(d.get('joinedAt')) }))
+        .sort((a, b) => (Number.isFinite(a.joined) ? a.joined : Infinity) - (Number.isFinite(b.joined) ? b.joined : Infinity) || a.uid.localeCompare(b.uid));
+      if (order.findIndex((m) => m.uid === uid) >= Number(billing.seats ?? 0)) {
+        await memberRef.delete();
+        throw new TeamError(409, 'team-full');
+      }
+    }
+  }
 
   const after = await memberRef.get();
   // 좌석 재배정(결제된 팀이면 새 팀원에게 좌석) — 실패해도 참가는 끝난 것이라 Worker 쪽에서 로그만.
@@ -435,7 +465,15 @@ export async function whoAmI(req, deps) {
       { role: 'owner', canViewDashboard: true },
       { merge: true },
     );
-    return { role: 'owner', canViewDashboard: true, repaired: true, name: teamName(team), defaultQuality: teamDefaultQuality(team) };
+    return {
+      role: 'owner',
+      canViewDashboard: true,
+      repaired: true,
+      name: teamName(team),
+      defaultQuality: teamDefaultQuality(team),
+      // 2026-11-01 코드 검토 D3 — 자동 복구 응답에도 잠금을 싣는다(예전엔 빠져 화면이 열린 팀으로 보였다).
+      locked: team.exists && team.get('locked') === true,
+    };
   }
 
   return {

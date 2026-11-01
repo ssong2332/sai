@@ -24,20 +24,33 @@ const PRICES = { PADDLE_PRICE_PRO_MONTH: 'pri_month_test', PADDLE_PRICE_PRO_YEAR
 const BILLING_ENV = { ...TEST_ENV, PADDLE_ENV: 'sandbox', PADDLE_API_KEY: API_KEY, PADDLE_WEBHOOK_SECRET: SECRET, ...PRICES };
 const NOW = Date.now();
 
+/** `custom_data` 서명 — 코드(`signCustomData`)와 따로 node:crypto로 만든다(같은 규칙인지 확인). */
+function cdSig(uid, teamId = null, key = API_KEY) {
+  return createHmac('sha256', key).update(`sai-custom-data|v1|${uid}|${teamId ?? ''}`).digest('hex');
+}
+
 function sign(raw, { secret = SECRET, ts = Math.floor(NOW / 1000) } = {}) {
   return `ts=${ts};h1=${createHmac('sha256', secret).update(`${ts}:${raw}`).digest('hex')}`;
 }
 
-function subEvent({ type = 'subscription.created', status = 'active', priceId = 'pri_month_test', occurred = '2026-10-31T11:00:00Z', uid = UID } = {}) {
+function subEvent({
+  type = 'subscription.created',
+  status = 'active',
+  priceId = 'pri_month_test',
+  occurred = '2026-10-31T11:00:00Z',
+  uid = UID,
+  id = 'sub_test',
+  sig = uid === undefined ? undefined : cdSig(uid),
+} = {}) {
   return {
     event_id: 'evt_test',
     event_type: type,
     occurred_at: occurred,
     data: {
-      id: 'sub_test',
+      id,
       status,
       customer_id: 'ctm_test',
-      custom_data: uid === undefined ? undefined : { uid },
+      custom_data: uid === undefined ? undefined : { uid, ...(sig === undefined ? {} : { sig }) },
       items: [{ price: { id: priceId } }],
       billing_cycle: { interval: 'month', frequency: 1 },
       current_billing_period: { starts_at: '2026-10-31T00:00:00Z', ends_at: '2026-11-30T00:00:00Z' },
@@ -174,7 +187,7 @@ test('P3 — 결제 시작: 로그인 필수, 모르는 요금제 400, 거래에
   assert.equal(sent.url, 'https://sandbox-api.paddle.com/transactions');
   assert.equal(sent.auth, `Bearer ${API_KEY}`);
   assert.deepEqual(sent.body.items, [{ price_id: 'pri_year_test', quantity: 1 }]);
-  assert.deepEqual(sent.body.custom_data, { uid: UID });
+  assert.deepEqual(sent.body.custom_data, { uid: UID, sig: cdSig(UID) });
   assert.equal(JSON.stringify(body).includes(API_KEY), false);
   assert.equal(logger.lines.join('\n').includes(API_KEY), false);
 });
@@ -256,4 +269,46 @@ test('해지 예약(scheduled_change.action=cancel)을 기록한다 — 계정 �
   const raw2 = JSON.stringify(subEvent());
   await plain.handle(webhook(raw2, sign(raw2)), BILLING_ENV);
   assert.equal((await billingDoc(plain.db)).cancelScheduled, false);
+});
+
+/* ── 2026-11-01 코드 검토 B1·C1·D4 ─────────────────────────────────────── */
+
+async function sendEvent(handle, event) {
+  const raw = JSON.stringify(event);
+  return handle(webhook(raw, sign(raw)), BILLING_ENV);
+}
+
+test('🔴 B1 — custom_data 서명이 없거나 위조·다른 키면 쓰기 0, Pro 가격이 아닌 개인 이벤트도 무시', async () => {
+  for (const [label, event] of [
+    ['서명 없음', subEvent({ sig: null })],
+    ['위조(다른 uid의 서명)', subEvent({ sig: cdSig('attacker-uid') })],
+    ['다른 키로 서명', subEvent({ sig: cdSig(UID, null, 'other-key') })],
+    ['Pro 가격 아님', subEvent({ priceId: 'pri_team_y' })],
+  ]) {
+    const { handle, db, logger } = setup();
+    assert.equal((await sendEvent(handle, event)).status, 200, `${label} — Paddle이 계속 재전송하지 않게 200`);
+    assert.equal(await billingDoc(db), null, `${label} — 쓰면 안 된다`);
+    assert.ok(logger.lines.some((l) => /→ (unsigned|wrong-price)/.test(l)), label);
+  }
+});
+
+test('C1 — 다른 구독의 해지가 결제 중 기록을 덮지 않는다 · 이미 결제 중이면 결제 시작 409', async () => {
+  const { handle, db } = setup();
+  await sendEvent(handle, subEvent({ id: 'sub_A', occurred: '2026-10-31T11:00:00Z' }));
+  await sendEvent(handle, subEvent({ id: 'sub_B', type: 'subscription.canceled', status: 'canceled', occurred: '2026-10-31T12:00:00Z' }));
+  const doc = await billingDoc(db);
+  assert.deepEqual([doc.status, doc.subscriptionId], ['active', 'sub_A']);
+
+  const again = await handle(checkoutRequest({ plan: 'pro', interval: 'year' }), BILLING_ENV);
+  assert.deepEqual([again.status, (await again.json()).error], [409, 'already-subscribed']);
+});
+
+test('D4 — 결제 중이면 expireAt 없음, 해지되면 기간 끝 + 5년, 다시 결제하면 지운다', async () => {
+  const { handle, db } = setup();
+  await sendEvent(handle, subEvent({ occurred: '2026-10-31T11:00:00Z' }));
+  assert.equal((await billingDoc(db)).expireAt ?? null, null);
+  await sendEvent(handle, subEvent({ type: 'subscription.canceled', status: 'canceled', occurred: '2026-10-31T12:00:00Z' }));
+  assert.equal(new Date((await billingDoc(db)).expireAt.toMillis()).toISOString().slice(0, 10), '2031-11-30');
+  await sendEvent(handle, subEvent({ type: 'subscription.updated', status: 'active', occurred: '2026-10-31T13:00:00Z' }));
+  assert.equal((await billingDoc(db)).expireAt ?? null, null);
 });

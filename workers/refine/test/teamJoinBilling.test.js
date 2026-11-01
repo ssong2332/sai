@@ -129,3 +129,34 @@ test('팀 기능 잠금 — 매일 작업: 출시 전엔 안 잠그고(잠긴 �
   assert.equal((await call(ownerToken, { action: 'me', teamId: free })).body.locked, true);
   assert.equal((await call(ownerToken, { action: 'me', teamId: paid })).body.locked, false);
 });
+
+/* ── 2026-11-01 코드 검토 D1·D2·D3 ─────────────────────────────────────── */
+
+test('D2 — 유료 출시 뒤 만든 팀은 처음부터 잠김, 출시 전(꺼짐)은 안 잠김', async () => {
+  const { db, call } = setup();
+  const enforced = { ...TEST_ENV, BILLING_ENFORCED: '1', BILLING_ENFORCED_AT: '2026-10-20T00:00:00Z' };
+  const after = await call(ownerToken, { action: 'create', name: '출시 뒤 팀' }, enforced);
+  assert.equal(after.body.locked, true);
+  assert.equal((await db.collection('teams').doc(after.body.teamId).get()).data().locked, true);
+  const before = await call(ownerToken, { action: 'create', name: '베타 팀' });
+  assert.equal(before.body.locked, false);
+  assert.equal((await db.collection('teams').doc(before.body.teamId).get()).data().locked ?? false, false);
+});
+
+test('D1 — 결제 팀(2석)에 둘이 동시에 참가해도 좌석을 넘지 않는다', async () => {
+  const { db, call } = setup();
+  const { teamId, inviteCode } = (await call(ownerToken, { action: 'create', name: '동시 팀' })).body;
+  await db.collection('teams').doc(teamId).set({ billing: { status: 'active', seats: 2 } }, { merge: true });
+  const results = await Promise.all([call(aToken, { action: 'join', inviteCode }), call(bToken, { action: 'join', inviteCode })]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+  assert.equal((await db.collection('teams').doc(teamId).collection('members').get()).docs.length, 2);
+});
+
+test('D3 — 팀장 자동 복구 응답에도 locked가 실린다', async () => {
+  const { db, call } = setup();
+  const { teamId } = (await call(ownerToken, { action: 'create', name: '복구 팀' })).body;
+  await db.collection('teams').doc(teamId).collection('members').doc('owner-uid').set({ role: 'member' }, { merge: true });
+  await db.collection('teams').doc(teamId).set({ locked: true }, { merge: true });
+  const me = await call(ownerToken, { action: 'me', teamId });
+  assert.deepEqual([me.body.repaired, me.body.locked], [true, true]);
+});
