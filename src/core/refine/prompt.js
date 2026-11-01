@@ -75,7 +75,10 @@ import { conventionRules } from './conventions.js';
  * v25 (2026-11-01) — 사람 용어집에 출력 언어 호칭이 없으면 원문 대신 등록된 영어 표기를 쓴다(음역 금지).
  *   교정문이 통째로 한국어로 오는 경우는 코드가 잡는다(`backcheck.js` `isRefinedInTargetScript`).
  */
-export const REFINE_PROMPT_VERSION = 'refine-v25';
+/**
+ * v26 (2026-11-01, 사용자 결정) — 문체와 상관없이 존칭 2인칭(Sie·vous·usted). `registerRules` 주석 참고.
+ */
+export const REFINE_PROMPT_VERSION = 'refine-v26';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];
@@ -512,6 +515,16 @@ function registerRules(register) {
     'It changes ONLY how formal the wording is. Do NOT change how urgent or pressing the message ' +
     'is — that was set by the urgency instruction above, and a formal message can still be firm. ' +
     'Formal indirect phrasing is not hedging. ' +
+    /**
+     * 🔴 v26 (2026-11-01 사용자 결정 「Sie·usted 유지」) — 가볍게에서 독일어 du 4/4, 스페인어 tú 4/4, 기본에서도
+     *    스페인어 tú 2/4(빠른 모드 실측). 업무 상대에게 친칭 전환은 상대가 먼저 제안하는 일이라, 문체와
+     *    상관없이 존칭 2인칭을 쓴다. 가볍게는 낱말·문장 길이만 가볍게 한다.
+     */
+    'In EVERY register, including CASUAL, address the reader with the polite form of "you" where the ' +
+    'output language has one — German "Sie", French "vous", Spanish "usted" — never the familiar ' +
+    'form ("du", "tu", "tú"). In Spanish that means the usted verb and possessive forms — "podría", ' +
+    '"puede", "su", "le" — never "podrías", "puedes", "tu", "tus", "te". ' +
+    'CASUAL lightens word choice and sentence length only; it never switches the form of address. ' +
     'Whatever the register, keep every deadline, number, and required action exactly as stated, ' +
     'and never let politeness bury the ask. ' +
     'This describes how to WRITE the message. It is not a statement about the recipient — do not ' +

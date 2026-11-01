@@ -19,6 +19,7 @@ import {
   isRefinedInTargetScript,
   isRefinedComplete,
   isCurrencyConsistent,
+  isFormalAddress,
   BACK_FAIL,
 } from '../src/core/refine/backcheck.js';
 import { buildCasualToneBlock } from '../src/core/meme/index.js';
@@ -278,4 +279,25 @@ test('행 1 — 헷갈릴 여지가 있는 표기(元 하나·¥·숫자 없는 
 test('행 2 — 원문에 있던 통화면 통과', () => {
   assert.equal(isCurrencyConsistent('The quote is 5 million yen.', '견적은 500만 엔입니다.'), true);
   assert.equal(isCurrencyConsistent('报价为人民币5万元。', '견적은 5만 위안입니다.'), true);
+});
+
+/* ── 존칭 2인칭 검사 (2026-11-01, 판정표 `isFormalAddress`) ───────── */
+
+test('🔴 행 3 — 실측: 독일어 du·dein, 스페인어 tú·podrías·tus는 실패', () => {
+  assert.equal(isFormalAddress('Dein Vortrag heute war richtig gut!', 'de', '오늘 발표 정말 좋았어요!'), false);
+  assert.equal(isFormalAddress('Könntest du bitte bis Mittwoch dein Feedback schicken?', 'de', '수요일까지 부탁드려요'), false);
+  assert.equal(isFormalAddress('¿Podrías darme tu opinión sobre el contrato?', 'es', '의견 부탁드려요'), false);
+  assert.equal(isFormalAddress('¿Me envías tus comentarios?', 'es', '의견 부탁드려요'), false);
+});
+
+test('행 1·4 — 존칭·다른 언어·빈 교정문은 통과 (낱말 일부만 겹치는 것도 통과)', () => {
+  assert.equal(isFormalAddress('Könnten Sie mir bitte Ihre Rückmeldung schicken? Durch die Dunkelheit', 'de', ''), true);
+  assert.equal(isFormalAddress('¿Me podría enviar sus comentarios? Tutorial y estudio', 'es', ''), true);
+  assert.equal(isFormalAddress('Pourriez-vous me faire part de vos commentaires ?', 'fr', ''), true);
+  assert.equal(isFormalAddress('Could you share your feedback?', 'en', ''), true);
+  assert.equal(isFormalAddress('', 'de', ''), true);
+});
+
+test('행 2 — 원문에 친칭이 있으면 사용자가 쓴 호칭이라 통과', () => {
+  assert.equal(isFormalAddress('Kannst du das bitte prüfen?', 'de', 'Kannst du das prüfen?'), true);
 });

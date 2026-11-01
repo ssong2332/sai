@@ -13,7 +13,7 @@ import { buildRefinePayload, REFINE_PROMPT_VERSION, URGENCY_LEVELS } from './pro
 import { normalizeRefineResponse } from './schema.js';
 import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
-import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, checkBackTranslation } from './backcheck.js';
+import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, isFormalAddress, checkBackTranslation } from './backcheck.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -144,11 +144,13 @@ function isRetryableTransient(error) {
  * | 1 | 교정문이 상대 언어로 왔는가(통째로 한국어 등) — `isRefinedInTargetScript` | `refined-wrong-script` |
  * | 2 | 말줄임표로 끊기거나 머뭇거리지 않았는가 — `isRefinedComplete` | `refined-truncated` |
  * | 3 | 원문에 없던 통화(위안·엔)가 나오지 않았는가 — `isCurrencyConsistent` | `refined-currency` |
+ * | 4 | 독일어·스페인어가 존칭 2인칭(Sie·usted)인가 — `isFormalAddress` | `refined-informal` |
  */
 function findContentIssue(result, input) {
   if (!isRefinedInTargetScript(result.refined, input.sourceLanguage, input.targetLanguage)) return 'refined-wrong-script';
   if (!isRefinedComplete(result.refined, input.text)) return 'refined-truncated';
   if (!isCurrencyConsistent(result.refined, input.text)) return 'refined-currency';
+  if (!isFormalAddress(result.refined, input.targetLanguage, input.text)) return 'refined-informal';
   return null;
 }
 

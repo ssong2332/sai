@@ -216,6 +216,38 @@ export function isCurrencyConsistent(refined, sourceText) {
   return true;
 }
 
+/**
+ * 교정문이 **존칭 2인칭**인지 본다 (2026-11-01 사용자 결정 「Sie·usted 유지」).
+ *
+ * 🔴 실측: 프롬프트 지시(refine-v26)만으로 스페인어는 0/8이 됐지만, 독일어 가볍게는 12회 중 2회 du·dein이 남았다
+ *    (「Dein Vortrag heute war richtig gut!」). 코어가 이 판정에 걸린 응답을 한 번 더 부른다.
+ *
+ * 판정표
+ * | 순서 | 조건 | 결과 |
+ * |---|---|---|
+ * | 1 | 출력 언어가 de·es가 아니다 · 교정문이 비었다 | 통과 |
+ * | 2 | 원문에도 같은 친칭 표지가 있다(예: 독일어 원문을 다듬는 경우) | 통과 — 사용자가 쓴 호칭 |
+ * | 3 | 교정문에 친칭 표지(`INFORMAL_YOU`)가 있다 | 🔴 실패 |
+ * | 4 | 그 밖 | 통과 |
+ *
+ * 🔴 표지는 2인칭 친칭으로만 쓰이는 낱말만 둔다. 프랑스어는 넣지 않았다 — 실측에서 친칭이 나오지 않았고(0/16),
+ *    `te`·`ta`처럼 다른 쓰임과 겹치는 낱말이 많다.
+ *
+ * @returns {boolean} 존칭이거나 판정 대상이 아니면 true.
+ */
+const INFORMAL_YOU = {
+  de: /\b(du|dir|dich|dein|deine|deinen|deinem|deiner|deines)\b/i,
+  es: /(?<![\p{L}])(tú|tu|tus|te|ti|contigo|podrías|puedes|quieres|tienes|sabes)(?![\p{L}])/iu,
+};
+
+export function isFormalAddress(refined, targetLanguage, sourceText) {
+  const test = INFORMAL_YOU[targetLanguage];
+  const value = String(refined ?? '');
+  if (!test || value.trim() === '') return true;
+  if (test.test(String(sourceText ?? ''))) return true;
+  return !test.test(value);
+}
+
 /** 화면 문구. 🔴 무엇이 실패했는지 말하고, 사용자가 할 수 있는 일을 알린다. */
 export function backFailMessage(reason) {
   if (reason === BACK_FAIL.SAME_AS_REFINED) {

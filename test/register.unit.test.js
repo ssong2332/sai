@@ -144,3 +144,16 @@ test('🔴 출력에 상대의 직급·서열을 언급하지 말라고 못 박�
     assert.match(instructionFor(r), /seniority, rank, or status/);
   }
 });
+
+/* ── 존칭 2인칭 (2026-11-01 사용자 결정 「Sie·usted 유지」, refine-v26) ─────────────── */
+
+test('🔴 어느 문체든 존칭 2인칭(Sie·vous·usted)을 쓰라고 못 박는다 — 가볍게 포함', () => {
+  for (const register of ['casual', null, 'formal']) {
+    for (const targetLanguage of ['de', 'fr', 'es']) {
+      const prompt = buildRefinePayload({ ...BASE, targetLanguage, register }).instruction;
+      assert.ok(prompt.includes('German "Sie"'), `${register}/${targetLanguage} — Sie`);
+      assert.ok(prompt.includes('Spanish "usted"'), `${register}/${targetLanguage} — usted`);
+      assert.ok(prompt.includes('it never switches the form of address'), `${register}/${targetLanguage}`);
+    }
+  }
+});
