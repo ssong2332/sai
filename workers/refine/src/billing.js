@@ -394,6 +394,24 @@ export async function handleBilling(request, { config, billing, db, json, logger
     }
   }
 
+  // 내 요금제(2026-11-01) — 사이드패널 로고 옆 배지. 판정은 한도와 같은 `resolvePlan` 한 곳. 결제 키가 없어도 읽기는 된다.
+  if (path === '/v1/billing/me') {
+    if (!db) return json(503, { error: 'billing-unavailable' });
+    let uid;
+    try {
+      ({ uid } = await verifyFirebaseIdToken(bearerToken(request), { projectId: config.projectId, ...(jwks ? { jwks } : {}), now }));
+    } catch (error) {
+      return json(401, { error: 'unauthorized', reason: error instanceof AuthError ? error.reason : 'bad-token' });
+    }
+    try {
+      const snap = await db.collection('billing').doc(uid).get();
+      return json(200, { plan: resolvePlan(snap.exists ? snap.data() ?? null : null, billing) });
+    } catch (error) {
+      logger.error(`[billing] 요금제 조회 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+      return json(503, { error: 'billing-unavailable' });
+    }
+  }
+
   if (path === '/v1/billing/checkout') {
     if (!billing.checkoutReady) return json(503, { error: 'billing-unavailable' });
     let uid;

@@ -6,7 +6,7 @@
  * 🔴 `FEATURES.billing`이 꺼져 있으면 화면에 진입점이 없다(`src/config.js`).
  */
 
-import { BILLING_CHECKOUT_ENDPOINT } from '../config.js';
+import { BILLING_CHECKOUT_ENDPOINT, BILLING_ME_ENDPOINT } from '../config.js';
 import { getIdToken } from './authClient.js';
 
 export const BILLING_ERRORS = {
@@ -54,6 +54,31 @@ export async function startCheckout(interval, { plan = 'pro', teamId, seats, fet
   if (response.status === 409 && payload?.error === 'already-subscribed') throw new BillingClientError(BILLING_ERRORS.ALREADY_SUBSCRIBED);
   if (!response.ok || typeof payload?.checkoutUrl !== 'string') throw new BillingClientError(BILLING_ERRORS.UNKNOWN);
   return payload.checkoutUrl;
+}
+
+/**
+ * 내 요금제 — 로고 옆 배지용(2026-11-01 사용자 결정 「로고 옆 배지로」). 판정은 Worker `resolvePlan`.
+ * 🔴 배지는 장식이다 — 로그인 안 함·네트워크·서버 오류는 전부 `null`(배지 없음)로 조용히 끝낸다.
+ * @returns {Promise<'pro'|'team'|'free'|'beta'|null>}
+ */
+export async function getMyPlan({ fetchImpl = globalThis.fetch } = {}) {
+  try {
+    const token = await getIdToken({ fetchImpl });
+    if (!token) return null;
+    const response = await fetchImpl(BILLING_ME_ENDPOINT, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) return null;
+    const plan = (await response.json().catch(() => ({})))?.plan;
+    return ['pro', 'team', 'free', 'beta'].includes(plan) ? plan : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 배지 글자 — 결제한 요금제만. 그 밖은 `null`(배지 없음). */
+export function planBadgeLabel(plan) {
+  if (plan === 'team') return 'TEAM';
+  if (plan === 'pro') return 'PRO';
+  return null;
 }
 
 /** 화면 문구 — 사유 코드 → 한 줄. */

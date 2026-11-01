@@ -312,3 +312,26 @@ test('D4 — 결제 중이면 expireAt 없음, 해지되면 기간 끝 + 5년, �
   await sendEvent(handle, subEvent({ type: 'subscription.updated', status: 'active', occurred: '2026-10-31T13:00:00Z' }));
   assert.equal((await billingDoc(db)).expireAt ?? null, null);
 });
+
+function meRequest({ auth = true } = {}) {
+  return new globalThis.Request('https://worker.test/v1/billing/me', {
+    method: 'POST',
+    headers: { Origin: `chrome-extension://${TEST_ENV.EXTENSION_ID}`, ...(auth ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+}
+
+test('내 요금제(로고 옆 배지) — 로그인 필수, 판정은 resolvePlan 그대로(없음 beta · Pro 결제 중 pro · 팀 좌석 team · 해지 뒤 beta)', async () => {
+  const { handle, db } = setup();
+  assert.equal((await handle(meRequest({ auth: false }), BILLING_ENV)).status, 401);
+  const planOf = async () => (await (await handle(meRequest(), BILLING_ENV)).json()).plan;
+  assert.equal(await planOf(), 'beta');
+  await sendEvent(handle, subEvent({ occurred: '2026-10-31T11:00:00Z' }));
+  assert.equal(await planOf(), 'pro');
+  await db.collection('billing').doc(UID).set({ teamSeat: { teamId: 't', paid: true } }, { merge: true });
+  assert.equal(await planOf(), 'team');
+  await db.collection('billing').doc(UID).set({ teamSeat: { teamId: 't', paid: false } }, { merge: true });
+  await sendEvent(handle, subEvent({ type: 'subscription.canceled', status: 'canceled', occurred: '2026-10-31T12:00:00Z' }));
+  assert.equal(await planOf(), 'beta');
+  // 결제 키가 없어도(판매 전) 읽기는 된다 — Firestore만 있으면.
+  assert.equal((await handle(meRequest(), TEST_ENV)).status, 200);
+});
