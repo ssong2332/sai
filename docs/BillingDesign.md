@@ -72,7 +72,7 @@
 |---|---|---|
 | 부가세 | 포함 가격 유지($6·$48이 최종 금액) | 변경 없음 |
 | 구독 중 계정 삭제 | 막고 「먼저 Paddle에서 해지」 안내(409 `subscription-active`) — 해지 예약(`cancelScheduled`)이면 허용 | `functions/account.js` · 웹훅이 `scheduled_change` 기록 |
-| 결제 기록 보관 | 구독 끝(또는 계정 삭제) 중 늦은 날 + **5년**, 계정 삭제해도 남김 | `retainBilling` → `expireAt` · 🔴 **Firestore TTL 정책(`billing` 컬렉션 `expireAt`)은 사용자가 콘솔에서 켠다** — 안 켜면 자동 파기가 안 된다 |
+| 결제 기록 보관 | 구독 끝(또는 계정 삭제) 중 늦은 날 + **5년**, 계정 삭제해도 남김 | `retainBilling` → `expireAt` · 🔴 **Firestore TTL 정책(`billing` 컬렉션 `expireAt`)은 아직 없다** — 2026-11-01 콘솔·CLI 둘 다 `403 billing disabled`(프로젝트가 Spark). 사용자 결정 「미루기」: **실판매 전환 때 Blaze 연결 후** `firestore.indexes.json` `fieldOverrides`에 `{collectionGroup:"billing", fieldPath:"expireAt", ttl:true, indexes:[]}`를 더해 `firebase deploy --only firestore:indexes`. 가장 이른 만료가 해지 +5년이라 그 전까지 지장 없음 |
 | 팀 요금제 | 팀까지 만들고 공개 출시 | 설계 다음 |
 ## 8. 팀 요금제 설계 (2026-11-01 사용자 결정 「팀까지 만들고 출시」)
 | 항목 | 결정 |
