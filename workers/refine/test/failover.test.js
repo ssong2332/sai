@@ -63,12 +63,12 @@ test('🔴 anthropic auth(401, 키 무효) → groq가 답한다(L15 규칙)', a
   assert.deepEqual(seen.order, ['anthropic', 'groq']);
 });
 
-test('anthropic 일반 오류(500) → 넘기지 않는다(두 번 불러도 같은 이유로 실패)', async () => {
+test('anthropic 일반 오류(500) → 예비로 넘기지 않는다(같은 provider를 한 번 더 부를 뿐 — 코어 일시 장애 재호출)', async () => {
   const { body, seen } = await call({ statuses: { anthropic: 500 } });
   assert.equal(body.fallback, true);
   assert.equal(body.fallbackReason, 'error');
   assert.equal('providerUsed' in body, false);
-  assert.deepEqual(seen.order, ['anthropic']);
+  assert.deepEqual(seen.order, ['anthropic', 'anthropic']);
 });
 
 test('🔴 명시 provider(anthropic) → 한도여도 넘기지 않는다', async () => {

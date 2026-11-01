@@ -589,3 +589,75 @@ test('🔴 실측 — 교정문이 말줄임표로 끊겨 오면 invalid 폴백�
   assert.equal(second.fallback, false);
   assert.equal(fetchImpl.calls.count, 1, '실패 응답이 캐시에 남으면 안 된다');
 });
+
+/* ── 내용 검사 재호출 · 통화 검사 (2026-11-01 통합 실측) ─────────────────────── */
+
+/** 호출마다 다른 응답을 준다(마지막 것은 반복). */
+function seqFetch(...raws) {
+  const calls = { count: 0 };
+  const impl = async () => {
+    const raw = raws[Math.min(calls.count, raws.length - 1)];
+    calls.count += 1;
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(raw) } }] }) };
+  };
+  impl.calls = calls;
+  return impl;
+}
+
+test('🔴 내용 검사에 걸리면 한 번 더 부르고, 두 번째가 정상이면 그 결과를 준다', async () => {
+  const request = { ...BASE_REQUEST, targetLanguage: 'zh' };
+  const fetchImpl = seqFetch(
+    goodRaw({ refined: '报价仍为人民币... ' }),
+    goodRaw({ refined: '报价仍为1,250万韩元，数量300个保持不变。' }),
+  );
+  const events = [];
+  const out = await refine(request, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.equal(out.fallback, false);
+  assert.equal(out.refined, '报价仍为1,250万韩元，数量300个保持不变。');
+  assert.equal(fetchImpl.calls.count, 2);
+  assert.ok(events.at(-1).issues.includes('content-retried'));
+});
+
+test('🔴 두 번 다 걸리면 invalid 폴백 — 세 번째는 부르지 않는다', async () => {
+  const request = { ...BASE_REQUEST, targetLanguage: 'zh' };
+  const fetchImpl = seqFetch(goodRaw({ refined: '报价仍为人民币... ' }));
+  const events = [];
+  const out = await refine(request, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.equal(out.fallback, true);
+  assert.equal(out.fallbackReason, FALLBACK_REASONS.INVALID);
+  assert.equal(fetchImpl.calls.count, 2);
+  assert.equal(events.at(-1).attempt, 2);
+});
+
+test('형식 위반·정상 응답은 다시 부르지 않는다', async () => {
+  const ok = seqFetch(goodRaw({ refined: '请问能否在周五前处理？' }));
+  await refine({ ...BASE_REQUEST, targetLanguage: 'zh' }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: ok });
+  assert.equal(ok.calls.count, 1);
+  const broken = seqFetch({ nope: true });
+  const out = await refine({ ...BASE_REQUEST, targetLanguage: 'zh' }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: broken });
+  assert.equal(out.fallback, true);
+  assert.equal(broken.calls.count, 1);
+});
+
+test('🔴 실측 — 원문에 없던 위안이 나오면 내용 검사에 걸린다(로그에 본문 없음)', async () => {
+  const request = { ...BASE_REQUEST, targetLanguage: 'zh' };
+  const fetchImpl = seqFetch(goodRaw({ refined: '报价仍为人民币12,500,000元(1,250万韩元)，数量300个不变。' }));
+  const events = [];
+  const out = await refine(request, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.equal(out.fallback, true);
+  assert.ok(events.at(-1).issues.includes('refined-currency'));
+  assert.ok(!JSON.stringify(events).includes('人民币'));
+});
+
+test('🔴 첫 시도가 12초를 넘겼으면 다시 부르지 않는다(확장 30초 안에 끝나야 한다)', async () => {
+  let t = 0;
+  const fetchImpl = seqFetch(goodRaw({ refined: '报价仍为人民币... ' }), goodRaw({ refined: '报价仍为1,250万韩元。' }));
+  const slow = async (...args) => {
+    t += 13_000;
+    return fetchImpl(...args);
+  };
+  slow.calls = fetchImpl.calls;
+  const out = await refine({ ...BASE_REQUEST, targetLanguage: 'zh' }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: slow, now: () => t });
+  assert.equal(out.fallback, true);
+  assert.equal(fetchImpl.calls.count, 1);
+});

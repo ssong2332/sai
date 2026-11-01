@@ -138,23 +138,23 @@ test('사고 스위치 — `adaptive`일 때만 thinking을 생략한다(코어 
   }
 });
 
-test('🔴 오류 분류 — status + error.type → classifyHttpFailure, 재시도 없음(호출 1회)', async () => {
+test('🔴 오류 분류 — status + error.type → classifyHttpFailure, 5xx만 한 번 더(2026-11-01 코어 `isRetryableTransient`)', async () => {
   const rows = [
-    [401, errorBody('authentication_error'), FALLBACK_REASONS.AUTH],
-    [403, errorBody('permission_error'), FALLBACK_REASONS.AUTH],
-    [429, errorBody('rate_limit_error'), FALLBACK_REASONS.QUOTA],
-    [400, errorBody('billing_error'), FALLBACK_REASONS.QUOTA], // status만 보면 error — type을 읽어야 quota
-    [400, errorBody('invalid_request_error'), FALLBACK_REASONS.ERROR],
-    [529, errorBody('overloaded_error'), FALLBACK_REASONS.ERROR],
-    [500, '<html>upstream error</html>', FALLBACK_REASONS.ERROR], // JSON 아닌 오류 본문
+    [401, errorBody('authentication_error'), FALLBACK_REASONS.AUTH, 1],
+    [403, errorBody('permission_error'), FALLBACK_REASONS.AUTH, 1],
+    [429, errorBody('rate_limit_error'), FALLBACK_REASONS.QUOTA, 1],
+    [400, errorBody('billing_error'), FALLBACK_REASONS.QUOTA, 1], // status만 보면 error — type을 읽어야 quota
+    [400, errorBody('invalid_request_error'), FALLBACK_REASONS.ERROR, 1],
+    [529, errorBody('overloaded_error'), FALLBACK_REASONS.ERROR, 2],
+    [500, '<html>upstream error</html>', FALLBACK_REASONS.ERROR, 2], // JSON 아닌 오류 본문
   ];
-  for (const [status, body, expected] of rows) {
+  for (const [status, body, expected, calls] of rows) {
     const fetchImpl = fakeFetch(status, body);
     const result = await run(fetchImpl);
     const label = `${status} ${typeof body === 'string' ? '(non-json)' : body.error.type}`;
     assert.equal(result.fallback, true, label);
     assert.equal(result.fallbackReason, expected, label);
-    assert.equal(fetchImpl.seen.calls, 1, `${label} — 재시도했다`);
+    assert.equal(fetchImpl.seen.calls, calls, `${label} — 호출 횟수`);
     assert.equal(String(result.fallbackDetail).includes(API_KEY), false, `${label} — 진단 문구에 키`);
     assert.equal(String(result.fallbackDetail).includes('test'), false, `${label} — 응답 error.message를 옮겼다`);
   }

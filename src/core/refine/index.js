@@ -13,7 +13,7 @@ import { buildRefinePayload, REFINE_PROMPT_VERSION, URGENCY_LEVELS } from './pro
 import { normalizeRefineResponse } from './schema.js';
 import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
-import { isRefinedInTargetScript, isRefinedComplete } from './backcheck.js';
+import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent } from './backcheck.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -119,6 +119,37 @@ function normalizeThreadContext(value) {
 }
 
 /**
+ * 일시 장애 재호출 판정 — `error` 사유 중 **5xx(529 과부하 포함)·연결 실패**만.
+ * | 분류 문자열(providers/*가 만든다 — 본문 없음) | 다시 부르나 |
+ * |---|---|
+ * | `(http 5xx)` | 예 |
+ * | `(http 4xx)`(400 잘못된 요청 등 — 다시 불러도 같다) | 아니오 |
+ * | 타임아웃·abort·키 없음 | 아니오 |
+ * | 그 밖(연결 실패 — `APIConnectionError`·`fetch failed` 등) | 예 |
+ */
+function isRetryableTransient(error) {
+  const detail = String(error?.message ?? error ?? '');
+  const http = /\(http (\d{3})\)/.exec(detail);
+  if (http) return http[1].startsWith('5');
+  return !/timeout|timed out|abort|missing api key/i.test(detail);
+}
+
+/**
+ * 교정문 내용 검사 — 걸린 사유 코드 하나, 없으면 null. 판정표는 `backcheck.js`의 각 함수에 있다.
+ * | 순서 | 검사 | 사유 코드 |
+ * |---|---|---|
+ * | 1 | 교정문이 상대 언어로 왔는가(통째로 한국어 등) — `isRefinedInTargetScript` | `refined-wrong-script` |
+ * | 2 | 말줄임표로 끊기거나 머뭇거리지 않았는가 — `isRefinedComplete` | `refined-truncated` |
+ * | 3 | 원문에 없던 통화(위안·엔)가 나오지 않았는가 — `isCurrencyConsistent` | `refined-currency` |
+ */
+function findContentIssue(result, input) {
+  if (!isRefinedInTargetScript(result.refined, input.sourceLanguage, input.targetLanguage)) return 'refined-wrong-script';
+  if (!isRefinedComplete(result.refined, input.text)) return 'refined-truncated';
+  if (!isCurrencyConsistent(result.refined, input.text)) return 'refined-currency';
+  return null;
+}
+
+/**
  * 교정 요청을 처리한다. **던지지 않는다** — LLM 실패는 폴백 응답으로 흡수한다
  * (요청 자체가 잘못된 경우만 RefineRequestError를 던진다).
  *
@@ -182,52 +213,76 @@ export async function refine(request, deps = {}) {
     }
   }
 
-  let raw;
-  try {
-    raw = await provider.call(payload, {
-      apiKey,
-      model,
-      timeoutMs,
-      fetchImpl,
-      // 🔴 `undefined`는 그대로 넘긴다 — provider가 「안 넘김」으로 보고 process.env를 읽는다(Node 경로 불변).
-      thinking,
-      effort,
-      errors: { RefineCallError, classifyHttpFailure, parseJsonContent },
-    });
-  } catch (error) {
-    const reason = error instanceof RefineCallError ? error.reason : FALLBACK_REASONS.ERROR;
-    const fallbackResult = buildFallbackResponse(input, reason);
-    // 🔴 진단용 상세(HTTP 상태·분류 코드). 메시지 본문은 담기지 않는다(providers/*가 보장).
-    fallbackResult.fallbackDetail = error?.message ?? String(error);
-    // 🔴 폴백은 캐시하지 않는다 — 키가 복구된 뒤에도 폴백이 계속 반환되면 시연이 망가진다.
-    logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: reason, urgency: fallbackResult.urgency, latencyMs: now() - startedAt });
-    return fallbackResult;
-  }
-
-  const { result, issues } = normalizeRefineResponse(raw, { userUrgency: input.userUrgency });
-
-  if (result === null) {
-    const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
-    logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues, latencyMs: now() - startedAt });
-    return fallbackResult;
-  }
-
   /**
-   * 🔴 교정문이 상대 언어로 오지 않았으면(통째로 한국어 등) 응답 형식 위반과 같이 `invalid` 폴백으로 돌린다
-   *    (`backcheck.js` `isRefinedInTargetScript` 판정표). 캐시하지 않고, 확장의 `invalid` 자동 재시도 한 번을 탄다.
-   *    로그에는 사유 코드만 — 교정문은 싣지 않는다(Zero Retention).
+   * 🔴 내용 검사(언어·잘림·통화)에 걸리면 **한 번 더** 부른다 (2026-11-01 통합 실측).
+   *    ko → zh 빠른 모드에서 같은 문장이 약 30% 걸렸다 — 확장의 `invalid` 재시도 한 번만으로는 두 번 연속 걸려
+   *    「교정하지 못했어요」가 약 9%(추정)였다. 형식 위반(`result === null`)·호출 실패는 여기서 다시 부르지 않는다.
+   * 🔴 이 재호출은 월 예산 추정(`qualityAllowance.js` — 요청당 고정 비용)에 잡히지 않는다. 마지막 방어선은 콘솔 한도다.
+   * 🔴 일시 장애(`error` — 연결 실패·5xx)도 **한 번만** 다시 부른다. 실측 2026-11-01: 약 300회 중 3회 `error`, 같은 문장
+   *    재실행은 정상 — 원인(HTTP 상태)은 확인하지 못했다. 타임아웃은 다시 부르지 않는다(기다림이 두 배가 된다).
+   *    한도·키(`quota`·`auth`)는 여기가 아니라 서버 폴오버(`failover.js`)가 맡는다.
    */
-  if (!isRefinedInTargetScript(result.refined, input.sourceLanguage, input.targetLanguage)) {
-    const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
-    logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues: [...issues, 'refined-wrong-script'], latencyMs: now() - startedAt });
-    return fallbackResult;
-  }
+  const MAX_CONTENT_ATTEMPTS = 2;
+  /**
+   * 🔴 확장은 30초에 끊는다(`config.js` `REFINE_TIMEOUT_MS`). 다시 부르는 것은 **12초 안에 끝난 첫 시도**뿐이고,
+   *    다시 부를 때는 15초에 끊는다 — 합쳐도 27초. 그보다 늦으면 다시 부르지 않고 그대로 폴백한다.
+   */
+  const RETRY_ELAPSED_LIMIT_MS = 12_000;
+  const RETRY_TIMEOUT_MS = 15_000;
+  const canRetry = () => now() - startedAt <= RETRY_ELAPSED_LIMIT_MS;
+  let contentAttempts = 0;
+  let transientRetried = false;
+  let result;
+  let issues;
+  for (let attempt = 1; ; attempt += 1) {
+    let raw;
+    try {
+      raw = await provider.call(payload, {
+        apiKey,
+        model,
+        timeoutMs: attempt === 1 ? timeoutMs : Math.min(timeoutMs ?? RETRY_TIMEOUT_MS, RETRY_TIMEOUT_MS),
+        fetchImpl,
+        // 🔴 `undefined`는 그대로 넘긴다 — provider가 「안 넘김」으로 보고 process.env를 읽는다(Node 경로 불변).
+        thinking,
+        effort,
+        errors: { RefineCallError, classifyHttpFailure, parseJsonContent },
+      });
+    } catch (error) {
+      const reason = error instanceof RefineCallError ? error.reason : FALLBACK_REASONS.ERROR;
+      if (reason === FALLBACK_REASONS.ERROR && !transientRetried && isRetryableTransient(error) && canRetry()) {
+        transientRetried = true;
+        continue;
+      }
+      const fallbackResult = buildFallbackResponse(input, reason);
+      // 🔴 진단용 상세(HTTP 상태·분류 코드). 메시지 본문은 담기지 않는다(providers/*가 보장).
+      fallbackResult.fallbackDetail = error?.message ?? String(error);
+      // 🔴 폴백은 캐시하지 않는다 — 키가 복구된 뒤에도 폴백이 계속 반환되면 시연이 망가진다.
+      logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: reason, urgency: fallbackResult.urgency, attempt, latencyMs: now() - startedAt });
+      return fallbackResult;
+    }
 
-  /** 🔴 교정문이 말줄임표로 끊겨 왔으면 같은 길로 `invalid` 폴백(`backcheck.js` `isRefinedComplete` 판정표). 로그는 사유 코드만. */
-  if (!isRefinedComplete(result.refined, input.text)) {
-    const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
-    logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues: [...issues, 'refined-truncated'], latencyMs: now() - startedAt });
-    return fallbackResult;
+    ({ result, issues } = normalizeRefineResponse(raw, { userUrgency: input.userUrgency }));
+
+    if (result === null) {
+      const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
+      logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues, attempt, latencyMs: now() - startedAt });
+      return fallbackResult;
+    }
+
+    const contentIssue = findContentIssue(result, input);
+    if (contentIssue === null) {
+      if (contentAttempts > 0) issues = [...issues, 'content-retried'];
+      if (transientRetried) issues = [...issues, 'transient-retried'];
+      break;
+    }
+    // 🔴 끝까지 걸리면 `invalid` 폴백 — 캐시하지 않고, 확장의 `invalid` 자동 재시도 한 번을 탄다.
+    //    로그에는 사유 코드만 — 교정문은 싣지 않는다(Zero Retention).
+    contentAttempts += 1;
+    if (contentAttempts >= MAX_CONTENT_ATTEMPTS || !canRetry()) {
+      const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
+      logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues: [...issues, contentIssue], attempt, latencyMs: now() - startedAt });
+      return fallbackResult;
+    }
   }
 
   /**

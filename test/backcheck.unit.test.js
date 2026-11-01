@@ -18,6 +18,7 @@ import {
   isExplanationReadable,
   isRefinedInTargetScript,
   isRefinedComplete,
+  isCurrencyConsistent,
   BACK_FAIL,
 } from '../src/core/refine/backcheck.js';
 import { buildCasualToneBlock } from '../src/core/meme/index.js';
@@ -257,4 +258,24 @@ test('행 1·2·4 — 빈 교정문·온전한 문장·원문에도 있는 말�
 test('행 2 — 원문이 말줄임표로 끝나면 교정문도 그래도 통과', () => {
   assert.equal(isRefinedComplete('Well, we will see...', '글쎄요, 두고 봐야죠...'), true);
   assert.equal(isRefinedComplete('Thanks…', '감사합니다…'), true);
+});
+
+/* ── 통화 검사 (2026-11-01, 판정표 `isCurrencyConsistent`) ───────── */
+
+test('🔴 행 3 — 실측: 원(원)이 위안·엔으로 바뀌면 실패', () => {
+  assert.equal(isCurrencyConsistent('报价仍为人民币12,500,000元(1,250万韩元)', KO_S1), false);
+  assert.equal(isCurrencyConsistent('The quote stays at RMB 12.5 million.', KO_S1), false);
+  assert.equal(isCurrencyConsistent('見積もりは1,250万円のままです。', KO_S1), false);
+});
+
+test('행 1 — 헷갈릴 여지가 있는 표기(元 하나·¥·숫자 없는 円)는 보지 않는다', () => {
+  assert.equal(isCurrencyConsistent('报价仍为1,250万韩元。', KO_S1), true);
+  assert.equal(isCurrencyConsistent('报价为12,500,000元。', KO_S1), true);
+  assert.equal(isCurrencyConsistent('円滑に進めるため、見積もりは1,250万ウォンのままです。', KO_S1), true);
+  assert.equal(isCurrencyConsistent('', KO_S1), true);
+});
+
+test('행 2 — 원문에 있던 통화면 통과', () => {
+  assert.equal(isCurrencyConsistent('The quote is 5 million yen.', '견적은 500만 엔입니다.'), true);
+  assert.equal(isCurrencyConsistent('报价为人民币5万元。', '견적은 5만 위안입니다.'), true);
 });
