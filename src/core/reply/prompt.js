@@ -67,8 +67,18 @@
  *   물음을 범위 밖으로 취급하는 것이다. 의도별 지시문이 공통 규칙을 이긴다.
  *   🔴 빠뜨리기는 지어내기와 달리 **화면에 아무 표시도 남지 않는다** — `verify.js`는 있는 값을
  *      검사하지 없는 답을 찾지 못한다. 여기서 막지 못하면 사용자는 알아챌 방법이 없다.
+ *
+ * v8 (2026-11-01) — 합성 실측(빠른 모드)이 잡은 결함 1건: 🔴 **누가 무엇을 하는지가 뒤바뀐다.**
+ *   상대가 **나에게** 견적을 보내 달라고 했는데 `schedule`이 「견적서를 언제 받아볼 수 있을지
+ *   확인 부탁드립니다」로, 상대가 **자기가** 계약서·샘플을 보내겠다고 했는데 `accept`·`clarify`가
+ *   「보내드리겠습니다」로 썼다(12건 중 6건). 원문 1인칭을 그대로 따라 쓰거나, 의도 지시문의
+ *   「요청을 인정하고 하겠다고 확인하라」를 상대의 약속에도 적용한 탓이다.
+ *   공통 `ROLE_RULE`로 막는다 — 의도는 **태도**를 바꿀 뿐 **수행자**를 바꾸지 않는다.
+ *   🔴 v7 교훈대로 의도별 지시문이 공통 규칙을 이기므로, 이 규칙은 의도 지시문 **바로 뒤**에 두고
+ *      「위 방향 전부에 적용된다」고 못박는다. 날짜·이름이 아니라 **관계의 환각**이라 `verify.js`가
+ *      못 잡는다(v2·v6와 같은 계열).
  */
-export const REPLY_PROMPT_VERSION = 'reply-v7';
+export const REPLY_PROMPT_VERSION = 'reply-v8';
 
 /**
  * 회신 의도 6종. 🔴 이 키 집합이 계약이다 — `schema.js`·`decode/schema.js`가 화이트리스트로
@@ -215,6 +225,30 @@ const STRUCTURE_RULE =
   'Do not pad the draft with apologies, compliments, or hedging to make it longer.';
 
 /**
+ * 🔴 역할 유지 규칙 (v8) — 의도와 무관한 공통 규칙이다.
+ *    상대가 나에게 맡긴 일은 회신에서 **내가** 하고, 상대가 하겠다고 한 일은 회신에서도 **상대의**
+ *    일로 남는다. 뒤바뀐 초안은 문장이 자연스러워서 사용자가 그대로 보내기 쉽다 — 내가 하지 않을
+ *    일을 약속하거나, 내가 보내야 할 것을 상대에게 달라고 하게 된다.
+ */
+const ROLE_RULE =
+  'Whichever direction above applies, keep who does what exactly as the ORIGINAL has it. The reader ' +
+  'is the person who RECEIVED the ORIGINAL; its sender is the person this reply goes to. In the ' +
+  'ORIGINAL, "you" is the reader and "I"/"we" is the sender — in the reply it is the other way ' +
+  'round, so never copy the ORIGINAL\'s first-person sentences as if the reader said them. Before ' +
+  'writing, settle for each action in the ORIGINAL who is to perform it: ' +
+  '(a) something the sender asks the reader to do or provide stays the READER\'s task — in the reply ' +
+  'the reader is the one who does it; ' +
+  '(b) something the sender says they themselves will do or provide stays the SENDER\'s — the reply ' +
+  'may thank them for it, welcome it, or ask about it, but the reader never takes it over or promises ' +
+  'it. If the ORIGINAL offers or promises rather than requests, accepting means welcoming it and ' +
+  'doing whatever the ORIGINAL asks of the reader in return, not repeating the promise as the ' +
+  'reader\'s own. ' +
+  'The direction changes the reader\'s stance toward these actions — agreeing, settling timing, ' +
+  'asking for detail — never who performs them. Any question the reader asks must be something the ' +
+  'reader needs to learn from the sender: never ask the sender whether the reader can do the ' +
+  'reader\'s own task, and never ask to receive what the sender asked the reader to provide.';
+
+/**
  * 🔴 사용자가 미리 답한 값의 취급 (v2).
  *    자리표시자 규칙과 **충돌하지 않는다** — "지어내지 마라"의 반대는 "사용자가 준 값을 써라"다.
  *    사용자가 답하지 않은 항목은 여전히 자리표시자로 남는다.
@@ -248,9 +282,20 @@ const COMPOSE_ORDER_RULE =
 
 const RESPONSE_FORMAT_RULE =
   'Respond with JSON only, matching exactly this shape: ' +
-  '{"draft": "<the reply written in the review language>", ' +
+  '{"roles": [{"action": "<one action the ORIGINAL mentions, a few English words>", ' +
+  '"doer": "reader" or "sender"}], ' +
+  '"draft": "<the reply written in the review language>", ' +
   '"placeholderNote": "<one short sentence in the review language ' +
   'telling the reader what they still need to fill in; empty string if there are no placeholders>"}. ' +
+  /**
+   * 🔴 v8 — `roles`를 **draft보다 먼저** 쓰게 한다. 규칙 문장만으로는 빠른 모드(사고 끔)가 역할을
+   *    뒤집는 비율이 그대로였다(12건 중 6건 → 6건). 수행자를 먼저 적게 하면 초안이 그 판정을 따른다.
+   *    `schema.js`가 이 필드를 버리므로 화면·캐시·로그 어디에도 남지 않는다.
+   */
+  'Fill "roles" FIRST, one entry per action the ORIGINAL mentions, deciding the doer by the rule ' +
+  'about who does what; then write the draft so that every action is performed by the party listed ' +
+  'there — "reader" is the one writing this reply, "sender" is the one who wrote the ORIGINAL. ' +
+  '"roles" is a working note only and is never shown. ' +
   // 🔴 분량 지시는 STRUCTURE_RULE 한 곳에만 둔다 — 두 군데에 있으면 고칠 때 한쪽만 고친다(v3).
   'Do not add any text outside the JSON object.';
 
@@ -273,6 +318,7 @@ export function buildReplyPayload({ text, intent, sourceLanguage, targetLanguage
   const instruction = [
     REPLY_RULE,
     INTENT_RULES[intent] ?? INTENT_RULES.clarify,
+    ROLE_RULE,
     STRUCTURE_RULE,
     NO_FABRICATION_RULE,
     // 답이 하나도 없으면 규칙을 싣지 않는다 — 빈 필드를 설명하는 문단은 토큰만 쓴다.
