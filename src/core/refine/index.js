@@ -14,6 +14,7 @@ import { normalizeRefineResponse } from './schema.js';
 import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
 import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, isFormalAddress, checkBackTranslation } from './backcheck.js';
+import { checkNumbersPreserved } from './numberCheck.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -238,11 +239,34 @@ export async function refine(request, deps = {}) {
   let contentAttempts = 0;
   let transientRetried = false;
   /**
-   * 🔴 역번역만 깨진 결과(교정문은 정상) — 한 번 더 불러 보고, 두 번째도 온전하지 않으면 **이것을 준다**
-   *    (2026-11-01 통합 실측: 역번역이 교정문 복사·다른 언어, 76건 중 1~3건). 교정문까지 버리지 않는다 —
-   *    화면은 역번역 실패 안내를 띄우고, 확장의 자동 재시도 한 번이 남아 있다(`SaiOverlay.jsx`).
+   * 🔴 **약한 검사** — 교정문은 쓸 만한데 흠이 있는 결과. 한 번 더 불러 보고, 두 번째가 더 낫지 않으면 **첫 결과를 준다**
+   *    (폴백하지 않는다 — 화면이 이미 그 흠을 경고한다). 내용 검사(`findContentIssue`)와 달리 오탐이 있을 수 있어서다.
+   * | 사유 | 판정 | 화면 경고 |
+   * |---|---|---|
+   * | `back` | 역번역이 교정문 복사·다른 언어(`checkBackTranslation`) — 통합 76건 중 1~3건 | 역번역 실패 안내 |
+   * | `numbers` | 원문 숫자가 교정문에 없음(`checkNumbersPreserved`) — 실측: 「1,250만 원」→「1.250.000 KRW」(10배 작음) | 숫자 확인 필요 |
+   * 둘 다면 `numbers`가 먼저다(돈·날짜가 틀린 쪽이 더 위험하다). 두 번째 결과를 쓰는 조건: 약한 흠이 없거나,
+   * 첫 결과는 숫자가 빠졌고 두 번째는 역번역만 깨졌을 때.
    */
-  let brokenBackResult = null;
+  const softIssueOf = (candidate) => {
+    const dropped = checkNumbersPreserved(
+      { refined: candidate.refined, sourceLanguage: input.sourceLanguage, targetLanguage: input.targetLanguage },
+      input.text,
+    );
+    if (dropped.length > 0) return 'numbers';
+    const backUsable = checkBackTranslation({
+      backTranslation: candidate.backTranslation,
+      refined: candidate.refined,
+      sourceLanguage: input.sourceLanguage,
+      targetLanguage: input.targetLanguage,
+    }).usable;
+    return backUsable ? null : 'back';
+  };
+  let softResult = null;
+  const keepSoftResult = () => {
+    ({ result, issues } = softResult);
+    issues = [...issues, `${softResult.kind}-retry-failed`];
+  };
   let result;
   let issues;
   for (let attempt = 1; ; attempt += 1) {
@@ -264,9 +288,8 @@ export async function refine(request, deps = {}) {
         transientRetried = true;
         continue;
       }
-      if (brokenBackResult) {
-        ({ result, issues } = brokenBackResult);
-        issues = [...issues, 'back-retry-failed'];
+      if (softResult) {
+        keepSoftResult();
         break;
       }
       const fallbackResult = buildFallbackResponse(input, reason);
@@ -279,9 +302,8 @@ export async function refine(request, deps = {}) {
 
     ({ result, issues } = normalizeRefineResponse(raw, { userUrgency: input.userUrgency }));
 
-    if (result === null && brokenBackResult) {
-      ({ result, issues } = brokenBackResult);
-      issues = [...issues, 'back-retry-failed'];
+    if (result === null && softResult) {
+      keepSoftResult();
       break;
     }
     if (result === null) {
@@ -292,30 +314,26 @@ export async function refine(request, deps = {}) {
 
     const contentIssue = findContentIssue(result, input);
     if (contentIssue === null) {
-      const backUsable = checkBackTranslation({
-        backTranslation: result.backTranslation,
-        refined: result.refined,
-        sourceLanguage: input.sourceLanguage,
-        targetLanguage: input.targetLanguage,
-      }).usable;
-      if (!backUsable && !brokenBackResult && canRetry()) {
-        brokenBackResult = { result, issues: [...issues, 'back-broken'] };
+      const softIssue = softIssueOf(result);
+      if (softIssue && !softResult && canRetry()) {
+        softResult = { result, issues: [...issues, `${softIssue}-broken`], kind: softIssue };
         continue;
       }
-      if (!backUsable && brokenBackResult) {
-        ({ result, issues } = brokenBackResult);
-        issues = [...issues, 'back-retry-failed'];
-        break;
+      if (softResult) {
+        const secondIsBetter = softIssue === null || (softResult.kind === 'numbers' && softIssue === 'back');
+        if (!secondIsBetter) {
+          keepSoftResult();
+          break;
+        }
+        issues = [...issues, `${softResult.kind}-retried`];
       }
-      if (brokenBackResult) issues = [...issues, 'back-retried'];
       if (contentAttempts > 0) issues = [...issues, 'content-retried'];
       if (transientRetried) issues = [...issues, 'transient-retried'];
       break;
     }
-    // 역번역 재호출이 내용 검사에 걸리면 — 교정문이 정상이던 첫 결과를 준다.
-    if (brokenBackResult) {
-      ({ result, issues } = brokenBackResult);
-      issues = [...issues, 'back-retry-failed'];
+    // 약한 검사 재호출이 내용 검사에 걸리면 — 교정문이 쓸 만하던 첫 결과를 준다.
+    if (softResult) {
+      keepSoftResult();
       break;
     }
     // 🔴 끝까지 걸리면 `invalid` 폴백 — 캐시하지 않고, 확장의 `invalid` 자동 재시도 한 번을 탄다.

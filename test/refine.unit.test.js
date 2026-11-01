@@ -738,3 +738,39 @@ test('🔴 문체만 다른 같은 문장은 캐시를 같이 쓰지 않는다',
   assert.equal(formal.cached ?? false, false);
   assert.equal(fetchImpl.bodies.length, 2);
 });
+
+/* ── 숫자 누락 재호출 (2026-11-01 통합 실측 — 「1,250만 원」→「1.250.000 KRW」) ── */
+
+const NUM_REQ = { ...BASE_REQUEST, text: '견적은 1,250만 원 그대로이고, 수량 300개는 변동 없습니다.', targetLanguage: 'de' };
+const NUM_OK = goodRaw({ refined: 'Das Angebot bleibt bei 12.500.000 KRW, die Menge von 300 Stück bleibt unverändert.', backTranslation: '견적은 1,250만 원 그대로이고 수량 300개는 변동 없습니다.' });
+const NUM_BAD = goodRaw({ refined: 'Das Angebot bleibt bei 1.250.000 KRW, die Menge von 300 Stück bleibt unverändert.', backTranslation: '견적은 125만 원이고 수량 300개는 변동 없습니다.' });
+
+test('🔴 숫자가 빠졌으면 한 번 더 부르고, 두 번째가 맞으면 그 결과를 준다', async () => {
+  const fetchImpl = seqFetch(NUM_BAD, NUM_OK);
+  const events = [];
+  const out = await refine(NUM_REQ, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.equal(out.fallback, false);
+  assert.ok(out.refined.includes('12.500.000'));
+  assert.equal(fetchImpl.calls.count, 2);
+  assert.ok(events.at(-1).issues.includes('numbers-retried'));
+  // 🔴 로그에 본문 없음 (Zero Retention).
+  assert.ok(!JSON.stringify(events).includes('Angebot'));
+});
+
+test('🔴 두 번 다 숫자가 빠지면 첫 결과를 준다 — 폴백하지 않는다(화면이 숫자 경고를 띄운다)', async () => {
+  const fetchImpl = seqFetch(NUM_BAD);
+  const events = [];
+  const out = await refine(NUM_REQ, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.equal(out.fallback, false);
+  assert.ok(out.refined.includes('1.250.000'));
+  assert.equal(fetchImpl.calls.count, 2);
+  assert.ok(events.at(-1).issues.includes('numbers-retry-failed'));
+});
+
+test('숫자가 빠진 첫 결과보다 역번역만 깨진 두 번째가 낫다 — 두 번째를 준다', async () => {
+  const backBroken = goodRaw({ ...NUM_OK, backTranslation: NUM_OK.refined });
+  const fetchImpl = seqFetch(NUM_BAD, backBroken);
+  const out = await refine(NUM_REQ, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+  assert.ok(out.refined.includes('12.500.000'));
+  assert.equal(fetchImpl.calls.count, 2);
+});
