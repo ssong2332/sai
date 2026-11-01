@@ -108,6 +108,43 @@ export function isExplanationReadable(text, sourceLanguage, targetLanguage) {
   return test.test(value);
 }
 
+/**
+ * 교정문이 **상대 언어로 왔는지** 본다 (2026-11-01, refine-v24 실측).
+ *
+ * 🔴 **실측한 결함**: 한국어 → 일본어·중국어 교정(사람 용어집이 걸린 문장)에서 `refined`가 **통째로 한국어**로
+ *    왔다(빠른 모드 20건 중 3건). 역번역 검사는 이걸 못 잡는다 — 역번역은 한국어로 정상이라서다. 그대로 두면
+ *    「상대에게 보낼 문장」 칸에 한국어가 들어가고, 그대로 전송될 수 있다.
+ * 🔴 **고쳐 쓰지 않는다.** 코어 `refine()`이 이 판정에 걸린 응답을 `invalid` 폴백으로 돌리고(캐시 안 함),
+ *    확장은 `invalid` 폴백을 이미 한 번 자동 재시도한다(`SaiOverlay.jsx`) — 새 경로를 만들지 않는다.
+ *
+ * 판정표 (위에서부터 처음 맞는 행 하나만 적용한다)
+ * | 순서 | 조건 | 결과 |
+ * |---|---|---|
+ * | 1 | 원문·상대 언어가 같다 · 교정문이 비었다 | 통과 |
+ * | 2 | 상대 언어가 ko·ja·zh인데 교정문에 그 언어 고유 문자(`SCRIPT_TEST`)가 하나도 없다 | 🔴 실패 |
+ * | 3 | 상대 언어가 ko가 아닌데 한글 음절이 글자(한글·가나·한자·라틴)의 절반을 넘는다 | 🔴 실패 |
+ * | 4 | 그 밖 | 통과 |
+ *
+ * 🔴 행 3이 「절반」인 이유: 용어집이 원문 표기를 지키라고 한 이름·용어(「김 대리님」)는 상대 언어 문장 안에
+ *    한글로 남을 수 있다. 몇 글자 섞인 것은 정상이고, 문장 전체가 한국어일 때만 잡는다(못 잡는 쪽으로 틀린다).
+ *
+ * @returns {boolean} 상대 언어로 왔다고 볼 수 있으면 true.
+ */
+export function isRefinedInTargetScript(refined, sourceLanguage, targetLanguage) {
+  const value = String(refined ?? '').trim();
+  if (value === '' || !sourceLanguage || !targetLanguage || sourceLanguage === targetLanguage) return true;
+
+  const test = SCRIPT_TEST[targetLanguage];
+  if (test && !test.test(value)) return false;
+
+  if (targetLanguage !== 'ko') {
+    const hangul = (value.match(/[가-힣]/g) ?? []).length;
+    const letters = (value.match(/[가-힣぀-ヿ一-鿿A-Za-zÀ-ÿ]/g) ?? []).length;
+    if (letters > 0 && hangul * 2 > letters) return false;
+  }
+  return true;
+}
+
 /** 화면 문구. 🔴 무엇이 실패했는지 말하고, 사용자가 할 수 있는 일을 알린다. */
 export function backFailMessage(reason) {
   if (reason === BACK_FAIL.SAME_AS_REFINED) {

@@ -16,6 +16,7 @@ import {
   checkBackTranslation,
   backFailMessage,
   isExplanationReadable,
+  isRefinedInTargetScript,
   BACK_FAIL,
 } from '../src/core/refine/backcheck.js';
 import { buildCasualToneBlock } from '../src/core/meme/index.js';
@@ -206,4 +207,27 @@ test('🔴 폴백 사유 이름이 바뀌면 이 테스트가 먼저 깨진다',
   assert.equal(FALLBACK_REASONS.INVALID, 'invalid', '재시도 조건이 참조하는 값이 바뀌었다');
   assert.equal(FALLBACK_REASONS.QUOTA, 'quota');
   assert.equal(FALLBACK_REASONS.ERROR, 'error');
+});
+
+/* ── 교정문 언어 검사 (2026-11-01, 판정표 `isRefinedInTargetScript`) ───────── */
+
+test('행 1 — 같은 언어·빈 교정문은 통과', () => {
+  assert.equal(isRefinedInTargetScript('그대로입니다', 'ko', 'ko'), true);
+  assert.equal(isRefinedInTargetScript('', 'ko', 'ja'), true);
+});
+
+test('🔴 행 2 — 상대 언어 고유 문자가 없으면 실패 (실측: zh·ja 목표에 한국어 교정문)', () => {
+  assert.equal(isRefinedInTargetScript('금요일까지 처리 가능한지 확인 부탁드립니다.', 'ko', 'zh'), false);
+  assert.equal(isRefinedInTargetScript('Nexus 대시보드 접근 권한 요청 건, 금요일까지 부탁드립니다.', 'ko', 'ja'), false);
+  assert.equal(isRefinedInTargetScript('Could you review this?', 'en', 'ko'), false);
+});
+
+test('🔴 행 3 — 라틴 목표에 한글이 절반을 넘으면 실패', () => {
+  assert.equal(isRefinedInTargetScript('금요일까지 처리 가능할까요?', 'ko', 'fr'), false);
+});
+
+test('행 4 — 상대 언어 문장에 등록 호칭 몇 글자가 섞인 것은 정상', () => {
+  assert.equal(isRefinedInTargetScript('您好，김 대리님已申请Nexus仪表板的访问权限。请问能否在周五前处理？', 'ko', 'zh'), true);
+  assert.equal(isRefinedInTargetScript('Bonjour, 김 대리님 a demandé l\'accès au tableau de bord Nexus.', 'ko', 'fr'), true);
+  assert.equal(isRefinedInTargetScript('キム・スジン様よりご依頼をいただいております。', 'ko', 'ja'), true);
 });

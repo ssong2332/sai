@@ -13,6 +13,7 @@ import { buildRefinePayload, REFINE_PROMPT_VERSION, URGENCY_LEVELS } from './pro
 import { normalizeRefineResponse } from './schema.js';
 import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
+import { isRefinedInTargetScript } from './backcheck.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -208,6 +209,17 @@ export async function refine(request, deps = {}) {
   if (result === null) {
     const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
     logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues, latencyMs: now() - startedAt });
+    return fallbackResult;
+  }
+
+  /**
+   * 🔴 교정문이 상대 언어로 오지 않았으면(통째로 한국어 등) 응답 형식 위반과 같이 `invalid` 폴백으로 돌린다
+   *    (`backcheck.js` `isRefinedInTargetScript` 판정표). 캐시하지 않고, 확장의 `invalid` 자동 재시도 한 번을 탄다.
+   *    로그에는 사유 코드만 — 교정문은 싣지 않는다(Zero Retention).
+   */
+  if (!isRefinedInTargetScript(result.refined, input.sourceLanguage, input.targetLanguage)) {
+    const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
+    logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues: [...issues, 'refined-wrong-script'], latencyMs: now() - startedAt });
     return fallbackResult;
   }
 
