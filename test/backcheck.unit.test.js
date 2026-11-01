@@ -17,6 +17,7 @@ import {
   backFailMessage,
   isExplanationReadable,
   isRefinedInTargetScript,
+  isRefinedComplete,
   BACK_FAIL,
 } from '../src/core/refine/backcheck.js';
 import { buildCasualToneBlock } from '../src/core/meme/index.js';
@@ -230,4 +231,30 @@ test('행 4 — 상대 언어 문장에 등록 호칭 몇 글자가 섞인 것�
   assert.equal(isRefinedInTargetScript('您好，김 대리님已申请Nexus仪表板的访问权限。请问能否在周五前处理？', 'ko', 'zh'), true);
   assert.equal(isRefinedInTargetScript('Bonjour, 김 대리님 a demandé l\'accès au tableau de bord Nexus.', 'ko', 'fr'), true);
   assert.equal(isRefinedInTargetScript('キム・スジン様よりご依頼をいただいております。', 'ko', 'ja'), true);
+});
+
+/* ── 교정문 잘림 검사 (2026-11-01, 판정표 `isRefinedComplete`) ───────── */
+
+const KO_S1 = '납품이 3월 14일에서 3월 21일로 1주일 밀립니다. 견적은 1,250만 원 그대로이고, 수량 300개는 변동 없습니다.';
+
+test('🔴 행 3 — 실측: 중국어 교정문이 「人民币... 」로 끊기면 실패', () => {
+  assert.equal(isRefinedComplete('您好,交货日期将从3月14日顺延至3月21日,延后一周。报价仍为人民币... ', KO_S1), false);
+  assert.equal(isRefinedComplete('The quote remains at…', KO_S1), false);
+  assert.equal(isRefinedComplete('見積もりは。。。', KO_S1), false);
+});
+
+test('🔴 행 3 — 실측: 문장 중간에서 「人民币... 不对」로 머뭇거린 교정문도 실패', () => {
+  assert.equal(isRefinedComplete('报价保持不变，为人民币... 不对，报价为韩元12,500,000，数量300个保持不变。', KO_S1), false);
+  assert.equal(isRefinedComplete('报价仍为人民币... 韩元 12,500,000，数量300个保持不变。', KO_S1), false);
+});
+
+test('행 1·2·4 — 빈 교정문·온전한 문장·원문에도 있는 말줄임표는 통과', () => {
+  assert.equal(isRefinedComplete('', KO_S1), true);
+  assert.equal(isRefinedComplete('报价仍为1,250万韩元，数量300个保持不变。', KO_S1), true);
+  assert.equal(isRefinedComplete('Hmm… let me check and get back to you.', '음… 확인해 볼게요.'), true);
+});
+
+test('행 2 — 원문이 말줄임표로 끝나면 교정문도 그래도 통과', () => {
+  assert.equal(isRefinedComplete('Well, we will see...', '글쎄요, 두고 봐야죠...'), true);
+  assert.equal(isRefinedComplete('Thanks…', '감사합니다…'), true);
 });

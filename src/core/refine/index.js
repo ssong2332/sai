@@ -13,7 +13,7 @@ import { buildRefinePayload, REFINE_PROMPT_VERSION, URGENCY_LEVELS } from './pro
 import { normalizeRefineResponse } from './schema.js';
 import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
-import { isRefinedInTargetScript } from './backcheck.js';
+import { isRefinedInTargetScript, isRefinedComplete } from './backcheck.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -220,6 +220,13 @@ export async function refine(request, deps = {}) {
   if (!isRefinedInTargetScript(result.refined, input.sourceLanguage, input.targetLanguage)) {
     const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
     logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues: [...issues, 'refined-wrong-script'], latencyMs: now() - startedAt });
+    return fallbackResult;
+  }
+
+  /** 🔴 교정문이 말줄임표로 끊겨 왔으면 같은 길로 `invalid` 폴백(`backcheck.js` `isRefinedComplete` 판정표). 로그는 사유 코드만. */
+  if (!isRefinedComplete(result.refined, input.text)) {
+    const fallbackResult = buildFallbackResponse(input, FALLBACK_REASONS.INVALID);
+    logger({ event: 'refine', cacheHit: false, fallback: true, fallbackReason: FALLBACK_REASONS.INVALID, issues: [...issues, 'refined-truncated'], latencyMs: now() - startedAt });
     return fallbackResult;
   }
 
