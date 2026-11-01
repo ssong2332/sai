@@ -276,6 +276,12 @@ export async function removeRecipient(id) {
 }
 
 /** 마지막으로 고른 수신자 id — 팝업이 열릴 때마다 다시 고르게 하지 않는다. */
+/**
+ * 「받는 사람 없음」을 **명시**하는 선택값(2026-11-01). 🔴 null은 「아직 안 고름」이라 아래가 목록 첫 사람으로 채운다 —
+ * 감지된 상대가 미등록이면 엉뚱한 사람(첫 사람) 기준으로 다듬어진다. 그래서 따로 둔다.
+ */
+export const NO_RECIPIENT_ID = 'none';
+
 export async function getSelectedRecipientId() {
   return getLocal(STORAGE_KEYS.RECIPIENT_SELECTED, null);
 }
@@ -290,7 +296,7 @@ export async function setSelectedRecipientId(id) {
  */
 export async function getSelectedRecipient() {
   const [list, selectedId] = await Promise.all([listRecipients(), getSelectedRecipientId()]);
-  if (list.length === 0) return null;
+  if (list.length === 0 || selectedId === NO_RECIPIENT_ID) return null;
   return list.find((entry) => entry.id === selectedId) ?? list[0];
 }
 

@@ -135,8 +135,19 @@ const INTEGRATION_IDS = INTEGRATIONS.map((item) => item.id);
  */
 const PERSON_DETECT_INTEGRATION_IDS = ['slack', 'gmail', 'outlook', 'teams', 'google-chat', 'linkedin', 'discord', 'whatsapp'];
 
-/** 페이지 호스트에서 대화 상대 자동 감지를 하는가. */
-export function isPersonDetectHost(pageHost) {
+/**
+ * 개발용 무대 페이지(`docs/store/stage.html`, `npx vite docs/store --port 5300`) — 2026-11-01 사용자 요청
+ * 「개발용 호스트도 허용해서 프로필도 자동으로 되도록」. 🔴 **포트까지** 맞아야 한다 — 다른 로컬 사이트에는 켜지지 않는다.
+ */
+const DEV_STAGE_HOSTS = ['localhost:5300', '127.0.0.1:5300'];
+
+/**
+ * 페이지 호스트에서 대화 상대 자동 감지를 하는가.
+ * @param {string} pageHost `location.hostname`
+ * @param {string} [pageHostWithPort] `location.host` — 개발용 무대 판정에만 쓴다.
+ */
+export function isPersonDetectHost(pageHost, pageHostWithPort = '') {
+  if (DEV_STAGE_HOSTS.includes(String(pageHostWithPort ?? '').toLowerCase())) return true;
   const integration = findIntegration(pageHost);
   return Boolean(integration && PERSON_DETECT_INTEGRATION_IDS.includes(integration.id));
 }

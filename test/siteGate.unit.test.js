@@ -218,3 +218,12 @@ test('🔴 통합 토글을 꺼도 감지 대상 판정은 바뀌지 않는다 �
   assert.equal(findIntegration('app.slack.com')?.id, 'slack');
   assert.equal(isPersonDetectHost('app.slack.com'), true);
 });
+
+test('2026-11-01 개발용 무대 페이지(localhost:5300)에서만 감지 — 포트가 다르면 다른 로컬 사이트라 끈다', () => {
+  assert.equal(isPersonDetectHost('localhost', 'localhost:5300'), true);
+  assert.equal(isPersonDetectHost('127.0.0.1', '127.0.0.1:5300'), true);
+  for (const hostWithPort of ['localhost:3000', 'localhost', '127.0.0.1:8080', 'localhost:53000']) {
+    assert.equal(isPersonDetectHost(hostWithPort.split(':')[0], hostWithPort), false, hostWithPort);
+  }
+  assert.equal(isPersonDetectHost('example.com', 'example.com:5300'), false, '🔴 포트만 같은 다른 사이트');
+});

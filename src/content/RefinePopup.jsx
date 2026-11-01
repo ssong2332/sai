@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import SaiMark from '../assets/SaiMark.jsx';
 import { useLoadingMessages } from './useLoadingMessages.js';
-import { tagLabel, PERSONAL_TEAM_ID } from '../lib/recipients.js';
+import { tagLabel, PERSONAL_TEAM_ID, NO_RECIPIENT_ID } from '../lib/recipients.js';
 // 🔴 데이터만 가져온다(배열 하나) — 사이드패널의 RegionPicker를 콘텐츠 스크립트로 끌어오지 않는다.
 import { REGIONS } from '../lib/regions.js';
 import { checkNamesPreserved, nameWarningText } from '../core/refine/names.js';
@@ -1046,7 +1046,7 @@ export default function RefinePopup({
           <select
             id="sai-recipient-select"
             className="sai-select"
-            value={adding ? ADD_NEW : (recipientId ?? '')}
+            value={adding ? ADD_NEW : (recipientId ?? (recipients.length > 0 ? NO_RECIPIENT_ID : ''))}
             onChange={(event) => {
               const value = event.target.value;
               if (value === ADD_NEW) {
@@ -1063,6 +1063,8 @@ export default function RefinePopup({
                 아직 없어요
               </option>
             )}
+            {/* 2026-11-01 — 「없음」을 고를 수 있게(감지된 상대가 미등록이면 여기로 비운다). */}
+            {recipients.length > 0 && <option value={NO_RECIPIENT_ID}>선택 안 함</option>}
             {recipients.map((entry) => (
               <option key={entry.id} value={entry.id}>
                 {entry.name}
