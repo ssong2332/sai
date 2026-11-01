@@ -175,6 +175,47 @@ export function isRefinedComplete(refined, sourceText) {
   return !ellipsis.test(value);
 }
 
+/**
+ * 교정문에 **원문에 없던 통화**가 나오지 않았는지 본다 (2026-11-01 통합 실측).
+ *
+ * 🔴 **실측한 결함**: ko → zh 빠른 모드에서 「1,250만 원」이 「人民币12,500,000元(1,250万韩元)」으로 왔다(15회 중 1회).
+ *    금액 숫자는 맞아서 숫자 검사(`numberCheck.js`)를 통과한다 — 그런데 받는 사람은 위안으로 읽는다.
+ *    원(원)·元·円은 같은 한자에서 나와 모델이 서로 헷갈린다. 그래서 위안·엔만 본다.
+ * 🔴 **고쳐 쓰지 않는다.** `isRefinedInTargetScript`와 같은 길 — 코어가 `invalid`로 돌린다.
+ *
+ * 판정표 (통화마다 따로, 하나라도 실패면 실패)
+ * | 순서 | 조건 | 결과 |
+ * |---|---|---|
+ * | 1 | 교정문에 그 통화 표지(`CURRENCY_MARKS[통화].refined`)가 없다 | 통과 |
+ * | 2 | 원문에 그 통화 표지(`.source`)가 있다 | 통과 — 원문에 있던 통화 |
+ * | 3 | 그 밖(교정문에만 있다) | 🔴 실패 |
+ *
+ * 🔴 표지는 **헷갈릴 여지가 없는 것만** 쓴다. 「元」 하나(韩元·美元·欧元 안에도 있다)·「¥」(위안·엔 공용)·
+ *    숫자 없는 「円」(円滑·円満)은 보지 않는다. 원문 쪽은 넓게 잡는다 — 못 잡는 쪽으로 틀린다.
+ *
+ * @returns {boolean} 원문에 없던 통화가 없으면 true.
+ */
+const CURRENCY_MARKS = {
+  CNY: {
+    refined: /人民币|人民幣|\bRMB\b|\bCNY\b|\brenminbi\b|\byuan\b|위안/iu,
+    source: /人民币|人民幣|\bRMB\b|\bCNY\b|\brenminbi\b|\byuan\b|위안|元|¥|￥/iu,
+  },
+  JPY: {
+    refined: /[0-9０-９万億千百]\s*円|\bJPY\b|\byen\b|엔화|日元|日圓/iu,
+    source: /円|\bJPY\b|\byen\b|엔|日元|日圓|¥|￥/iu,
+  },
+};
+
+export function isCurrencyConsistent(refined, sourceText) {
+  const value = String(refined ?? '');
+  const source = String(sourceText ?? '');
+  if (value.trim() === '') return true;
+  for (const marks of Object.values(CURRENCY_MARKS)) {
+    if (marks.refined.test(value) && !marks.source.test(source)) return false;
+  }
+  return true;
+}
+
 /** 화면 문구. 🔴 무엇이 실패했는지 말하고, 사용자가 할 수 있는 일을 알린다. */
 export function backFailMessage(reason) {
   if (reason === BACK_FAIL.SAME_AS_REFINED) {

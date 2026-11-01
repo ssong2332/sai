@@ -99,29 +99,44 @@ test('🔴 temperature를 보내지 않는다 · 재시도 없음 · 모델 기�
   assert.deepEqual(fetchImpl.seen.body.output_config, { effort: 'low' });
 });
 
-test('오류 분류 — 기존 사유 표를 따르고, 재시도하지 않는다(호출 1회)', async () => {
+test('오류 분류 — 기존 사유 표를 따르고, 5xx만 한 번 더 부른다(2026-11-01)', async () => {
+  // 🔴 SDK 재시도는 여전히 0 — 코어(`index.js` `isRetryableTransient`)가 5xx·연결 실패만 한 번 더 부른다.
   const rows = [
-    [401, 'authentication_error', FALLBACK_REASONS.AUTH],
-    [429, 'rate_limit_error', FALLBACK_REASONS.QUOTA],
-    [400, 'billing_error', FALLBACK_REASONS.QUOTA],
-    [400, 'invalid_request_error', FALLBACK_REASONS.ERROR],
-    [529, 'overloaded_error', FALLBACK_REASONS.ERROR],
+    [401, 'authentication_error', FALLBACK_REASONS.AUTH, 1],
+    [429, 'rate_limit_error', FALLBACK_REASONS.QUOTA, 1],
+    [400, 'billing_error', FALLBACK_REASONS.QUOTA, 1],
+    [400, 'invalid_request_error', FALLBACK_REASONS.ERROR, 1],
+    [529, 'overloaded_error', FALLBACK_REASONS.ERROR, 2],
   ];
-  for (const [status, type, expected] of rows) {
+  for (const [status, type, expected, calls] of rows) {
     const fetchImpl = fakeFetch(status, errorBody(type));
     const result = await run(fetchImpl);
     assert.equal(result.fallback, true);
     assert.equal(result.fallbackReason, expected, `${status} ${type}`);
-    assert.equal(fetchImpl.seen.calls, 1, `${status} ${type} — 재시도했다`);
+    assert.equal(fetchImpl.seen.calls, calls, `${status} ${type} — 호출 횟수`);
   }
 });
 
-test('연결 실패는 error', async () => {
-  const fetchImpl = async () => {
+test('연결 실패는 error — 한 번 더 부르고, 두 번째가 정상이면 그 결과', async () => {
+  let n = 0;
+  const failing = async () => {
+    n += 1;
     throw new TypeError('fetch failed');
   };
-  const result = await run(fetchImpl);
+  const result = await run(failing);
   assert.equal(result.fallbackReason, FALLBACK_REASONS.ERROR);
+  assert.equal(n, 2, '연결 실패는 한 번만 더 부른다');
+
+  let m = 0;
+  const ok = fakeFetch(200, message([{ type: 'text', text: JSON.stringify(goodRaw()) }]));
+  const flaky = async (...args) => {
+    m += 1;
+    if (m === 1) throw new TypeError('fetch failed');
+    return ok(...args);
+  };
+  const recovered = await run(flaky);
+  assert.equal(recovered.fallback, false);
+  assert.equal(m, 2);
 });
 
 test('거절·잘림은 invalid — 형식에 맞는 답이 없다', async () => {
