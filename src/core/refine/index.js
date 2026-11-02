@@ -275,6 +275,7 @@ export async function refine(request, deps = {}) {
   let issues;
   // 🔴 재호출 때만 바뀔 수 있다(빠진 용어 알림 — `withGlossaryReminder`). 캐시 키는 원래 payload 그대로다.
   let callPayload = payload;
+  let contextCount = input.threadContext.length;
   for (let attempt = 1; ; attempt += 1) {
     let raw;
     try {
@@ -324,7 +325,15 @@ export async function refine(request, deps = {}) {
       if (softIssue && !softResult && canRetry()) {
         softResult = { result, issues: [...issues, `${softIssue}-broken`], kind: softIssue };
         if (softIssue === 'glossary') {
-          callPayload = withGlossaryReminder(payload, missingGlossaryEntries(result.refined, input.glossary, input.text));
+          /**
+           * 🔴 용어 재호출은 **대화 참고 없이** 부른다 (2026-11-02 실측, 사용자 승인). 같은 문장 + 팀 「배포 → ABC」 +
+           *    빠진 용어 알림: 대화 참고 없음 8/8 반영, 있음 1/5·0/8 — 「Hi」 한 줄만 있어도 실패했고 규칙 문장을 빼도 같았다
+           *    (원인 미확인). 첫 호출은 대화 참고를 그대로 쓴다. 대가: 재호출 결과는 앞 대화를 가리키는 말을 못 풀 수 있다.
+           */
+          callPayload = withGlossaryReminder(
+            buildRefinePayload({ ...input, threadContext: [] }),
+            missingGlossaryEntries(result.refined, input.glossary, input.text),
+          );
         }
         continue;
       }
@@ -335,6 +344,8 @@ export async function refine(request, deps = {}) {
           break;
         }
         issues = [...issues, `${softResult.kind}-retried`];
+        // 화면의 「직전 대화 N개 참고함」은 실제로 실린 개수다 — 이 결과는 대화 참고 없이 나왔다.
+        if (softResult.kind === 'glossary') contextCount = 0;
       }
       if (contentAttempts > 0) issues = [...issues, 'content-retried'];
       if (transientRetried) issues = [...issues, 'transient-retried'];
@@ -361,7 +372,7 @@ export async function refine(request, deps = {}) {
    *    상한으로 잘라냈는데 화면이 보낸 개수를 말하면 그건 거짓 표시다.
    * 🔴 개수뿐이다. 맥락 본문은 응답에도 싣지 않는다.
    */
-  result.threadContextCount = input.threadContext.length;
+  result.threadContextCount = contextCount;
   // 🔴 「적용됨」은 모델 신고가 아니라 등록된 말로 판정한다(`glossaryVerify.js` 판정표).
   result = reconcileAppliedGlossary(result, input.glossary, input.text);
 
@@ -378,7 +389,7 @@ export async function refine(request, deps = {}) {
     appliedGlossaryCount: result.appliedGlossary.length,
     misreadRiskCount: result.misreadRisks.length,
     // 🔴 S21 — **건수만**. 맥락은 남이 쓴 메시지 본문이라 한 조각도 로그에 남기지 않는다.
-    threadContextCount: input.threadContext.length,
+    threadContextCount: contextCount,
     issues,
     latencyMs: now() - startedAt,
   });

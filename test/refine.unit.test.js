@@ -876,3 +876,26 @@ test('숫자 재호출에는 용어 알림을 붙이지 않는다', async () => 
   assert.equal(bodies.length, 2);
   assert.ok(!bodies[1].includes('RETRY NOTE'));
 });
+
+test('🔴 용어 재호출은 대화 참고 없이 부른다 — 첫 호출에는 싣고, 결과의 참고 개수는 0', async () => {
+  const bodies = [];
+  const raws = [GL_BAD, GL_OK];
+  const fetchImpl = async (_url, init) => {
+    bodies.push(String(init?.body ?? ''));
+    const raw = raws[Math.min(bodies.length - 1, raws.length - 1)];
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(raw) } }] }) };
+  };
+  const out = await refine({ ...GL_REQ, threadContext: [{ text: 'Hi' }, { text: 'Got it' }] }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+  const sent = bodies.map((b) => JSON.parse(JSON.parse(b).messages[0].content));
+  assert.equal(sent[0].threadContext.length, 2);
+  assert.equal(sent[1].threadContext.length, 0);
+  assert.ok(sent[1].instruction.includes('RETRY NOTE'));
+  assert.ok(out.refined.includes('ABC'));
+  assert.equal(out.threadContextCount, 0);
+});
+
+test('용어 재호출도 실패해 첫 결과를 쓰면 참고 개수는 그대로다', async () => {
+  const out = await refine({ ...GL_REQ, threadContext: [{ text: 'Hi' }] }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: seqFetch(GL_BAD) });
+  assert.ok(out.refined.includes('deployment'));
+  assert.equal(out.threadContextCount, 1);
+});
