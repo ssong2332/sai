@@ -281,18 +281,20 @@ export async function refine(request, deps = {}) {
   let issues;
   // 🔴 재호출 때만 바뀔 수 있다(빠진 용어 알림 — `withGlossaryReminder`). 캐시 키는 원래 payload 그대로다.
   let callPayload = payload;
+  // 🔴 용어 재호출 때만 바뀔 수 있다(`deps.glossaryRetry` — 빠른 모드면 기본 모드 모델, `quality.js`).
+  let callModel = { model, thinking, effort };
   let contextCount = input.threadContext.length;
   for (let attempt = 1; ; attempt += 1) {
     let raw;
     try {
       raw = await provider.call(callPayload, {
         apiKey,
-        model,
+        model: callModel.model,
         timeoutMs: attempt === 1 ? timeoutMs : Math.min(timeoutMs ?? RETRY_TIMEOUT_MS, RETRY_TIMEOUT_MS),
         fetchImpl,
         // 🔴 `undefined`는 그대로 넘긴다 — provider가 「안 넘김」으로 보고 process.env를 읽는다(Node 경로 불변).
-        thinking,
-        effort,
+        thinking: callModel.thinking,
+        effort: callModel.effort,
         errors: { RefineCallError, classifyHttpFailure, parseJsonContent },
       });
     } catch (error) {
@@ -340,6 +342,7 @@ export async function refine(request, deps = {}) {
             buildRefinePayload({ ...input, threadContext: [] }),
             missingGlossaryEntries(result.refined, input.glossary, input.text),
           );
+          if (deps.glossaryRetry?.model) callModel = { ...callModel, ...deps.glossaryRetry };
         }
         continue;
       }

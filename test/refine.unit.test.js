@@ -909,3 +909,23 @@ test('🔴 둘 다 용어가 모자라면 더 많이 반영한 쪽을 준다 —
   const back = await refine(req, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: seqFetch(one, zero) });
   assert.ok(back.refined.includes('ABC'), '나중 것이 더 나쁘면 첫 결과');
 });
+
+test('🔴 용어 재호출만 deps.glossaryRetry 모델로 부른다 — 첫 호출·숫자 재호출은 원래 모델', async () => {
+  const capture = (raws) => {
+    const bodies = [];
+    const impl = async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body ?? '{}')));
+      const raw = raws[Math.min(bodies.length - 1, raws.length - 1)];
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(raw) } }] }) };
+    };
+    impl.bodies = bodies;
+    return impl;
+  };
+  const glossaryRetry = { model: 'retry-model', thinking: 'disabled', effort: 'low' };
+  const gl = capture([GL_BAD, GL_OK]);
+  await refine(GL_REQ, { apiKey: 'k', model: 'first-model', glossaryRetry, cache: new MemoryCacheStore(), fetchImpl: gl });
+  assert.deepEqual(gl.bodies.map((b) => b.model), ['first-model', 'retry-model']);
+  const num = capture([NUM_BAD, NUM_OK]);
+  await refine(NUM_REQ, { apiKey: 'k', model: 'first-model', glossaryRetry, cache: new MemoryCacheStore(), fetchImpl: num });
+  assert.deepEqual(num.bodies.map((b) => b.model), ['first-model', 'first-model']);
+});

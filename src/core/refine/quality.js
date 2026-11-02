@@ -72,6 +72,17 @@ export function effectiveQuality(mine, teamDefault = null) {
  */
 export function qualityStepDeps(quality, provider) {
   if (provider !== 'anthropic') return {};
-  const { model, thinking, effort, timeoutMs } = QUALITY_MODES[resolveQuality(quality)];
-  return { model, thinking, effort, timeoutMs };
+  const resolved = resolveQuality(quality);
+  const { model, thinking, effort, timeoutMs } = QUALITY_MODES[resolved];
+  return { model, thinking, effort, timeoutMs, ...(resolved === 'fast' ? { glossaryRetry: GLOSSARY_RETRY_FAST } : {}) };
 }
+
+/**
+ * 빠른 모드에서 **용어가 빠져 다시 부를 때만** 쓰는 모델 (2026-11-02 사용자 결정 「재호출만 기본 모델」).
+ * 🔴 실측: 진행보고·부드럽게 프로필 + 대화 참고에서 Haiku는 팀 「배포 → ABC」를 재호출로도 두 곳 0/6.
+ * 🔴 기본 모드 모델(Sonnet)을 쓰되 **사고 없이·effort low** — 재호출은 15초에 끊긴다(`index.js` `RETRY_TIMEOUT_MS`).
+ *    사고를 켜면 그 안에 못 끝날 수 있다. 이 재호출 비용은 월 예산 추정(`qualityAllowance.js`)에 잡히지 않는다.
+ * 🔴 Sonnet 5.5는 `{type: 'disabled'}`를 400으로 거절한다(2026-11-02 실측 — "send between_tools instead").
+ *    `between_tools`가 이 모델의 「응답 전 사고 없음」이다(`providers/anthropic.js` `thinkingConfig`).
+ */
+export const GLOSSARY_RETRY_FAST = Object.freeze({ model: QUALITY_MODES.standard.model, thinking: 'between_tools', effort: 'low' });
