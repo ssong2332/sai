@@ -57,6 +57,7 @@ import { readConfig } from './config.js';
 import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
+import { extraCallsMicros } from './qualityAllowance.js';
 import { handleTeam } from './teamRoute.js';
 import { resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
 import { googleClientsFromEnv } from './google/clients.js';
@@ -294,6 +295,11 @@ export function createHandler(deps = {}) {
       const limits = plan === 'beta' ? null : PLAN_LIMITS[plan];
       const quota = store.admit ? await store.admit(uid, { quality, limits }) : await store.consumeDailyQuota(uid);
       if (!quota.ok) {
+        // 🔴 2026-11-02 — 이달 추정이 멈춤선($95, `MONTHLY_HARD_STOP_MICROS`) 이상이면 모든 사용자를 멈춘다.
+        if (quota.reason === 'monthly-limit') {
+          logger.warn('[refine] 이달 예산 멈춤선 도달 — 거절');
+          return json(429, { error: 'monthly-limit' });
+        }
         logger.warn(`[refine] 일일 상한 초과 used=${quota.used} limit=${quota.limit}`);
         return json(429, { error: 'daily-limit', limit: quota.limit });
       }
@@ -324,6 +330,8 @@ export function createHandler(deps = {}) {
     // 사슬 단계 모델(stepModel)이 있으면 그 단계는 품질 모드 표를 쓰지 않는다.
 
     /** 한 단계 호출. 🔴 `ANTHROPIC_MODEL`은 anthropic 단계에만 — 사슬 단계 모델이 있으면 그게 이긴다. */
+    // 🔴 2026-11-02 — 코어가 실제로 부른 호출(재호출·폴오버 포함)을 모델 이름으로만 기록한다 → 이달 추정에 더한다.
+    const calls = [];
     const runStep = ({ provider, apiKey }, stepModel) => {
       const model = stepModel ?? (provider === 'anthropic' ? config.anthropicModel : undefined);
       const q = quality && !stepModel ? qualityStepDeps(quality, provider) : {};
@@ -337,6 +345,7 @@ export function createHandler(deps = {}) {
         // 품질 모드 표 값이 있으면 위 model·thinking보다 이긴다(anthropic 단계만 — `qualityStepDeps`).
         ...q,
         ...(fetchImpl ? { fetchImpl } : {}),
+        onCall: (call) => calls.push({ model: call?.model ?? null }),
         now,
         // 🔴 성공(폴백 아님) 이벤트는 로그를 쓰지 않는다 (2026-10-24 L33). 무료 플랜 CPU 한도 10ms에 실측 콜드 22ms —
         //    로컬 workerd에서 console.log 한 줄이 첫 요청 +10ms·데운 요청 +3ms였다. 성공 건수·지연은 Cloudflare
@@ -383,6 +392,10 @@ export function createHandler(deps = {}) {
       );
       return json(400, { error: error?.message ?? 'bad request' });
     }
+
+    // 받을 때 1번은 이미 셌다 — 그 뒤 호출(재호출·폴오버)만 더한다. 실패해도 응답은 막지 않는다.
+    const extra = extraCallsMicros(calls);
+    if (extra > 0 && store.addBudget) await safeMetric(logger, () => store.addBudget(extra));
 
     // 다듬기 응답에 실제로 쓴 품질 모드 이름을 붙인다(화면 표시용 — 모델명은 싣지 않는다).
     // 낮췄으면 사유도 붙인다(`budget`·`daily`·`unavailable` — 팝업 문구용).

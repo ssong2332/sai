@@ -102,3 +102,11 @@ test('🔴 상한 카운터를 클라이언트가 건드리지 못한다', () =>
   assert.ok(block, 'refineQuota 규칙이 없다 — 기본 거부에 기대지 말고 명시한다');
   assert.match(block[0], /allow read, write: if false;/, 'refineQuota가 클라이언트에 열려 있다');
 });
+
+test('🔴 429 monthly-limit은 하루 한도와 다른 안내 — 「내일 다시」가 아니라 「다음 달」 (2026-11-02)', () => {
+  assert.match(BACKGROUND, /error\?\.code === 'monthly-limit' \? MONTHLY_LIMIT_NOTICE/, '이달 멈춤을 가르지 않는다');
+  const block = BACKGROUND.match(/const MONTHLY_LIMIT_NOTICE = \{[\s\S]*?\n\};/);
+  assert.ok(block, 'MONTHLY_LIMIT_NOTICE 선언을 못 찾았다');
+  assert.match(block[0], /다음 달/);
+  assert.doesNotMatch(block[0], /내일/);
+});

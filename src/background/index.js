@@ -42,7 +42,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
        *
        * 🔴 모드를 가리지 않는다. 교정·해독·회신·결정 어느 쪽이든 사용자가 해야 할 일은 같다.
        */
-      const authNotice = AUTH_FAILURE_NOTICES[error?.status];
+      const authNotice =
+        error?.status === 429 && error?.code === 'monthly-limit' ? MONTHLY_LIMIT_NOTICE : AUTH_FAILURE_NOTICES[error?.status];
       if (authNotice) {
         sendResponse(buildAuthFailureResponse(message.request, mode, authNotice));
         return;
@@ -158,6 +159,15 @@ const AUTH_FAILURE_NOTICES = {
 };
 
 /**
+ * 429 `monthly-limit` (2026-11-02 사용자 결정 「수익화 전 공개」) — 이달 무료 운영 예산(추정 $95)을 다 써서 서버가 모두를 멈췄다.
+ * 사용자가 할 일은 없다(다음 달 1일, 한국 시간에 다시 열린다). 하루 한도와 문구를 나눈다 — 「내일 다시」는 거짓말이 된다.
+ */
+const MONTHLY_LIMIT_NOTICE = {
+  reason: 'monthly-limit',
+  notice: '이번 달 무료로 운영할 수 있는 사용량을 모두 썼어요. 다음 달 1일에 다시 열려요.',
+};
+
+/**
  * 🔴 **응답 «모양»은 `buildFallbackResponse`에서 가져오고, «내용»만 갈아 끼운다.**
  *    여기서 객체를 처음부터 새로 쓰면 나중에 응답 계약이 바뀔 때 이 한 곳만 낡는다.
  * 🔴 **`refined`를 원문으로 되돌린다.** `buildFallbackResponse`는 데모 시드가 있는 입력에
@@ -193,10 +203,12 @@ function buildAuthFailureResponse(request, mode, { reason, notice }) {
  *    로그인만 하면 될 사람에게 목업을 보여주고, 그 사람은 그게 진짜 결과인 줄 안다.
  */
 export class BackendError extends Error {
-  constructor(status) {
+  constructor(status, code = null) {
     super(`http ${status}`);
     this.name = 'BackendError';
     this.status = status;
+    // 서버가 준 사유 코드(`daily-limit`·`monthly-limit`) — 본문이 아니다.
+    this.code = code;
   }
 }
 
@@ -233,7 +245,11 @@ async function callBackend(request) {
       body: JSON.stringify(request),
       signal: controller.signal,
     });
-    if (!response.ok) throw new BackendError(response.status);
+    if (!response.ok) {
+      // 🔴 2026-11-02 — 429는 사유 코드로 하루 한도·이달 멈춤을 가른다. 못 읽으면 예전처럼 하루 한도로 본다.
+      const code = response.status === 429 ? (await response.json().catch(() => null))?.error ?? null : null;
+      throw new BackendError(response.status, typeof code === 'string' ? code : null);
+    }
     return await response.json();
   } finally {
     clearTimeout(timer);

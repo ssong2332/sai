@@ -12,6 +12,9 @@ import { createFirestoreUsageStore, createMemoryUsageStore } from '../src/usageS
 import {
   COST_ESTIMATE_MICROS,
   MONTHLY_BUDGET_GUARD_MICROS,
+  MONTHLY_HARD_STOP_MICROS,
+  extraCallsMicros,
+  modelCostMicros,
   PREMIUM_DAILY_LIMITS,
   decideQuality,
   seoulMonthKey,
@@ -31,7 +34,8 @@ function setup(usageStore) {
   let n = 0;
   const call = async (body) => {
     n += 1;
-    const res = await handle(refineRequest(token, { ...BASE_BODY, text: `${BASE_BODY.text} ${n}`, ...body }), TEST_ENV);
+    // 🔴 숫자를 붙이면 숫자 누락 재호출이 일어나 추가 호출 비용이 섞인다(2026-11-02).
+    const res = await handle(refineRequest(token, { ...BASE_BODY, text: `${BASE_BODY.text} ${'아'.repeat(n)}`, ...body }), TEST_ENV);
     return { status: res.status, body: await res.json(), sentModel: fetchImpl.seen.bodies.at(-1)?.model };
   };
   return { call, logger, fetchImpl };
@@ -165,4 +169,47 @@ test('B7 하루 전체 상한은 그대로 429 — 상위 모드 강등보다 �
   const r = await call({ quality: 'deep' });
   assert.equal(r.status, 429);
   assert.equal(r.body.error, 'daily-limit');
+});
+
+/* ── 2026-11-02 수익화 전 공개 — 월 멈춤선 · 재호출 비용 집계 ── */
+
+test('C1 이달 추정이 멈춤선($95) 이상이면 빠른 모드도 429 monthly-limit — Claude를 부르지 않는다', async () => {
+  const store = createMemoryUsageStore({ monthMicros: MONTHLY_HARD_STOP_MICROS });
+  const { call, fetchImpl } = setup(store);
+  const r = await call({ quality: 'fast' });
+  assert.equal(r.status, 429);
+  assert.equal(r.body.error, 'monthly-limit');
+  assert.equal(fetchImpl.seen.bodies.length, 0);
+});
+
+test('C1 Firestore — 멈춤선 이상이면 거절하고 하루 횟수도 깎지 않는다', async () => {
+  const fake = createFakeFirestore();
+  const db = new RestFirestore({ projectId: 'sai-global-msg-2026', token: async () => 't', fetchImpl: fake.fetch });
+  const now = () => new Date('2026-10-31T03:00:00Z');
+  await db.collection('budgetMonthly').doc('2026-10').set({ micros: MONTHLY_HARD_STOP_MICROS });
+  const { call } = setup(createFirestoreUsageStore({ db, now }));
+  const r = await call({ quality: 'fast' });
+  assert.deepEqual([r.status, r.body.error], [429, 'monthly-limit']);
+  const quota = await db.collection('refineQuota').doc('uid-test-123_2026-10-31').get();
+  assert.equal(quota.exists, false);
+});
+
+test('C2 재호출 비용 — 숫자가 빠져 한 번 더 부르면 그 호출도 이달 추정에 더한다', async () => {
+  const store = createMemoryUsageStore();
+  const fetchImpl = fakeAnthropicFetch();
+  const handle = createHandler({ jwks: keys.jwks, fetchImpl, usageStore: store, cache: new MemoryCacheStore(), logger: captureLogger() });
+  // 원문의 「3시」가 가짜 교정문에 없다 → 숫자 재호출 1번.
+  const res = await handle(refineRequest(token, { ...BASE_BODY, text: '내일 3시까지 리뷰 부탁드립니다', quality: 'fast' }), TEST_ENV);
+  assert.equal(res.status, 200);
+  assert.equal(fetchImpl.seen.bodies.length, 2);
+  assert.equal(store.monthMicros(), COST_ESTIMATE_MICROS.fast * 2);
+});
+
+test('C2 modelCostMicros·extraCallsMicros — 첫 호출은 빼고 모델 이름으로 센다', () => {
+  assert.equal(modelCostMicros('claude-haiku-5-5'), COST_ESTIMATE_MICROS.fast);
+  assert.equal(modelCostMicros('claude-sonnet-5-5'), COST_ESTIMATE_MICROS.standard);
+  assert.equal(modelCostMicros('claude-opus-5-5'), COST_ESTIMATE_MICROS.deep);
+  assert.equal(modelCostMicros(null), COST_ESTIMATE_MICROS.other);
+  assert.equal(extraCallsMicros([{ model: 'claude-haiku-5-5' }]), 0);
+  assert.equal(extraCallsMicros([{ model: 'claude-haiku-5-5' }, { model: 'claude-sonnet-5-5' }]), COST_ESTIMATE_MICROS.standard);
 });

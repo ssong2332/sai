@@ -286,6 +286,8 @@ export async function refine(request, deps = {}) {
   let contextCount = input.threadContext.length;
   for (let attempt = 1; ; attempt += 1) {
     let raw;
+    // 🔴 2026-11-02 — 실제 호출마다 알린다(재호출 포함). Worker가 월 예산 추정에 더한다. 모델 이름·회차만 — 본문 없음.
+    deps.onCall?.({ model: callModel.model ?? null, attempt });
     try {
       raw = await provider.call(callPayload, {
         apiKey,

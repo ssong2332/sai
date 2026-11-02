@@ -31,6 +31,33 @@ export const MONTHLY_BUDGET_GUARD_MICROS = 90_000_000;
  */
 export const COST_ESTIMATE_MICROS = Object.freeze({ fast: 750, standard: 15_700, deep: 38_200, other: 700 });
 
+/**
+ * 🔴 2026-11-02 사용자 결정 「수익화 전 공개」 — 이달 추정이 이 값 이상이면 **모든 모드를 멈춘다**(429 `monthly-limit`).
+ *    $90 안전장치는 상위 모드만 낮추고 빠른 모드는 계속 돌아서, 콘솔 한도 $100에 닿으면 오류·Groq 폴오버로 조용히 바뀌었다.
+ *    $95에서 우리가 먼저 멈추고 「이번 달 무료 사용량이 끝났어요」로 알린다(남은 $5는 추정 오차 여유).
+ */
+export const MONTHLY_HARD_STOP_MICROS = 95_000_000;
+
+/**
+ * 실제 호출 1번의 추정 비용 — 모델 이름으로(2026-11-02, 재호출 포함 집계용). 모르는 모델·null은 `other`.
+ * 🔴 Sonnet 용어 재호출(사고 없음)은 기본 모드 추정(사고 켬)보다 싸지만 같은 값으로 센다 — 넘치게 세는 쪽이 안전.
+ */
+export function modelCostMicros(model) {
+  const name = String(model ?? '');
+  if (name.includes('opus')) return COST_ESTIMATE_MICROS.deep;
+  if (name.includes('sonnet')) return COST_ESTIMATE_MICROS.standard;
+  if (name.includes('haiku')) return COST_ESTIMATE_MICROS.fast;
+  return COST_ESTIMATE_MICROS.other;
+}
+
+/**
+ * 받을 때 미리 센 1번 **뒤의** 호출 비용 합(재호출·폴오버 단계). 첫 호출은 `admit`이 `costMicros(quality)`로 이미 셌다.
+ * @param {Array<{model: string|null}>} calls 코어 `deps.onCall` 기록(순서대로).
+ */
+export function extraCallsMicros(calls) {
+  return (Array.isArray(calls) ? calls.slice(1) : []).reduce((sum, call) => sum + modelCostMicros(call?.model), 0);
+}
+
 /** 서울 기준 `YYYY-MM`. 🔴 `toISOString()`은 UTC라 쓰지 않는다(하루 상한과 같은 이유). */
 export function seoulMonthKey(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' }).format(now);

@@ -94,6 +94,8 @@
 | 기본값(없음·모르는 값·옛 확장) | **빠른** | `src/core/refine/quality.js` `DEFAULT_QUALITY` |
 | 1인 하루 상위 모드 | 기본 10 · 심층 3 — 넘으면 **빠른으로 다듬는다**(거절 아님), 응답 `qualityDowngrade:'daily'` | 같은 파일 `PREMIUM_DAILY_LIMITS` |
 | 이달(서울) 추정 비용 안전장치 | ≥ $90이면 기본·심층 → 빠른, `qualityDowngrade:'budget'` | `workers/refine/src/qualityAllowance.js` |
+| 이달 멈춤선 (2026-11-02) | ≥ $95이면 **모든 모드** 429 `monthly-limit` — 확장은 「다음 달 1일에 다시 열려요」 | `qualityAllowance.js` `MONTHLY_HARD_STOP_MICROS` · `src/background/index.js` |
+| 재호출 비용 (2026-11-02) | 받을 때 1번은 모드 추정치로 미리 세고, 그 뒤 호출(재호출·폴오버)은 모델 이름(haiku·sonnet·opus)별 추정치로 더한다 | 코어 `deps.onCall` → `extraCallsMicros` → `addBudget` |
 | 추정 방법 | 받은 요청마다 그 모드 건당 실측값(빠른 $0.00075 · 기본 $0.0157 · 심층 $0.0382 · 그 밖 $0.0007)을 더함 — 캐시·실패도 셈(넘치게) | 같은 파일 |
 | 카운터 장애 | 다듬기는 계속, 상위 모드는 빠른(`unavailable`) | `handler.js` ⑥ |
 | 저장 | `refineQuota/{uid}_{날짜}.premium.*` · `budgetMonthly/{YYYY-MM}.micros`(uid 없음) — 본문·모델명 없음. 요청당 Firestore 쓰기 +1 | `usageStore.js` |
