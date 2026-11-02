@@ -604,3 +604,23 @@ test('원문에 없는 수는 단어 대조를 넣어도 여전히 잡는다', (
 test('하이픈으로 붙은 수사도 낱말로 본다 — "four-person"', () => {
   assert.deepEqual(findUnverifiedSpecifics('4명입니다.', 'A four-person team.'), []);
 });
+
+/* ── reply-v9 (2026-11-01 실측) ─────────────────────────────── */
+
+const V9_INPUT = { text: 'Could you check whether that still works on your side?', sourceLanguage: 'en', targetLanguage: 'ko' };
+
+test('🔴 v9 — 세부 코멘트 요청(clarify)은 질문을 최소 1개 하라고 못 박는다', () => {
+  const { instruction } = buildReplyPayload({ ...V9_INPUT, intent: 'clarify' });
+  assert.ok(instruction.includes('MUST ask the sender at least one direct question'));
+  assert.ok(instruction.includes('Do NOT close by promising the result'));
+  // 다른 방향에는 이 의무가 없다 — 수락에 질문을 강제하면 안 된다.
+  const accept = buildReplyPayload({ ...V9_INPUT, intent: 'accept' }).instruction;
+  assert.ok(!accept.includes('MUST ask the sender at least one direct question'));
+});
+
+test('🔴 v9 — 모든 방향에 원문에 없는 평가·감정 부사(벌써·또) 금지가 실린다', () => {
+  for (const intent of REPLY_INTENTS) {
+    const { instruction } = buildReplyPayload({ ...V9_INPUT, intent });
+    assert.ok(instruction.includes('벌써'), intent);
+  }
+});
