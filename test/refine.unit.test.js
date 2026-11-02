@@ -14,6 +14,7 @@ import { RefineRequestError } from '../src/core/refine/index.js';
 import { buildRefinePayload } from '../src/core/refine/prompt.js';
 import { computeCacheKey, canonicalJson } from '../src/core/refine/cache.js';
 import { normalizeRefineResponse, URGENCY_FALLBACK_NOTICE } from '../src/core/refine/schema.js';
+import { checkGlossaryApplied } from '../src/core/refine/glossaryCheck.js';
 
 const BASE_REQUEST = {
   text: '내일 오전까지 리뷰 부탁드립니다',
@@ -791,4 +792,58 @@ test('같은 달 안에서는 캐시 키가 같고, 달이 바뀌면 달라진�
   const c = canonicalJson(buildRefinePayload({ ...BASE_REQUEST, referenceDate: '2026-12-01', glossary: [] }));
   assert.equal(a, b);
   assert.notEqual(a, c);
+});
+
+/* ── 용어집 서버 대조 (2026-11-02 실측 — 팀 「배포 → ABC」인데 deployment를 쓰고 적용했다고 신고) ── */
+
+const GL_REQ = {
+  ...BASE_REQUEST,
+  text: '배포 일정이 다음 주로 밀렸습니다.',
+  targetLanguage: 'en',
+  glossary: [{ id: 't1', entryType: 'term', scope: 'team', sourceText: '배포', targetText: 'ABC', keepSource: false }],
+};
+const GL_BAD = goodRaw({
+  refined: 'The deployment has been pushed to next week.',
+  backTranslation: '배포가 다음 주로 밀렸습니다.',
+  appliedGlossary: [{ id: 't1', sourceText: '배포', appliedText: 'deployment' }],
+});
+const GL_OK = goodRaw({
+  refined: 'The ABC schedule has been pushed to next week.',
+  backTranslation: '배포 일정이 다음 주로 밀렸습니다.',
+  appliedGlossary: [{ id: 't1', sourceText: '배포', appliedText: 'ABC' }],
+});
+
+test('🔴 등록된 말이 빠졌으면 한 번 더 부르고, 두 번째가 맞으면 그 결과를 준다', async () => {
+  const fetchImpl = seqFetch(GL_BAD, GL_OK);
+  const events = [];
+  const out = await refine(GL_REQ, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl, logger: (e) => events.push(e) });
+  assert.ok(out.refined.includes('ABC'));
+  assert.equal(fetchImpl.calls.count, 2);
+  assert.ok(events.at(-1).issues.includes('glossary-retried'));
+  assert.ok(!JSON.stringify(events).includes('ABC'), '로그에 본문·용어 없음');
+});
+
+test('🔴 두 번 다 빠지면 첫 결과를 주되, 「적용됨」 신고는 등록된 말로 바꾼다 — 화면이 경고를 띄운다', async () => {
+  const fetchImpl = seqFetch(GL_BAD);
+  const out = await refine(GL_REQ, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+  assert.equal(out.fallback, false);
+  assert.ok(out.refined.includes('deployment'));
+  assert.deepEqual(out.appliedGlossary, [{ id: 't1', sourceText: '배포', appliedText: 'ABC' }]);
+  const check = checkGlossaryApplied(out);
+  assert.equal(check.applied.length, 0, 'deployment에 초록 표시가 붙으면 안 된다');
+  assert.deepEqual(check.missing, ['ABC']);
+});
+
+test('원문에 없는 용어를 모델이 적용했다고 신고하면 뺀다', async () => {
+  const req = { ...GL_REQ, glossary: [...GL_REQ.glossary, { id: 't2', entryType: 'term', scope: 'team', sourceText: '정산', targetText: 'settlement', keepSource: false }] };
+  const raw = goodRaw({ ...GL_OK, appliedGlossary: [...GL_OK.appliedGlossary, { id: 't2', sourceText: '정산', appliedText: 'settlement' }] });
+  const out = await refine(req, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: seqFetch(raw) });
+  assert.deepEqual(out.appliedGlossary.map((g) => g.id), ['t1']);
+});
+
+test('용어집이 없는 요청은 다시 부르지 않고 신고도 건드리지 않는다', async () => {
+  const fetchImpl = seqFetch(GL_BAD);
+  const out = await refine({ ...GL_REQ, glossary: [] }, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+  assert.equal(fetchImpl.calls.count, 1);
+  assert.equal(out.appliedGlossary[0].appliedText, 'deployment');
 });
