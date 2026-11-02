@@ -68,3 +68,10 @@ test('TP5 팀 기본 모드 — 내가 고른 것이 우선, 안 골랐을 때�
   assert.equal(effectiveQuality(null, null), DEFAULT_QUALITY);
   assert.equal(effectiveQuality(null, 'claude-opus-5-5'), DEFAULT_QUALITY, '🔴 팀 값도 표 밖이면 기본값');
 });
+
+test('🔴 빠른 모드만 용어 재호출 모델(기본 모드 모델·between_tools·low)을 싣는다', () => {
+  assert.deepEqual(qualityStepDeps('fast', 'anthropic').glossaryRetry, { model: QUALITY_MODES.standard.model, thinking: 'between_tools', effort: 'low' });
+  assert.equal(qualityStepDeps('standard', 'anthropic').glossaryRetry, undefined);
+  assert.equal(qualityStepDeps('deep', 'anthropic').glossaryRetry, undefined);
+  assert.equal(qualityStepDeps('fast', 'groq').glossaryRetry, undefined);
+});
