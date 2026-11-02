@@ -847,3 +847,32 @@ test('용어집이 없는 요청은 다시 부르지 않고 신고도 건드리�
   assert.equal(fetchImpl.calls.count, 1);
   assert.equal(out.appliedGlossary[0].appliedText, 'deployment');
 });
+
+test('🔴 빠진 용어로 다시 부를 때는 그 용어(원문 → 등록된 말)만 짚는 한 줄을 붙인다 — 첫 호출·캐시 키는 그대로', async () => {
+  const bodies = [];
+  const raws = [GL_BAD, GL_OK];
+  const fetchImpl = async (_url, init) => {
+    bodies.push(String(init?.body ?? ''));
+    const raw = raws[Math.min(bodies.length - 1, raws.length - 1)];
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(raw) } }] }) };
+  };
+  const out = await refine(GL_REQ, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+  assert.ok(out.refined.includes('ABC'));
+  assert.equal(bodies.length, 2);
+  assert.ok(!bodies[0].includes('RETRY NOTE'));
+  assert.ok(bodies[1].includes('RETRY NOTE'));
+  const sent = JSON.parse(JSON.parse(bodies[1]).messages[0].content);
+  assert.ok(sent.instruction.includes('"배포" -> "ABC"'), '빠진 용어 쌍이 실린다');
+});
+
+test('숫자 재호출에는 용어 알림을 붙이지 않는다', async () => {
+  const bodies = [];
+  const fetchImpl = async (_url, init) => {
+    bodies.push(String(init?.body ?? ''));
+    const raw = bodies.length === 1 ? NUM_BAD : NUM_OK;
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(raw) } }] }) };
+  };
+  await refine(NUM_REQ, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl });
+  assert.equal(bodies.length, 2);
+  assert.ok(!bodies[1].includes('RETRY NOTE'));
+});

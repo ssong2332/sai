@@ -52,9 +52,35 @@ export function activeGlossaryEntries(glossary, sourceText) {
   return active;
 }
 
+/** 원문에 나오는데 등록된 말이 교정문에 없는 항목들. */
+export function missingGlossaryEntries(refined, glossary, sourceText) {
+  return activeGlossaryEntries(glossary, sourceText).filter((entry) => !occursIn(expectedText(entry), refined));
+}
+
 /** 원문에 나오는데 등록된 말이 교정문에 없는 항목 수 — 약한 검사(`glossary`) 판정용. */
 export function countMissingGlossary(refined, glossary, sourceText) {
-  return activeGlossaryEntries(glossary, sourceText).filter((entry) => !occursIn(expectedText(entry), refined)).length;
+  return missingGlossaryEntries(refined, glossary, sourceText).length;
+}
+
+/**
+ * 재호출 payload에 빠진 용어를 짚는 한 줄을 붙인다 (2026-11-02 실브라우저 후속).
+ *
+ * 🔴 **실측**: 「배포 일정이 다음 주로 밀렸습니다. 금요일 배포 전에 QA …」 + 팀 「배포 → ABC」는 같은 payload로
+ *    다시 불러도 5/5 「deployment」였다(같은 문장에 「배포 → rollout」은 5/5 반영). 코드처럼 생긴 말을 모델이
+ *    일반 명사로 되돌린다 — 팀 코드명·제품명이 바로 이런 말이다. 같은 요청을 반복하면 같은 답이 온다.
+ * 🔴 붙이는 것은 **용어(원문 → 등록된 말)뿐**이다 — 이미 payload의 `glossary`에 있는 값이고, 메시지 본문은 넣지 않는다.
+ *    값은 `JSON.stringify`로 감싸 지시문이 아닌 데이터로 둔다(glossaryRules의 「USER DATA」 원칙).
+ */
+export function withGlossaryReminder(payload, missing) {
+  if (!Array.isArray(missing) || missing.length === 0) return payload;
+  const pairs = missing.map((entry) => `${JSON.stringify(entry.sourceText)} -> ${JSON.stringify(expectedText(entry))}`).join(', ');
+  const note =
+    ' RETRY NOTE: your previous answer did not use these registered glossary entries: ' +
+    pairs +
+    '. Each target is a fixed name the user registered (it may look like a code, abbreviation or brand name) — ' +
+    'write it exactly as given wherever the original has the source phrase, even if it looks unusual; ' +
+    'do not replace it with a common word.';
+  return { ...payload, instruction: `${payload.instruction}${note}` };
 }
 
 /** 모델 신고 대신 등록된 말로 `appliedGlossary`를 다시 만든다. 용어집이 없으면 그대로 둔다. */

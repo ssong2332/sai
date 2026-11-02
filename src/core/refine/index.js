@@ -15,7 +15,7 @@ import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
 import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, isFormalAddress, checkBackTranslation } from './backcheck.js';
 import { checkNumbersPreserved } from './numberCheck.js';
-import { countMissingGlossary, reconcileAppliedGlossary } from './glossaryVerify.js';
+import { countMissingGlossary, missingGlossaryEntries, reconcileAppliedGlossary, withGlossaryReminder } from './glossaryVerify.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -273,10 +273,12 @@ export async function refine(request, deps = {}) {
   };
   let result;
   let issues;
+  // 🔴 재호출 때만 바뀔 수 있다(빠진 용어 알림 — `withGlossaryReminder`). 캐시 키는 원래 payload 그대로다.
+  let callPayload = payload;
   for (let attempt = 1; ; attempt += 1) {
     let raw;
     try {
-      raw = await provider.call(payload, {
+      raw = await provider.call(callPayload, {
         apiKey,
         model,
         timeoutMs: attempt === 1 ? timeoutMs : Math.min(timeoutMs ?? RETRY_TIMEOUT_MS, RETRY_TIMEOUT_MS),
@@ -321,6 +323,9 @@ export async function refine(request, deps = {}) {
       const softIssue = softIssueOf(result);
       if (softIssue && !softResult && canRetry()) {
         softResult = { result, issues: [...issues, `${softIssue}-broken`], kind: softIssue };
+        if (softIssue === 'glossary') {
+          callPayload = withGlossaryReminder(payload, missingGlossaryEntries(result.refined, input.glossary, input.text));
+        }
         continue;
       }
       if (softResult) {

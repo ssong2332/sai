@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { activeGlossaryEntries, countMissingGlossary, reconcileAppliedGlossary } from '../src/core/refine/glossaryVerify.js';
+import { activeGlossaryEntries, countMissingGlossary, reconcileAppliedGlossary, withGlossaryReminder } from '../src/core/refine/glossaryVerify.js';
 
 const team = (sourceText, targetText, extra = {}) => ({ id: `t-${sourceText}-${targetText}`, entryType: 'term', scope: 'team', sourceText, targetText, keepSource: false, ...extra });
 const personal = (sourceText, targetText) => ({ ...team(sourceText, targetText), id: `p-${sourceText}`, scope: 'personal' });
@@ -44,4 +44,19 @@ test('reconcile — 모델 신고(deployment)를 등록된 말(ABC)로 바꾸고
 test('reconcile — 용어집이 없으면 그대로 둔다', () => {
   const result = { appliedGlossary: [{ id: 'x', appliedText: 'y' }] };
   assert.equal(reconcileAppliedGlossary(result, [], '원문'), result);
+});
+
+test('withGlossaryReminder — 빠진 항목이 없으면 payload를 그대로 돌려준다', () => {
+  const payload = { instruction: 'x' };
+  assert.equal(withGlossaryReminder(payload, []), payload);
+});
+
+test('withGlossaryReminder — instruction 끝에 쌍을 JSON 문자열로 붙이고, 다른 필드는 건드리지 않는다', () => {
+  const payload = { instruction: 'base', text: '원문' };
+  const out = withGlossaryReminder(payload, [team('배포', 'ABC'), team('Sai', null, { keepSource: true })]);
+  assert.ok(out.instruction.startsWith('base RETRY NOTE'));
+  assert.ok(out.instruction.includes('"배포" -> "ABC"'));
+  assert.ok(out.instruction.includes('"Sai" -> "Sai"'));
+  assert.equal(out.text, '원문');
+  assert.equal(payload.instruction, 'base');
 });
