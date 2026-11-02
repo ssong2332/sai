@@ -99,6 +99,9 @@ export function createMemoryUsageStore({
       billing.set(uid, doc);
     },
     monthMicros: () => budget.get(month()) ?? startMicros,
+    async getMonthMicros() {
+      return budget.get(month()) ?? startMicros;
+    },
     async addBudget(micros) {
       if (!(micros > 0)) return;
       const m = month();
@@ -131,6 +134,11 @@ export function createFirestoreUsageStore({ db, limit = DAILY_REFINE_LIMIT, now 
     recordDailyUser: (uid) => recordDailyUser(db, uid, now()),
     recordRequest: (input) => recordRequest(db, input, now()),
     addBudget: (micros) => addBudgetFirestore(db, micros, now()),
+    // 2026-11-02 — 이달 추정(`/health/budget` 단계 판정용). 문서 읽기 1회.
+    getMonthMicros: async () => {
+      const snap = await db.collection('budgetMonthly').doc(seoulMonthKey(now())).get();
+      return snap.exists ? Number(snap.data()?.micros ?? 0) : 0;
+    },
   };
 }
 

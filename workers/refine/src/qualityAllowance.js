@@ -39,6 +39,29 @@ export const COST_ESTIMATE_MICROS = Object.freeze({ fast: 750, standard: 15_700,
 export const MONTHLY_HARD_STOP_MICROS = 95_000_000;
 
 /**
+ * 이달 추정 비용 단계 (2026-11-02 사용자 승인 「진행」 — 공개 뒤 비용을 미리 알기 위해). 금액은 밖으로 내지 않는다.
+ *
+ * | 이달 추정 | 단계 | 뜻 |
+ * |---|---|---|
+ * | < $50 | `ok` | 평소 |
+ * | ≥ $50 | `notice` | 절반 — 사용량 추세를 본다 |
+ * | ≥ $80 | `warn` | 곧 상위 모드가 빠른으로 낮아진다($90) |
+ * | ≥ $90 | `guard` | 상위 모드 → 빠른(`MONTHLY_BUDGET_GUARD_MICROS`) |
+ * | ≥ $95 | `stopped` | 모두 멈춤(`MONTHLY_HARD_STOP_MICROS`) |
+ */
+export const BUDGET_NOTICE_MICROS = 50_000_000;
+export const BUDGET_WARN_MICROS = 80_000_000;
+
+export function budgetLevel(micros) {
+  const m = Number(micros) || 0;
+  if (m >= MONTHLY_HARD_STOP_MICROS) return 'stopped';
+  if (m >= MONTHLY_BUDGET_GUARD_MICROS) return 'guard';
+  if (m >= BUDGET_WARN_MICROS) return 'warn';
+  if (m >= BUDGET_NOTICE_MICROS) return 'notice';
+  return 'ok';
+}
+
+/**
  * 실제 호출 1번의 추정 비용 — 모델 이름으로(2026-11-02, 재호출 포함 집계용). 모르는 모델·null은 `other`.
  * 🔴 Sonnet 용어 재호출(사고 없음)은 기본 모드 추정(사고 켬)보다 싸지만 같은 값으로 센다 — 넘치게 세는 쪽이 안전.
  */

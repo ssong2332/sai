@@ -96,6 +96,7 @@
 | 이달(서울) 추정 비용 안전장치 | ≥ $90이면 기본·심층 → 빠른, `qualityDowngrade:'budget'` | `workers/refine/src/qualityAllowance.js` |
 | 이달 멈춤선 (2026-11-02) | ≥ $95이면 **모든 모드** 429 `monthly-limit` — 확장은 「다음 달 1일에 다시 열려요」 | `qualityAllowance.js` `MONTHLY_HARD_STOP_MICROS` · `src/background/index.js` |
 | 재호출 비용 (2026-11-02) | 받을 때 1번은 모드 추정치로 미리 세고, 그 뒤 호출(재호출·폴오버)은 모델 이름(haiku·sonnet·opus)별 추정치로 더한다 | 코어 `deps.onCall` → `extraCallsMicros` → `addBudget` |
+| 이달 비용 감시 (2026-11-02) | `GET /health/budget` → 단계만(`ok` <$50 · `notice` ≥$50 · `warn` ≥$80 · `guard` ≥$90 · `stopped` ≥$95 · `unknown` 못 읽음), 금액 없음, isolate 5분 캐시. UptimeRobot **키워드 감시**(`budget-ok`가 없으면 알림). 금액은 로컬 `npm --prefix workers/refine run report`(서비스 계정 키 필요) | `handler.js` · `qualityAllowance.js` `budgetLevel` · `scripts/report.mjs` |
 | 추정 방법 | 받은 요청마다 그 모드 건당 실측값(빠른 $0.00075 · 기본 $0.0157 · 심층 $0.0382 · 그 밖 $0.0007)을 더함 — 캐시·실패도 셈(넘치게) | 같은 파일 |
 | 카운터 장애 | 다듬기는 계속, 상위 모드는 빠른(`unavailable`) | `handler.js` ⑥ |
 | 저장 | `refineQuota/{uid}_{날짜}.premium.*` · `budgetMonthly/{YYYY-MM}.micros`(uid 없음) — 본문·모델명 없음. 요청당 Firestore 쓰기 +1 | `usageStore.js` |

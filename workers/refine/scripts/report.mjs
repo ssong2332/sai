@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { createTokenSource } from '../src/google/serviceAccount.js';
 import { RestFirestore } from '../src/google/firestoreRest.js';
 import { summarizeDay, judgeDay, judgeHealth, pct } from './reportCore.mjs';
+import { budgetLevel } from '../src/qualityAllowance.js';
 
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'sai-global-msg-2026';
 const ORIGIN = process.env.SAI_WORKER_ORIGIN || 'https://sai-refine.aiisgod.workers.dev';
@@ -74,6 +75,19 @@ async function main() {
         day.requests === 0 ? ' 요청 없음' : ` ${dayWarnings.join(', ') || '-'}`,
       ].join(' '),
     );
+  }
+
+  // 2026-11-02 — 이달 추정 비용(서울 달). 금액은 이 로컬 스크립트에서만 본다(`/health/budget`은 단계만).
+  const monthKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' }).format(new Date(now));
+  try {
+    const snap = await db.collection('budgetMonthly').doc(monthKey).get();
+    const micros = snap.exists ? Number(snap.data()?.micros ?? 0) : 0;
+    const level = budgetLevel(micros);
+    console.log(`
+이달(${monthKey}) 추정 비용 ${(micros / 1e6).toFixed(2)} · 단계 ${level} (멈춤 $95)`);
+    if (level !== 'ok') warnings.push(`이달 추정 비용 단계 ${level}`);
+  } catch (error) {
+    warnings.push(`이달 추정 비용 읽기 실패: ${error?.code ?? error?.status ?? error?.name ?? 'unknown'}`);
   }
 
   let status = 0;

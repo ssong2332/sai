@@ -11,6 +11,7 @@
  * |---|---|
  * | `OPTIONS *` | CORS 사전 요청 — `cors.js` 판정표 |
  * | `GET /health` | 설정 상태(키 **이름·유무**만, 값 없음) |
+ * | `GET /health/budget` | 이달 추정 비용 **단계만**(`ok`·`notice`·`warn`·`guard`·`stopped`·`unknown`) — 금액 없음. UptimeRobot 키워드 감시용(2026-11-02) |
  * | `POST /v1/refine` + `mode` 없음·`refine`·모르는 값 | 교정 `refine()` — 기존 서버와 같이 모르는 mode는 refine으로 본다 |
  * | `POST /v1/refine` + `mode` = `decode` | 수신 해독 `decode()` |
  * | `POST /v1/refine` + `mode` = `decisions` | 결정 요약 `summarizeDecisions()` |
@@ -57,7 +58,7 @@ import { readConfig } from './config.js';
 import { AuthError, bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
-import { extraCallsMicros } from './qualityAllowance.js';
+import { budgetLevel, extraCallsMicros } from './qualityAllowance.js';
 import { handleTeam } from './teamRoute.js';
 import { resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
 import { googleClientsFromEnv } from './google/clients.js';
@@ -158,6 +159,9 @@ export function createHandler(deps = {}) {
   };
 
   const storeFor = typeof usageStore === 'function' ? usageStore : () => usageStore;
+  // `/health/budget` 단계 — isolate 메모리에 5분(아래 라우트 주석).
+  const BUDGET_CACHE_MS = 5 * 60 * 1000;
+  const budgetCache = { at: null, level: 'unknown' };
 
   return async function handle(request, env = {}) {
     const config = readConfig(env);
@@ -186,6 +190,27 @@ export function createHandler(deps = {}) {
         status: 204,
         headers: origin === 'allowed' ? corsHeaders(config.extensionId) : {},
       });
+    }
+
+    /**
+     * 이달 추정 비용 단계 (2026-11-02). 🔴 금액은 내지 않는다(공개 주소) — 단계 이름과 감시용 표지만.
+     * 🔴 isolate마다 5분 동안 같은 답을 준다 — 이 주소를 두드려도 Firestore 읽기(하루 5만)가 크게 늘지 않게.
+     * 읽지 못하면 `unknown`(감시가 `budget-ok`를 못 찾아 알린다 — 모르는 것도 알려야 한다).
+     */
+    if (url.pathname === '/health/budget') {
+      if (request.method !== 'GET') return json(405, { error: 'method not allowed' });
+      if (budgetCache.at === null || now() - budgetCache.at > BUDGET_CACHE_MS) {
+        let level = 'unknown';
+        try {
+          const store = resolveStore(storeFor, env, logger);
+          if (store.getMonthMicros) level = budgetLevel(await store.getMonthMicros());
+        } catch (error) {
+          logger.error(`[budget] 이달 추정 읽기 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+        }
+        budgetCache.at = now();
+        budgetCache.level = level;
+      }
+      return json(200, { level: budgetCache.level, marker: `budget-${budgetCache.level}` });
     }
 
     if (url.pathname === '/health') {

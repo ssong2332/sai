@@ -13,6 +13,9 @@ import {
   COST_ESTIMATE_MICROS,
   MONTHLY_BUDGET_GUARD_MICROS,
   MONTHLY_HARD_STOP_MICROS,
+  BUDGET_NOTICE_MICROS,
+  BUDGET_WARN_MICROS,
+  budgetLevel,
   extraCallsMicros,
   modelCostMicros,
   PREMIUM_DAILY_LIMITS,
@@ -212,4 +215,51 @@ test('C2 modelCostMicros·extraCallsMicros — 첫 호출은 빼고 모델 이�
   assert.equal(modelCostMicros(null), COST_ESTIMATE_MICROS.other);
   assert.equal(extraCallsMicros([{ model: 'claude-haiku-5-5' }]), 0);
   assert.equal(extraCallsMicros([{ model: 'claude-haiku-5-5' }, { model: 'claude-sonnet-5-5' }]), COST_ESTIMATE_MICROS.standard);
+});
+
+/* ── 2026-11-02 이달 비용 감시 — /health/budget ── */
+
+test('D1 budgetLevel 판정표 — 경계값 포함', () => {
+  assert.equal(budgetLevel(0), 'ok');
+  assert.equal(budgetLevel(BUDGET_NOTICE_MICROS - 1), 'ok');
+  assert.equal(budgetLevel(BUDGET_NOTICE_MICROS), 'notice');
+  assert.equal(budgetLevel(BUDGET_WARN_MICROS), 'warn');
+  assert.equal(budgetLevel(MONTHLY_BUDGET_GUARD_MICROS), 'guard');
+  assert.equal(budgetLevel(MONTHLY_HARD_STOP_MICROS), 'stopped');
+  assert.equal(budgetLevel(undefined), 'ok');
+});
+
+const budgetGet = (handle) => handle(new globalThis.Request('https://sai.example/health/budget'), TEST_ENV);
+
+test('D2 /health/budget — 단계와 감시 표지만, 금액은 없다', async () => {
+  const store = createMemoryUsageStore({ monthMicros: BUDGET_WARN_MICROS + 1234 });
+  const handle = createHandler({ jwks: keys.jwks, usageStore: store, cache: new MemoryCacheStore(), logger: captureLogger() });
+  const res = await budgetGet(handle);
+  assert.equal(res.status, 200);
+  const text = await res.text();
+  assert.deepEqual(JSON.parse(text), { level: 'warn', marker: 'budget-warn' });
+  assert.equal(/\d{4,}/.test(text), false, '🔴 금액(숫자)이 새어 나갔다');
+});
+
+test('D3 /health/budget — 5분 동안 같은 답(Firestore 읽기를 늘리지 않는다), 지나면 다시 읽는다', async () => {
+  let t = 0;
+  let reads = 0;
+  let micros = 0;
+  const store = { kind: 'custom', getMonthMicros: async () => { reads += 1; return micros; } };
+  const handle = createHandler({ jwks: keys.jwks, usageStore: store, now: () => t, logger: captureLogger() });
+  assert.equal((await (await budgetGet(handle)).json()).level, 'ok');
+  micros = MONTHLY_HARD_STOP_MICROS;
+  t = 4 * 60 * 1000;
+  assert.equal((await (await budgetGet(handle)).json()).level, 'ok');
+  t = 6 * 60 * 1000;
+  assert.equal((await (await budgetGet(handle)).json()).level, 'stopped');
+  assert.equal(reads, 2);
+});
+
+test('D4 /health/budget — 읽지 못하면 unknown(감시가 budget-ok를 못 찾아 알린다)', async () => {
+  const failing = { kind: 'custom', getMonthMicros: async () => { throw Object.assign(new Error('x'), { code: 'UNAVAILABLE' }); } };
+  const h1 = createHandler({ jwks: keys.jwks, usageStore: failing, logger: captureLogger() });
+  assert.equal((await (await budgetGet(h1)).json()).marker, 'budget-unknown');
+  const h2 = createHandler({ jwks: keys.jwks, logger: captureLogger() });
+  assert.equal((await (await budgetGet(h2)).json()).level, 'unknown', 'noop 저장소(시크릿 없음)도 unknown');
 });
