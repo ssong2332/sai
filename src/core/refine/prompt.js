@@ -78,7 +78,10 @@ import { conventionRules } from './conventions.js';
 /**
  * v26 (2026-11-01, 사용자 결정) — 문체와 상관없이 존칭 2인칭(Sie·vous·usted). `registerRules` 주석 참고.
  */
-export const REFINE_PROMPT_VERSION = 'refine-v26';
+/**
+ * v27 (2026-11-02) — 연도 없는 날짜: 기준 월보다 앞이고 앞으로 할 일이면 다음 해(`dateNumberRules` 주석).
+ */
+export const REFINE_PROMPT_VERSION = 'refine-v27';
 
 /** 긴급도 어휘 — c1.ts와 동일. UI 표기(Critical/Normal/Low)는 클라이언트가 매핑한다. */
 export const URGENCY_LEVELS = ['CRITICAL', 'NORMAL', 'LOW'];
@@ -325,9 +328,10 @@ function directionRules(sourceLanguage, targetLanguage, honorificLevel) {
 }
 
 /** ⓒ 날짜·숫자 비모호 정규화 (구 AC-049). 방향 공통. */
-function dateNumberRules(referenceYear, targetLanguage) {
+function dateNumberRules(referenceYear, referenceMonth, targetLanguage) {
   const example =
-    targetLanguage === 'ko' ? `"${referenceYear}년 8월 4일"` : `"Aug 4, ${referenceYear}"`;
+    // v27 — 예시에 연도를 넣지 않는다. 예시가 연도를 달고 있으면 「연도를 붙이지 마라」를 이긴다.
+    targetLanguage === 'ko' ? '"8월 4일"' : '"Aug 4"';
   return (
     `The reference year is ${referenceYear} — treat it as the current year. ` +
     // 🔴 v2 — 이 금지가 없으면 "내일"이 "May 21, 2026" 같은 없는 날짜로 바뀐다(실측).
@@ -340,8 +344,17 @@ function dateNumberRules(referenceYear, targetLanguage) {
     'The rules below apply ONLY to dates the original actually writes as a date (e.g. "8/4", ' +
     '"8월 12일", "2026.08.04"). Normalize those to an unambiguous written form in the output ' +
     `language (e.g. ${example}) but NEVER change the underlying date, time, or numeric value ` +
-    `itself. If such a written date has no year, fill in ${referenceYear} — do NOT guess a ` +
-    'different year and do NOT drop the year. If the original states a year, keep that stated year. ' +
+    'itself. If the original states a year, keep that stated year. ' +
+    /**
+     * 🔴 v27 (2026-11-02 실측) — 예전에는 「연도가 없으면 기준 연도」였다. 11월에 「3월 14일 납품」이 10/10 「2026년 3월」
+     *    (이미 지난 날짜)로 나갔다. 1차로 「앞선 달의 앞으로 할 일은 다음 해」를 시켰지만 빠른 모드가 따르지 못했다
+     *    (0/4, 연도를 빼기도 함). 그래서 **원문에 연도가 없으면 붙이지 않는다** — 틀린 연도보다 없는 연도가 안전하다.
+     */
+    'If such a written date has NO year in the original, do NOT add a year — write the month and ' +
+    'day only (e.g. "March 14", "14. März", "3月14日"). The reader of the original knows which year ' +
+    'is meant; a year you add can only be a guess, and a wrong year turns a deadline into a date ' +
+    `that has already passed. (For reference only: today is in month ${referenceMonth} of ` +
+    `${referenceYear}.) ` +
     'Keep currency amounts and measurement units exactly as written in the original — never convert ' +
     'currencies or units on your own (e.g. do not turn KRW into USD, or ms into seconds). ' +
     /**
@@ -898,6 +911,8 @@ export function buildRefinePayload({
   referenceDate,
 }) {
   const referenceYear = referenceDate.slice(0, 4);
+  // 🔴 v27 — 연도 없는 날짜의 해를 고르려면 월이 필요하다. 일(day)은 싣지 않는다(캐시가 매일 깨진다).
+  const referenceMonth = Number(referenceDate.slice(5, 7));
   const annotatedGlossary = annotateGlossaryMatches(glossary, text, sourceLanguage);
   const instruction = [
     'You are refining a cross-border professional work message. In ONE response you must classify ' +
@@ -933,7 +948,7 @@ export function buildRefinePayload({
     //    `profile` 앞에 두어 「본인 설정이 수신자 성향을 이긴다」는 순서는 그대로 지킨다.
     recipientRules(recipient),
     profileRules(profile),
-    dateNumberRules(referenceYear, targetLanguage),
+    dateNumberRules(referenceYear, referenceMonth, targetLanguage),
     backTranslationRule(sourceLanguage, targetLanguage),
     PLACEHOLDER_RULE,
     intentAndTicketRule(sourceLanguage, targetLanguage),
@@ -957,5 +972,6 @@ export function buildRefinePayload({
     casualTone,
     threadContext,
     referenceYear,
+    referenceMonth,
   };
 }
