@@ -39,7 +39,7 @@ export const PREMIUM_DAILY_LIMITS = Object.freeze({ standard: 10, deep: 3 });
  * 🔴 한 곳에만 둔다 — Worker `billing.js`가 판정에, 확장 설정 「지금 플랜」이 안내에 같은 표를 읽는다(2026-11-01 코어로 옮김).
  */
 export const PLAN_LIMITS = Object.freeze({
-  beta: Object.freeze({ daily: 100, standard: 10, deep: 3 }),
+  beta: Object.freeze({ daily: 20, standard: 10, deep: 3 }), // 2026-11-02 공개 전 100 → 20(`refineQuota.js`)
   free: Object.freeze({ daily: 20, standard: 0, deep: 0 }),
   pro: Object.freeze({ daily: 200, standard: 10, deep: 3 }),
   team: Object.freeze({ daily: 200, standard: 20, deep: 5 }),

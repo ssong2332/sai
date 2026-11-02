@@ -1028,7 +1028,7 @@ function DataPanel({ data, toast }) {
 
 /**
  * 요금제 (L36, 2026-10-29 사용자 결정 — Spec §0 수익화). 표·비교는 소개 사이트 `/pricing`에만 두고 여기는 지금 상태와 링크만.
- * 🔴 숫자를 두 곳에 늘리지 않는다 — 하루 100회는 `functions/refineQuota.js` DAILY_REFINE_LIMIT(서울 날짜 경계).
+ * 🔴 숫자를 두 곳에 늘리지 않는다 — 하루 20회(2026-11-02 100 → 20)는 `functions/refineQuota.js` DAILY_REFINE_LIMIT(서울 날짜 경계).
  * 🔴 오늘 쓴 횟수는 보여 주지 않는다(2026-10-29 사용자 결정).
  * 🔴 `PRODUCTION_SITE_URL`(src/config.js)은 externally_connectable을 정하므로 여기서 쓰지 않는다 — 링크 주소만 따로 둔다.
  */
@@ -1064,7 +1064,7 @@ function PlanPanel({ plan }) {
           </div>
           <div>
             <dt>하루 횟수</dt>
-            <dd className="num">100회</dd>
+            <dd className="num">20회</dd>
           </div>
         </dl>
         <p className="group-note">

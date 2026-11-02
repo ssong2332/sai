@@ -1,7 +1,7 @@
 import { consumeDailyQuota, DAILY_REFINE_LIMIT, quotaExpireAt, seoulDateKey } from '../../../functions/refineQuota.js';
 import { recordDailyUser, recordRequest } from '../../../functions/betaMetrics.js';
 import { googleClientsFromEnv } from './google/clients.js';
-import { costMicros, decideQuality, seoulMonthKey } from './qualityAllowance.js';
+import { costMicros, decideQuality, MONTHLY_HARD_STOP_MICROS, seoulMonthKey } from './qualityAllowance.js';
 
 /**
  * 일일 상한(quota)·베타 지표(betaMetrics) 저장소 인터페이스 — 2026-10-26부터 Firestore(아래 표), 시크릿이 없으면 스텁.
@@ -82,6 +82,7 @@ export function createMemoryUsageStore({
       if (used > dailyLimit) return { ok: false, used: used - 1, limit: dailyLimit };
       const m = month();
       const monthMicros = budget.get(m) ?? startMicros;
+      if (monthMicros >= MONTHLY_HARD_STOP_MICROS) return { ok: false, reason: 'monthly-limit', used: used - 1, limit: dailyLimit };
       const premiumUsed = quality ? { [quality]: premium.get(`${key}:${quality}`) ?? 0 } : {};
       const decided = decideQuality({ requested: quality, premiumUsed, monthMicros, ...(limits ? { limits } : {}) });
       counts.set(key, used);
@@ -98,6 +99,11 @@ export function createMemoryUsageStore({
       billing.set(uid, doc);
     },
     monthMicros: () => budget.get(month()) ?? startMicros,
+    async addBudget(micros) {
+      if (!(micros > 0)) return;
+      const m = month();
+      budget.set(m, (budget.get(m) ?? startMicros) + micros);
+    },
     async recordDailyUser(uid) {
       dailyUsers.add(`${today()}:${uid}`);
     },
@@ -124,6 +130,7 @@ export function createFirestoreUsageStore({ db, limit = DAILY_REFINE_LIMIT, now 
     },
     recordDailyUser: (uid) => recordDailyUser(db, uid, now()),
     recordRequest: (input) => recordRequest(db, input, now()),
+    addBudget: (micros) => addBudgetFirestore(db, micros, now()),
   };
 }
 
@@ -143,6 +150,9 @@ async function admitFirestore(db, { uid, quality, limit, limits = null, now }) {
     const q = quotaSnap.exists ? quotaSnap.data() ?? {} : {};
     const used = Number(q.count ?? 0);
     if (used >= limit) return { ok: false, used, limit };
+    const monthMicrosNow = budgetSnap.exists ? Number(budgetSnap.data()?.micros ?? 0) : 0;
+    // 🔴 2026-11-02 — 이달 추정이 멈춤선 이상이면 아무것도 쓰지 않고 거절한다(횟수도 깎지 않는다).
+    if (monthMicrosNow >= MONTHLY_HARD_STOP_MICROS) return { ok: false, reason: 'monthly-limit', used, limit };
     const premiumUsed = Object.fromEntries(Object.entries(q.premium ?? {}).map(([k, v]) => [k, Number(v ?? 0)]));
     const monthMicros = budgetSnap.exists ? Number(budgetSnap.data()?.micros ?? 0) : 0;
     const decided = decideQuality({ requested: quality, premiumUsed, monthMicros, ...(limits ? { limits } : {}) });
@@ -153,6 +163,21 @@ async function admitFirestore(db, { uid, quality, limit, limits = null, now }) {
     tx.set(quotaRef, quotaDoc, { merge: true });
     tx.set(budgetRef, { monthKey, micros: monthMicros + costMicros(decided.quality), updatedAt: now }, { merge: true });
     return { ok: true, used: used + 1, limit, ...decided };
+  });
+}
+
+/**
+ * 받은 뒤의 추가 호출 비용(재호출·폴오버)을 이달 추정에 더한다 (2026-11-02). 금액만 — uid·본문 없음.
+ * 🔴 추가 호출이 있었을 때만 불린다 — 대부분의 요청은 쓰기가 늘지 않는다(Spark 하루 쓰기 2만).
+ */
+async function addBudgetFirestore(db, micros, now) {
+  if (!(micros > 0)) return;
+  const monthKey = seoulMonthKey(now);
+  const ref = db.collection('budgetMonthly').doc(monthKey);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.exists ? Number(snap.data()?.micros ?? 0) : 0;
+    tx.set(ref, { monthKey, micros: current + micros, updatedAt: now }, { merge: true });
   });
 }
 
