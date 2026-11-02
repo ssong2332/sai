@@ -60,3 +60,35 @@ test('withGlossaryReminder — instruction 끝에 쌍을 JSON 문자열로 붙�
   assert.equal(out.text, '원문');
   assert.equal(payload.instruction, 'base');
 });
+
+/* ── 횟수 (2026-11-02 — 원문 두 곳 중 한 곳만 바뀌어도 통과했다) ── */
+
+import { countOccurrences, missingGlossaryEntries } from '../src/core/refine/glossaryVerify.js';
+import { checkGlossaryApplied, glossaryPartialText } from '../src/core/refine/glossaryCheck.js';
+
+test('countOccurrences — 겹치지 않게 세고, 대소문자·공백을 무시하고, 빈 값은 0', () => {
+  assert.equal(countOccurrences('배포', '배포 일정이 … 금요일 배포 전에'), 2);
+  assert.equal(countOccurrences('abc', 'The ABC schedule … the Friday ABC'), 2);
+  assert.equal(countOccurrences('aa', 'aaaa'), 2);
+  assert.equal(countOccurrences('', 'x'), 0);
+});
+
+test('원문 두 곳인데 교정문 한 곳이면 빠진 것으로 본다(재호출 대상)', () => {
+  const g = [team('배포', 'ABC')];
+  const src = '배포 일정이 밀렸습니다. 금요일 배포 전에 QA 부탁드립니다.';
+  assert.equal(missingGlossaryEntries('The ABC schedule slipped. QA before the Friday release?', g, src).length, 1);
+  assert.equal(missingGlossaryEntries('The ABC schedule slipped. QA before the Friday ABC?', g, src).length, 0);
+});
+
+test('화면 — 일부만이면 적용됨·초록은 그대로, partial에 횟수를 담는다', () => {
+  const result = { refined: 'The ABC schedule slipped. QA before the Friday release?', appliedGlossary: [{ id: 't1', sourceText: '배포', appliedText: 'ABC' }] };
+  const check = checkGlossaryApplied(result, '배포 일정이 밀렸습니다. 금요일 배포 전에');
+  assert.equal(check.applied.length, 1);
+  assert.deepEqual(check.partial, [{ appliedText: 'ABC', inSource: 2, inRefined: 1 }]);
+  assert.ok(glossaryPartialText(check.partial).includes('「ABC」 원문 2곳 중 1곳'));
+});
+
+test('화면 — 원문을 모르면 일부만 판정을 하지 않는다(예전 동작)', () => {
+  const result = { refined: 'The ABC slipped.', appliedGlossary: [{ id: 't1', sourceText: '배포', appliedText: 'ABC' }] };
+  assert.deepEqual(checkGlossaryApplied(result).partial, []);
+});

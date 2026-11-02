@@ -13,6 +13,7 @@
  * |---|---|---|
  * | 원문에 그 용어가 있고 등록된 말이 교정문에 있다 | `appliedText` = 등록된 말 | 적용됨·초록 |
  * | 원문에 그 용어가 있는데 등록된 말이 교정문에 없다 | `appliedText` = 등록된 말 | 「반영되지 않았어요」 경고 |
+ * | 등록된 말이 교정문에 원문보다 적게 나온다 | `appliedText` = 등록된 말 | 적용됨·초록 + 「일부만 반영됐어요」 경고 |
  * | 원문에 그 용어가 없다 | 뺀다 (모델이 신고했어도) | 표시 없음 |
  * | 요청에 없는 id를 모델이 신고했다 | 뺀다 | 표시 없음 |
  * | 요청에 용어집이 없다 | 모델 신고 그대로 (이전 동작) | 이전과 같음 |
@@ -52,9 +53,41 @@ export function activeGlossaryEntries(glossary, sourceText) {
   return active;
 }
 
-/** 원문에 나오는데 등록된 말이 교정문에 없는 항목들. */
+/**
+ * `needle`이 `haystack`에 몇 번 나오는가 (겹치지 않게, 대소문자·공백 무시 — `occursIn`과 같은 잣대).
+ * 🔴 정규식을 만들지 않는다 — 사용자 문자열을 패턴으로 해석하지 않는다(`reasoning.js`와 같은 원칙).
+ */
+export function countOccurrences(needle, haystack) {
+  const norm = (value) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const a = norm(needle);
+  if (a === '') return 0;
+  const h = norm(haystack);
+  let count = 0;
+  for (let at = h.indexOf(a); at !== -1; at = h.indexOf(a, at + a.length)) count += 1;
+  return count;
+}
+
+/**
+ * 원문에 나오는데 등록된 말이 교정문에 **원문보다 적게** 나오는 항목들 (2026-11-02 사용자 승인 「고쳐」).
+ * 🔴 실측: 「배포 일정이 … 금요일 배포 전에 …」 + 「배포 → ABC」 → "The ABC schedule … before the Friday release" —
+ *    한 곳만 바뀌어도 「있다」로 통과했다. 원문 횟수만큼 나와야 통과다. 0번이면 예전과 같은 「빠짐」이다.
+ */
 export function missingGlossaryEntries(refined, glossary, sourceText) {
-  return activeGlossaryEntries(glossary, sourceText).filter((entry) => !occursIn(expectedText(entry), refined));
+  return activeGlossaryEntries(glossary, sourceText).filter(
+    (entry) => countOccurrences(expectedText(entry), refined) < countOccurrences(entry.sourceText, sourceText),
+  );
+}
+
+/**
+ * 교정문에 등록된 말이 나온 횟수의 합 — 원문 횟수까지만 센다. 두 결과가 다 「일부만」일 때 어느 쪽이 나은지 가르는 데 쓴다.
+ * 🔴 실측: 첫 결과 0곳 · 재호출 1곳(원문 2곳)인데 「둘 다 glossary」라 첫 결과(0곳)를 줬다.
+ */
+export function glossaryHitCount(refined, glossary, sourceText) {
+  return activeGlossaryEntries(glossary, sourceText).reduce(
+    (sum, entry) =>
+      sum + Math.min(countOccurrences(expectedText(entry), refined), countOccurrences(entry.sourceText, sourceText)),
+    0,
+  );
 }
 
 /** 원문에 나오는데 등록된 말이 교정문에 없는 항목 수 — 약한 검사(`glossary`) 판정용. */
@@ -75,10 +108,10 @@ export function withGlossaryReminder(payload, missing) {
   if (!Array.isArray(missing) || missing.length === 0) return payload;
   const pairs = missing.map((entry) => `${JSON.stringify(entry.sourceText)} -> ${JSON.stringify(expectedText(entry))}`).join(', ');
   const note =
-    ' RETRY NOTE: your previous answer did not use these registered glossary entries: ' +
+    ' RETRY NOTE: your previous answer did not use these registered glossary entries in every place the original has them: ' +
     pairs +
     '. Each target is a fixed name the user registered (it may look like a code, abbreviation or brand name) — ' +
-    'write it exactly as given wherever the original has the source phrase, even if it looks unusual; ' +
+    'write it exactly as given in EVERY place the original has the source phrase (once per occurrence), even if it looks unusual; ' +
     'do not replace it with a common word.';
   return { ...payload, instruction: `${payload.instruction}${note}` };
 }

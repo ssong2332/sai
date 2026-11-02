@@ -15,7 +15,13 @@ import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
 import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, isFormalAddress, checkBackTranslation } from './backcheck.js';
 import { checkNumbersPreserved } from './numberCheck.js';
-import { countMissingGlossary, missingGlossaryEntries, reconcileAppliedGlossary, withGlossaryReminder } from './glossaryVerify.js';
+import {
+  countMissingGlossary,
+  glossaryHitCount,
+  missingGlossaryEntries,
+  reconcileAppliedGlossary,
+  withGlossaryReminder,
+} from './glossaryVerify.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -338,7 +344,14 @@ export async function refine(request, deps = {}) {
         continue;
       }
       if (softResult) {
-        const secondIsBetter = softIssue === null || SOFT_RANK[softIssue] > SOFT_RANK[softResult.kind];
+        const secondIsBetter =
+          softIssue === null ||
+          SOFT_RANK[softIssue] > SOFT_RANK[softResult.kind] ||
+          // 둘 다 용어가 모자라면 더 많이 반영한 쪽(예: 원문 2곳 중 0곳 → 1곳).
+          (softIssue === 'glossary' &&
+            softResult.kind === 'glossary' &&
+            glossaryHitCount(result.refined, input.glossary, input.text) >
+              glossaryHitCount(softResult.result.refined, input.glossary, input.text));
         if (!secondIsBetter) {
           keepSoftResult();
           break;

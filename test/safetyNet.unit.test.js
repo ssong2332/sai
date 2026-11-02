@@ -58,7 +58,7 @@ test('A — appliedText가 비면 적용됨으로 세지도, 경고하지도 않
     refined: 'Hello.',
     appliedGlossary: [{ id: 'g1', sourceText: '안녕', appliedText: '' }],
   });
-  assert.deepEqual(out, { applied: [], missing: [] });
+  assert.deepEqual(out, { applied: [], missing: [], partial: [] });
 });
 
 test('A — 폴백·빈 결과는 검사하지 않는다', () => {
@@ -68,9 +68,9 @@ test('A — 폴백·빈 결과는 검사하지 않는다', () => {
       refined: '원문',
       appliedGlossary: [{ id: 'g', sourceText: 'x', appliedText: 'Y' }],
     }),
-    { applied: [], missing: [] },
+    { applied: [], missing: [], partial: [] },
   );
-  assert.deepEqual(checkGlossaryApplied(null), { applied: [], missing: [] });
+  assert.deepEqual(checkGlossaryApplied(null), { applied: [], missing: [], partial: [] });
   assert.equal(glossaryWarningText([]), '');
 });
 

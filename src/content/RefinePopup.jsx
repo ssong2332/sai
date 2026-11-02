@@ -7,7 +7,7 @@ import { REGIONS } from '../lib/regions.js';
 import { checkNamesPreserved, nameWarningText } from '../core/refine/names.js';
 // L31 — 원문 숫자가 교정문에서 빠졌는지(모델 무관, 코드 대조).
 import { checkNumbersPreserved, numberWarningText } from '../core/refine/numberCheck.js';
-import { checkGlossaryApplied, glossaryWarningText } from '../core/refine/glossaryCheck.js';
+import { checkGlossaryApplied, glossaryWarningText, glossaryPartialText } from '../core/refine/glossaryCheck.js';
 import { checkIntentDrift, intentDriftWarningText } from '../core/refine/intentDrift.js';
 import { QUALITY_DOWNGRADE_NOTES, QUALITY_LABELS } from '../core/refine/quality.js';
 // L32 — 등록되지 않은 사람의 직급을 지어냈는지(「박 과장님」→ "Manager Park").
@@ -348,7 +348,7 @@ export default function RefinePopup({
    *    (`core/refine/glossaryCheck.js`). 실측(N-02): 「Sujin Kim」을 적용했다고 신고했지만
    *    교정문에 없었다. 「적용됨」 개수·초록 강조는 **대조를 통과한 항목만** 쓴다.
    */
-  const glossaryCheck = useMemo(() => checkGlossaryApplied(result), [result]);
+  const glossaryCheck = useMemo(() => checkGlossaryApplied(result, sourceText), [result, sourceText]);
   const glossaryCount = glossaryCheck.applied.length;
 
   /**
@@ -1390,6 +1390,14 @@ export default function RefinePopup({
                 용어집 확인 필요 — {glossaryCheck.missing.join(' · ')}
               </span>
               <p className="sai-blank-text">{glossaryWarningText(glossaryCheck.missing)}</p>
+            </div>
+          )}
+          {glossaryCheck.partial.length > 0 && (
+            <div className="sai-missing sai-blank" role="status">
+              <span className="sai-missing-head sai-blank-head">
+                용어집 일부만 반영 — {glossaryCheck.partial.map((p) => p.appliedText).join(' · ')}
+              </span>
+              <p className="sai-blank-text">{glossaryPartialText(glossaryCheck.partial)}</p>
             </div>
           )}
 
