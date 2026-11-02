@@ -78,7 +78,11 @@
  *      「위 방향 전부에 적용된다」고 못박는다. 날짜·이름이 아니라 **관계의 환각**이라 `verify.js`가
  *      못 잡는다(v2·v6와 같은 계열).
  */
-export const REPLY_PROMPT_VERSION = 'reply-v8';
+/**
+ * v9 (2026-11-01 실측) — 🔴 `clarify`(세부 코멘트 요청) 초안이 질문 없이 약속으로 끝났다(6/6) → 질문 최소 1개를
+ *   의무로. 🔴 `accept`에 원문에 없는 「벌써」(2/6) → 공통 `REPLY_RULE`에 평가·감정 부사 금지.
+ */
+export const REPLY_PROMPT_VERSION = 'reply-v9';
 
 /**
  * 회신 의도 6종. 🔴 이 키 집합이 계약이다 — `schema.js`·`decode/schema.js`가 화이트리스트로
@@ -155,7 +159,22 @@ const INTENT_RULES = {
     'The reader needs MORE DETAIL before they can act. Acknowledge the request, then ask for the ' +
     'specific points that are unclear. Do NOT invent what is unclear — base the questions only on ' +
     'what the ORIGINAL actually leaves open, and use placeholders where the reader must name a ' +
-    'specific item.',
+    'specific item. ' +
+    /**
+     * 🔴 v9 (2026-11-01 실측) — 6/6이 질문 없이 「확인해 보고 알려드리겠습니다」로 끝났다. 모델이 「원문에 모호한 점이
+     *    없다」고 보면 약속문으로 바뀌어 수락과 구별되지 않았다. 사용자가 이 방향을 고른 것 자체가 「더 알아야 한다」는 뜻이다.
+     */
+    'The reader chose this direction because THEY need more information, so the draft MUST ask the ' +
+    'sender at least one direct question, ending in a question mark. If the ORIGINAL leaves nothing ' +
+    'obviously open, ask about what the reader needs to know as a bracketed placeholder inside the ' +
+    'question (for example "Could you tell me a little more about [what I need to know]?"). Do NOT ' +
+    'close by promising the result — the reader cannot commit until they have the answer; at most ' +
+    'say they will proceed once they hear back. ' +
+    // 🔴 v9 1차 실측: 질문을 강제하자 「견적서를 언제 받아볼 수 있을까요?」처럼 **내 일**을 상대에게 묻는 질문이 3/3 나왔다.
+    'The question must be about the CONTENT or SCOPE of what the sender wants — which items, what ' +
+    'should change, what format, what the goal is — never about who delivers it or when the sender ' +
+    'can receive it. If the sender asked the reader to provide something, the reader still provides ' +
+    'it; the question only asks what exactly it should contain.',
   /**
    * 🔴 이 셋(v4)이 특히 지어내기 쉬운 방향이다 — 「정보 제공」은 회사·업무 설명을, 「진행 공유」는
    *    진척률을, 「거절」은 사유를 모델이 알 리 없다. 전부 자리표시자로 못박는다.
@@ -304,7 +323,10 @@ const REPLY_RULE =
   'given the message they received and the direction they want their reply to take. Write in a ' +
   'tone that is professional, warm, and direct — clear about what is being asked or agreed, ' +
   'without excessive apologising or hedging. Reply to what the ORIGINAL actually says; do not ' +
-  'respond to requests it does not make.';
+  'respond to requests it does not make. ' +
+  // 🔴 v9 — 「벌써 다음 주 목요일로 미뤄진」(수락 6건 중 2건). 원문에 없는 평가·감정 부사는 상대를 탓하는 말로 읽힌다.
+  'Do not add judging or emotional words the ORIGINAL does not carry — such as "already", "again", ' +
+  '"finally", "unfortunately" (in Korean: 벌써, 또, 드디어, 아쉽게도).';
 
 /**
  * @param {object} input
