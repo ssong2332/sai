@@ -899,3 +899,13 @@ test('용어 재호출도 실패해 첫 결과를 쓰면 참고 개수는 그대
   assert.ok(out.refined.includes('deployment'));
   assert.equal(out.threadContextCount, 1);
 });
+
+test('🔴 둘 다 용어가 모자라면 더 많이 반영한 쪽을 준다 — 원문 2곳 중 0곳보다 1곳', async () => {
+  const req = { ...GL_REQ, text: '배포 일정이 밀렸습니다. 금요일 배포 전에 QA 부탁드립니다.' };
+  const zero = goodRaw({ refined: 'The deployment slipped. QA before the Friday deployment?', backTranslation: '배포가 밀렸습니다. 금요일 배포 전에 QA 부탁드립니다.' });
+  const one = goodRaw({ refined: 'The ABC slipped. QA before the Friday release?', backTranslation: 'ABC가 밀렸습니다. 금요일 릴리스 전에 QA 부탁드립니다.' });
+  const out = await refine(req, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: seqFetch(zero, one) });
+  assert.ok(out.refined.includes('ABC'));
+  const back = await refine(req, { apiKey: 'k', cache: new MemoryCacheStore(), fetchImpl: seqFetch(one, zero) });
+  assert.ok(back.refined.includes('ABC'), '나중 것이 더 나쁘면 첫 결과');
+});

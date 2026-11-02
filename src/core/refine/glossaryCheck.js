@@ -16,6 +16,7 @@
  * | `appliedText`가 교정문에 있다 (대소문자·공백 무시) | ✅ 센다·강조   | 없음 |
  * | `appliedText`가 있는데 교정문에 없다               | ❌ 빼다        | 🔴 「용어집 「…」이(가) 교정문에 반영되지 않았어요」 |
  * | `appliedText`가 비었다                             | ❌ 빼다        | 없음 — 무엇을 찾을지 모른다(대조 불가 = 근거 없음) |
+ * | 교정문에 있지만 원문 횟수보다 적다 (2026-11-02)     | ✅ 센다·강조   | 🔴 「원문 N곳 중 M곳만 반영됐어요」 |
  * | 같은 `appliedText`가 여러 번 신고됐다              | 지금처럼 각각 센다 | 한 번만 |
  * | 폴백 결과                                          | ❌ (원래 빈 목록) | 없음 — 대조할 교정문이 없다 |
  *
@@ -25,6 +26,7 @@
  */
 
 import { occursIn } from './reasoning.js';
+import { countOccurrences } from './glossaryVerify.js';
 
 /**
  * @param {object|null} result `normalizeRefineResponse`의 결과.
@@ -34,20 +36,40 @@ import { occursIn } from './reasoning.js';
  * }} `applied` — 교정문에서 확인된 항목(화면의 「적용됨」·강조는 이것만 쓴다).
  *    `missing` — 신고됐지만 교정문에 없는 `appliedText`(경고용, 중복 없음).
  */
-export function checkGlossaryApplied(result) {
-  if (!result || typeof result !== 'object' || result.fallback) return { applied: [], missing: [] };
+export function checkGlossaryApplied(result, sourceText = '') {
+  if (!result || typeof result !== 'object' || result.fallback) return { applied: [], missing: [], partial: [] };
   const refined = String(result.refined ?? '');
   const entries = Array.isArray(result.appliedGlossary) ? result.appliedGlossary : [];
 
   const applied = [];
   const missing = [];
+  /**
+   * 🔴 2026-11-02 — 「일부만」: 원문에 두 번 나온 용어가 교정문에 한 번만 나왔다
+   *    ("The ABC schedule … before the Friday release"). 적용됨·초록은 그대로 두고 경고만 더한다.
+   *    원문(`sourceText`)을 모르면 셀 수 없으니 판정하지 않는다(예전 동작).
+   */
+  const partial = [];
   for (const entry of entries) {
     const target = String(entry?.appliedText ?? '').trim();
     if (target === '') continue;
-    if (occursIn(target, refined)) applied.push(entry);
-    else if (!missing.some((m) => m.toLowerCase() === target.toLowerCase())) missing.push(target);
+    if (occursIn(target, refined)) {
+      applied.push(entry);
+      const inSource = countOccurrences(entry?.sourceText, sourceText);
+      const inRefined = countOccurrences(target, refined);
+      if (inRefined < inSource && !partial.some((p) => p.appliedText.toLowerCase() === target.toLowerCase())) {
+        partial.push({ appliedText: target, inSource, inRefined });
+      }
+    } else if (!missing.some((m) => m.toLowerCase() === target.toLowerCase())) missing.push(target);
   }
-  return { applied, missing };
+  return { applied, missing, partial };
+}
+
+/** 「일부만」 화면 문구. 🔴 왜 덜 바뀌었는지 단정하지 않는다(대명사로 받았을 수도 있다). */
+export function glossaryPartialText(partial) {
+  if (!Array.isArray(partial) || partial.length === 0) return '';
+  return `${partial
+    .map((p) => `「${p.appliedText}」 원문 ${p.inSource}곳 중 ${p.inRefined}곳`)
+    .join(', ')}만 반영됐어요 — 나머지 자리는 다른 말로 바뀌었을 수 있어요. 보내기 전에 확인해 주세요.`;
 }
 
 /**
