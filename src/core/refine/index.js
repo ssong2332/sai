@@ -15,6 +15,7 @@ import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
 import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, isFormalAddress, checkBackTranslation } from './backcheck.js';
 import { checkNumbersPreserved } from './numberCheck.js';
+import { countMissingGlossary, reconcileAppliedGlossary } from './glossaryVerify.js';
 import {
   resolveProvider,
   classifyHttpFailure,
@@ -245,15 +246,18 @@ export async function refine(request, deps = {}) {
    * |---|---|---|
    * | `back` | 역번역이 교정문 복사·다른 언어(`checkBackTranslation`) — 통합 76건 중 1~3건 | 역번역 실패 안내 |
    * | `numbers` | 원문 숫자가 교정문에 없음(`checkNumbersPreserved`) — 실측: 「1,250만 원」→「1.250.000 KRW」(10배 작음) | 숫자 확인 필요 |
-   * 둘 다면 `numbers`가 먼저다(돈·날짜가 틀린 쪽이 더 위험하다). 두 번째 결과를 쓰는 조건: 약한 흠이 없거나,
-   * 첫 결과는 숫자가 빠졌고 두 번째는 역번역만 깨졌을 때.
+   * | `glossary` | 원문에 나온 용어의 등록된 말이 교정문에 없음(`glossaryVerify.js`) — 실측 2026-11-02: 팀 「배포 → ABC」 6회 중 2회 | 용어 반영 안 됨 |
+   * 여럿이면 `numbers` > `glossary` > `back` 순이다(돈·날짜가 틀린 쪽이 가장 위험하다). 두 번째 결과를 쓰는 조건:
+   * 약한 흠이 없거나, 두 번째의 흠이 첫 번째보다 뒤 순위일 때(예: 첫 결과는 숫자가 빠졌고 두 번째는 역번역만 깨졌다).
    */
+  const SOFT_RANK = { numbers: 0, glossary: 1, back: 2 };
   const softIssueOf = (candidate) => {
     const dropped = checkNumbersPreserved(
       { refined: candidate.refined, sourceLanguage: input.sourceLanguage, targetLanguage: input.targetLanguage },
       input.text,
     );
     if (dropped.length > 0) return 'numbers';
+    if (countMissingGlossary(candidate.refined, input.glossary, input.text) > 0) return 'glossary';
     const backUsable = checkBackTranslation({
       backTranslation: candidate.backTranslation,
       refined: candidate.refined,
@@ -320,7 +324,7 @@ export async function refine(request, deps = {}) {
         continue;
       }
       if (softResult) {
-        const secondIsBetter = softIssue === null || (softResult.kind === 'numbers' && softIssue === 'back');
+        const secondIsBetter = softIssue === null || SOFT_RANK[softIssue] > SOFT_RANK[softResult.kind];
         if (!secondIsBetter) {
           keepSoftResult();
           break;
@@ -353,6 +357,8 @@ export async function refine(request, deps = {}) {
    * 🔴 개수뿐이다. 맥락 본문은 응답에도 싣지 않는다.
    */
   result.threadContextCount = input.threadContext.length;
+  // 🔴 「적용됨」은 모델 신고가 아니라 등록된 말로 판정한다(`glossaryVerify.js` 판정표).
+  result = reconcileAppliedGlossary(result, input.glossary, input.text);
 
   cache.set(cacheKey, result);
   logger({
