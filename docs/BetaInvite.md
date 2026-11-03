@@ -1,7 +1,7 @@
-# 베타 초대 안내 (2단계 — Unlisted · 공개 링크, 2026-10-31)
+# 초대 안내 (공개 — 2026-11-02 스토어 공개, 0.1.74 · 2026-11-03 갱신)
 
 ## 금지
-- 🔴 2026-10-31 사용자 결정: 링크는 **공개**다 — 소개 사이트(`site/src/pages/Landing.jsx` `STORE_URL`) 「베타 체험하기」에 걸려 있다. 스토어 검색에는 나오지 않는다(미등록). 비용은 `docs/QualityModes.md` 5절 장치가 막는다.
+- 🔴 2026-11-02 사용자 결정: 스토어 **공개(검색에도 나온다)** — 소개 사이트(`site/src/pages/Landing.jsx` `STORE_URL`)에도 걸려 있다. 이달 추정 $95에서 전원 멈춤(`workers/refine/src/qualityAllowance.js` `MONTHLY_HARD_STOP_MICROS`). 비용은 `docs/QualityModes.md` 5절 장치가 막는다.
 - 🔴 안내문에 기능·한도를 코드와 다르게 쓰지 않는다 — 아래 표의 근거 열이 기준.
 - 키·토큰·서비스 계정 값을 안내문에 넣지 않는다.
 
@@ -9,8 +9,7 @@
 | 항목 | 값 | 근거 |
 |---|---|---|
 | 스토어 링크(짧은 형태) | `https://chromewebstore.google.com/detail/gdipbmakeghjecpenebjlfhgcajbikkg` | 2026-10-31 조회 200, 제목 「SAI — 해외 협업 메시지 다듬기」 |
-| 지금 스토어 버전 | **0.1.58**(2026-10-31 게시 — 공개 페이지 조회) | 대시보드 패키지 「게시됨 0.1.58」 |
-| 다음 업로드 | 0.1.59(설정 기본값 3개 변경) — 업로드·심사 뒤 자동 업데이트 | `sai-extension-0.1.59.zip`(`npm run pack:store`) |
+| 지금 스토어 버전 | **0.1.74**(2026-11-02 공개 게시 — 공개 페이지 조회) | 대시보드 「게시됨 0.1.74」 |
 | 문의처 | `asg21274@gmail.com` | `site/src/legal/privacy.html` 8절 |
 
 ## 2. 테스터에게 알려 줄 것
@@ -18,17 +17,17 @@
 |---|---|---|
 | 로그인 | 처음 다듬을 때 구글 로그인이 필요하다 | Worker는 Firebase ID 토큰만 받는다(Spec §0 교정 서버) |
 | 쓰는 법 | 메시지 입력창에서 문장을 선택 → 오른쪽 끝 Sai 아이콘 → 다듬기 결과를 「적용하기」 | 실확장 확인(`docs/QualityModes.md` 3-2) |
-| 하루 횟수 | 다듬기·뜻 풀기 합쳐 하루 100회 | `functions/refineQuota.js` `DAILY_REFINE_LIMIT` |
+| 하루 횟수 | 다듬기·뜻 풀기·회신 합쳐 하루 20회(2026-11-02 100 → 20) | `functions/refineQuota.js` `DAILY_REFINE_LIMIT` |
 | 품질 모드(0.1.58부터) | 빠른(처음 설정) · 기본 하루 10회 · 심층 하루 3회, 넘으면 빠른으로 다듬음 | `src/core/refine/quality.js` |
 | 본문 저장 | 메시지 본문은 서버에 저장하지 않는다 | Spec 필수 5 · 처리방침 |
 | 결과의 성격 | AI 제안이라 틀릴 수 있다 — 보내기 전에 한 번 읽어 보기 | `site/src/legal/terms.html` |
 
 ## 3. 초대 메시지 (붙여 넣기용)
 ```
-안녕하세요, 해외 협업 메시지를 다듬어 주는 크롬 확장 「사이(SAI)」 베타에 초대합니다.
+안녕하세요, 해외 협업 메시지를 다듬어 주는 크롬 확장 「사이(SAI)」를 소개합니다.
 
 설치: https://chromewebstore.google.com/detail/gdipbmakeghjecpenebjlfhgcajbikkg
-(소개 사이트 https://sai-global-msg-2026.web.app 의 「베타 체험하기」로도 설치할 수 있어요.)
+(소개 사이트 https://sai-global-msg-2026.web.app 에서도 설치할 수 있어요.)
 
 쓰는 법
 1. 크롬에서 위 링크로 설치합니다.
@@ -37,7 +36,7 @@
    처음 한 번은 구글 로그인이 필요합니다.
 
 알아 두실 것
-- 하루 100회까지 쓸 수 있습니다.
+- 지금은 팀 기능까지 모두 무료이고, 하루 20회까지 쓸 수 있습니다.
 - 메시지 본문은 서버에 저장하지 않습니다.
 - AI가 만든 제안이라 틀릴 수 있으니 보내기 전에 한 번 읽어 주세요.
 
@@ -45,5 +44,5 @@
 ```
 
 ## 4. 남은 것
-- 🟡 사용량 — 공개 링크라 사용자 수를 정할 수 없다. 월 $100 예산 기준 하루 15건 쓰는 사람(추정)으로 빠른만 약 290명, 상위 모드를 섞으면 약 27명(`docs/QualityModes.md` 5절 앞 계산). 넘으면 상위 모드가 빠른으로 내려가고 콘솔 한도 $100에서 멈춘다. Worker 주간 점검(`npm --prefix workers/refine run report`)으로 사용량을 본다.
+- 🟡 사용량 — 공개라 사용자 수를 정할 수 없다. 인원 추정과 채널 순서는 `docs/marketing/LaunchPlan.md` 3절. 이달 비용 단계는 UptimeRobot 「SAI 이달 비용」이 $50부터 알린다.
 - 🟡 피드백을 이메일로만 받을지 — 설문 등은 아직 없다.

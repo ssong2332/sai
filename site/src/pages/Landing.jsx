@@ -14,7 +14,7 @@ import Segmented from '../components/Segmented.jsx';
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 /**
- * Chrome 웹 스토어 설치 링크(2026-10-31 사용자 결정 — 미등록 항목을 소개 사이트에 공개, 「베타 체험」).
+ * Chrome 웹 스토어 설치 링크(2026-10-31 미등록 항목을 소개 사이트에 공개 → 2026-11-02 사용자 결정 스토어 공개, 「무료로 시작하기」).
  * 🔴 짧은 형태(ID만) — 스토어가 이름 붙은 주소로 넘긴다. 근거·한도 안내는 `docs/BetaInvite.md`.
  */
 const STORE_URL = 'https://chromewebstore.google.com/detail/gdipbmakeghjecpenebjlfhgcajbikkg';
@@ -165,7 +165,7 @@ function Hero() {
         <div className="ctas">
           <a href={STORE_URL} className="btn primary press" target="_blank" rel="noopener noreferrer">
             <span className="soon-dot" aria-hidden="true" />
-            Chrome에 추가 · 베타 체험하기
+            Chrome에 추가 · 무료로 시작하기
           </a>
           <a href="#write" className="btn ghost press">
             어떻게 동작하나요
@@ -947,10 +947,10 @@ function Start() {
               1
             </b>
             <h3>설치</h3>
-            <p>Chrome 웹 스토어에서 추가하세요. 지금은 베타라 하루에 쓸 수 있는 횟수에 한도가 있어요.</p>
+            <p>Chrome 웹 스토어에서 추가하세요. 지금은 팀 기능까지 모두 무료이고, 하루 20회까지 쓸 수 있어요.</p>
             <a href={STORE_URL} className="soon-pill press" target="_blank" rel="noopener noreferrer">
               <span className="soon-dot" aria-hidden="true" />
-              베타 체험하기
+              무료로 설치하기
             </a>
           </Reveal>
           <Reveal as="li" className="start-card" delay={2}>
