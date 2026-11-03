@@ -35,7 +35,7 @@ $src = (Resolve-Path 'docs/marketing/assets/cards.html').Path -replace '\','/'; 
 | 구성 | 컷 11개(박 0.6초에 맞춤): 보내기 전에, → 한 번 더. → 톤·긴급도·뉘앙스 → 한국어 입력 → 영어 다듬기 → 노트북(실제 화면) → circle back = 보류 → 속뜻까지 → 시간대 → 팀 용어집 배포→deploy → 본문 저장 안 함 → 로고·주소 |
 | 이미지 | `assets/gen-laptop.png` · `gen-bubbles.png` = GPT 이미지 생성(Codex CLI `codex exec -m gpt-5.6-sol`, 기본 설정 모델 `gpt-6.1-sol`은 ChatGPT 계정에서 400). 노트북 화면 안은 실제 스토어 스크린샷 1번(`laptop-sai.png`) |
 | 참고 | github.com/yihui-dev/awesome-opus5-5-videos 의 「Apple Evolution Motion Graphics」·「SaaS Launch Video」 프롬프트(줌·타이핑·빠른 전환) |
-| 소리 | `make_kinetic_audio.py` — 100bpm 합성 음악 + 컷 타격음·전환 바람 소리·타이핑·끝 장 상승음과 화음(직접 합성) |
+| 소리 | `make_kinetic_audio.py`(큐 파일 없이) → 전용 `kinetic_track.py`. 🔴 2026-11-03 2판(사용자 「브금 별로 · 효과음 다듬어」): 릴스 팝 대신 100bpm 일렉트로닉 — Am9→Fmaj9→Cadd9→G6, 첫 마디 스네어 롤 → 2.4초에 터짐, 4박 킥·사이드체인 스탭·엇박 베이스·FM 벨, 12.3초에 멈췄다 12.9초 Cadd9로 마무리. 효과음: 컷 = 밝은 타격(저음 뺌), 글자 = 음정 「톡」, 전환 = 컷까지 차오르는 바람(좌↔우), 키 소리 두 겹, 끝 장 깊은 타격·반짝임. -14.3 LUFS · 최고점 -0.6 dBFS(AAC 뒤) · 80Hz 아래 에너지 40%(1판 55%) |
 
 다시 만들기:
 ```
@@ -44,6 +44,7 @@ python -I docs/marketing/assets/make_kinetic_audio.py <소리.wav>
 <ffmpeg> -framerate 30 -i <프레임 폴더>/f%04d.png -i <소리.wav> -map 0:v -map 1:a -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart docs/marketing/out/promo-kinetic-15s.mp4
 ```
 🔴 컷 시각을 바꾸면 `kinetic.html` `SCENES`와 `make_kinetic_audio.py` `HITS`·`SCENE_CUTS`를 같이 바꾼다. 한 장면 확인: `kinetic.html?t=6.0`.
+소리만 바꿀 때(그림 그대로): `<ffmpeg> -i <옛 mp4> -i <소리.wav> -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart <새 mp4>` (2026-11-03 실행).
 
 ## 홍보 영상 3편 추가 (2026-11-03 — awesome-opus5-5-videos 프롬프트 참고)
 | 파일 | 길이 | 참고 프롬프트 | 사이로 옮긴 것 |

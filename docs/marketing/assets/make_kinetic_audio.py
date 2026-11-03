@@ -63,6 +63,14 @@ def main():
     global TOTAL, HITS, SCENE_CUTS, TYPING
     out = sys.argv[1]
     riser_at, final_at, music_gain = (12.3, 0.6), 12.9, 0.55
+    if len(sys.argv) == 2:  # kinetic.html — 전용 음악·효과음(kinetic_track.py, 2026-11-03 2판)
+        spec2 = importlib.util.spec_from_file_location("kt", Path(__file__).with_name("kinetic_track.py"))
+        kt = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(kt)
+        n = int(TOTAL * SR)
+        mix = kt.music(TOTAL, final_at, riser_at[0])[:n] * 0.8 + kt.sfx(TOTAL, HITS, SCENE_CUTS, TYPING, riser_at, final_at)[:n]
+        mix *= ma.env(n, 0.005, 0.8)[:, None]
+        return write(out, np.tanh(mix * 1.5) / 1.5, -1.5)  # 부드럽게 눌러 약 -13 LUFS · 실제 최고점 -1 dBFS 아래
     if len(sys.argv) > 2:
         import json
         cue = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
@@ -90,8 +98,11 @@ def main():
     fx = ma.reverb(fx, 0.6, 0.15)
     mix = bed + fx[:, None]
     mix *= ma.env(n, 0.02, 1.0)[:, None]
-    mix = np.tanh(mix * 1.4) / 1.4
-    mix *= 10 ** (-1 / 20) / np.max(np.abs(mix))
+    write(out, np.tanh(mix * 1.4) / 1.4)
+
+
+def write(out, mix, peak_db=-1):
+    mix = mix * 10 ** (peak_db / 20) / np.max(np.abs(mix))
     with wave.open(out, "wb") as w:
         w.setnchannels(2)
         w.setsampwidth(2)
