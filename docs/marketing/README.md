@@ -9,7 +9,7 @@
 | `LaunchPlan.md` | 대상·말할 것·채널 순서·예산 |
 | `LaunchPosts.md` | 채널별 글·캡션·대본(5절 인스타·쇼츠·Threads) |
 | `assets/cards.html` | 카드뉴스 원본(`?s=a1`…`b6`) |
-| `assets/video.html` · `assets/make_video.py` | 세로 영상 장면 원본 · 이어 붙이기 |
+| `assets/video.html` · `assets/make_video.py` · `make_audio.py` · `make_voice.py` | 세로 영상 장면 원본 · 이어 붙이기 · 음악·효과음 합성 · 내레이션 |
 | `assets/ui-*.png` | 스토어 스크린샷 1·2번에서 잘라 낸 실제 팝업 |
 | `out/` | 만든 결과(PNG 12장 · mp4 2편) |
 
@@ -21,7 +21,7 @@ $src = (Resolve-Path 'docs/marketing/assets/cards.html').Path -replace '\','/'; 
 영상(소리 없는 원본): 위와 같은 명령으로 `video.html`을 `--window-size=1080,1920`, 장면 `v1-1`…`v1-5`·`v2-1`…`v2-5`로 한 폴더에 렌더 → `python -I docs/marketing/assets/make_video.py <장면 폴더> v1 <무음.mp4> [장면 길이]`.
 
 소리:
-1. (내레이션 버전만) 한국어 음성 — PowerShell `System.Speech`, 음성 `Microsoft Heami Desktop`, Rate 1, 44.1kHz 16비트 모노로 `<폴더>1-1.wav`…`v2-5.wav`. 문장은 `LaunchPosts.md` 5-5.
+1. (내레이션 버전만) `python -I docs/marketing/assets/make_voice.py <내레이션 폴더>` — Microsoft 신경망 음성 ko-KR-SunHiNeural(edge-tts 7.3.1). 🔴 문장이 Microsoft 서비스로 간다 — 공개 문장만. 🔴 2026-11-03 첫 호출이 403(`WSServerHandshakeError`)이었다가 잠시 뒤 다시 하니 됐다 — 일시 장애였다.
 2. `python -I docs/marketing/assets/make_audio.py v1 <소리.wav> [내레이션 폴더]` → 마지막 줄 장면 길이를 영상의 [장면 길이]로 넘긴다(내레이션 없으면 생략 — 17.2초).
 3. 합치기: `<ffmpeg> -i <무음.mp4> -i <소리.wav> -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest <결과.mp4>` — ffmpeg는 `python -c "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())"`.
 🔴 cv2.imread는 Windows 한글 경로를 못 연다 — make_video.py는 바이트로 읽는다.

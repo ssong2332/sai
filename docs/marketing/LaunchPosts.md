@@ -123,9 +123,9 @@
 | `docs/marketing/out/card-a1~a6.png` | 1080×1350(4:5) 6장 | 「해외 동료의 이 말, 진짜 뜻은?」 — 뜻 풀기 예시 3 + 쓰는 법 + 설치 | `assets/cards.html?s=a1…` |
 | `docs/marketing/out/card-b1~b6.png` | 1080×1350 6장 | 「이 한국어, 영어로 어떻게 보내지?」 — 다듬기 예시 3 + 쓰는 법 + 설치 | `assets/cards.html?s=b1…` |
 | `docs/marketing/out/reel-1-decode.mp4` | 1080×1920 · 17.2초 · H.264 · AAC 음악·효과음 | 「Let's circle back」 직역 vs 실제 의도 | `assets/video.html?s=v1-1…` → `make_video.py` + `make_audio.py` |
-| `docs/marketing/out/reel-1-decode-voice.mp4` | 같음 · 23.7초 · 내레이션 추가 | 위 + 한국어 내레이션(Windows 「Microsoft Heami」 음성) | 같음 |
+| `docs/marketing/out/reel-1-decode-voice.mp4` | 같음 · 22.4초 · 내레이션 추가 | 위 + 한국어 내레이션(Microsoft 신경망 음성 SunHi, `make_voice.py`) | 같음 |
 | `docs/marketing/out/reel-2-refine.mp4` | 1080×1920 · 17.2초 · 음악·효과음 | 「빨리 해주세요」 다듬기 + 역번역 | `assets/video.html?s=v2-1…` |
-| `docs/marketing/out/reel-2-refine-voice.mp4` | 21.9초 · 내레이션 추가 | 위 + 한국어 내레이션 | 같음 |
+| `docs/marketing/out/reel-2-refine-voice.mp4` | 21.3초 · 내레이션 추가 | 위 + 한국어 내레이션(SunHi) | 같음 |
 다시 만드는 명령은 `docs/marketing/README.md`.
 
 ### 5-2. 인스타그램 캡션
@@ -157,7 +157,7 @@
 #비즈니스영어 #영어메일 #업무메일 #해외협업 #크롬확장 #생산성
 ```
 **릴스 1 · 2** — 위 캡션 첫 두 줄 + 「설치는 프로필 링크에서」.
-🔴 소리: 배경음악·효과음은 `make_audio.py`로 직접 합성한 것이라 저작권 문제가 없다. 내레이션은 Windows 기본 음성이라 기계음이다 — 어색하면 음악 버전을 올리고 인스타 앱의 「보이스오버」로 직접 녹음하거나 앱 음원으로 바꾼다. 앱 음원을 쓰면 원래 소리를 꺼야 겹치지 않는다.
+🔴 소리: 배경음악·효과음은 `make_audio.py`로 직접 합성한 것이라 저작권 문제가 없다. 2026-11-03 사용자 지적 「기계음 · 배경음악이 별로」로 고쳤다 — 내레이션은 Windows Heami → Microsoft 신경망 음성 SunHi(edge-tts), 음악은 96bpm 사인파 패드 → 112bpm 밝은 팝(F–C–Dm–B♭). 내레이션 중 음악은 25%로 낮춰 목소리가 약 10.9dB 크다(실측). 그래도 어색하면 음악 버전에 인스타 「보이스오버」로 직접 녹음한다. 앱 음원을 쓰면 원래 소리를 꺼야 겹치지 않는다.
 
 ### 5-3. 릴스·쇼츠 대본 (직접 찍을 3편 — 실제 화면 녹화)
 | # | 제목 | 장면(초) | 찍는 곳 |

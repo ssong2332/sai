@@ -3,22 +3,23 @@
 쓰는 법(저장소 루트):
   python -I docs/marketing/assets/make_audio.py <v1|v2> <출력.wav> [내레이션 폴더]
   → 마지막 줄에 장면 길이(쉼표 목록)를 찍는다. 그 값을 make_video.py 네 번째 인자로 넘겨 영상 길이를 맞춘다.
-내레이션 폴더에는 <v1|v2>-1.wav … -5.wav (Windows 「Microsoft Heami」 음성, README 명령) — 없으면 음악·효과음만.
+내레이션 폴더에는 <v1|v2>-1.wav … -5.wav (`make_voice.py` 결과) — 없으면 음악·효과음만.
 
-음악: 96bpm, Fmaj7 → Em7 → Dm7 → Cmaj7 반복. 패드 + 베이스 + 부드러운 킥 + 하이햇 + 아르페지오.
-효과음: 장면이 들어올 때 짧은 「뽁」, 나갈 때 바람 소리. 내레이션이 나오는 동안 음악을 45%로 낮춘다.
-필요: numpy만.
+음악: 112bpm, F → C → Dm → B♭ 반복. 사이드체인 패드 + 당김음 베이스 + 킥·클랩·하이햇 + 점8분 딜레이 멜로디, 잔향.
+효과음: 장면이 들어올 때 짧은 「뽁」, 나갈 때 바람 소리. 내레이션이 나오는 동안 음악을 25%로 낮춘다(목소리가 약 10dB 크게).
+필요: numpy · scipy.
 """
 import sys
 import wave
 from pathlib import Path
 
 import numpy as np
+from scipy.signal import butter, fftconvolve, lfilter
 
 SR = 44100
 DEFAULT = [3.2, 2.8, 4.4, 3.6, 3.2]  # make_video.py DURATIONS와 같다
 FADE = 0.35
-BPM = 96
+BPM = 112
 BEAT = 60 / BPM
 rng = np.random.default_rng(7)
 
@@ -27,8 +28,11 @@ def midi(n):
     return 440.0 * 2 ** ((n - 69) / 12)
 
 
-CHORDS = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [48, 52, 55, 59]]  # Fmaj7 Em7 Dm7 Cmaj7
-ROOTS = [41, 40, 38, 36]
+# 🔴 2026-11-03 사용자 지적 「배경음악이 별로」 — 96bpm 사인파 패드(잔잔·밋밋)를 112bpm 밝은 팝으로 바꿨다.
+# 진행 F → C → Dm → B♭ (I–V–vi–IV, add9 보이싱). 첫 마디는 패드·하이햇만(시작), 둘째 마디부터 드럼·베이스·멜로디.
+CHORDS = [[53, 57, 60, 67], [48, 55, 60, 62], [50, 57, 60, 64], [46, 53, 58, 60]]
+ROOTS = [29, 36, 26, 34]
+HOOK = [(0, 72), (0.5, 74), (1, 77), (2, 76), (2.5, 74), (3, 72), (4, 69), (4.5, 72), (5, 74), (6, 72), (7, 69)]  # (박, 음) 두 마디
 
 
 def env(n, attack, release):
@@ -41,52 +45,93 @@ def env(n, attack, release):
     return e
 
 
-def lowpass(x, cutoff):
-    a = np.exp(-2 * np.pi * cutoff / SR)
-    y = np.empty_like(x)
-    acc = 0.0
-    for i, v in enumerate(x):  # 한 극 필터 — 길이가 짧아 충분히 빠르다
-        acc = (1 - a) * v + a * acc
-        y[i] = acc
-    return y
+def lowpass(x, cutoff, order=2):
+    b, a = butter(order, cutoff / (SR / 2), btype="low")
+    return lfilter(b, a, x)
+
+
+def band(x, lo, hi):
+    b, a = butter(2, [lo / (SR / 2), hi / (SR / 2)], btype="band")
+    return lfilter(b, a, x)
 
 
 def add(buf, start, sig):
     s = int(start * SR)
-    if s >= len(buf):
+    if s >= len(buf) or s < 0:
         return
     e = min(len(buf), s + len(sig))
     buf[s:e] += sig[: e - s]
 
 
+def saw(freq, t, voices=3, detune=0.006):
+    out = 0
+    for k in range(voices):
+        f = freq * (1 + detune * (k - (voices - 1) / 2))
+        ph = (f * t + rng.random()) % 1.0
+        out = out + (2 * ph - 1)
+    return out / voices
+
+
+def reverb(x, seconds=1.4, mix=0.25):
+    n = int(seconds * SR)
+    ir = rng.standard_normal(n) * np.exp(-np.arange(n) / SR * 4.5)
+    ir = lowpass(ir, 5000)
+    wet = fftconvolve(x, ir)[: len(x)]
+    wet *= np.max(np.abs(x)) / (np.max(np.abs(wet)) + 1e-9)
+    return x * (1 - mix) + wet * mix
+
+
 def music(total):
     n = int(total * SR)
-    pad_l, pad_r, beat = np.zeros(n), np.zeros(n), np.zeros(n)
+    pad, bass, drums, lead, hats = (np.zeros(n) for _ in range(5))
+    pump = np.ones(n)
     bar = BEAT * 4
-    t_bar = np.arange(int(bar * SR)) / SR
-    for b in range(int(total / bar) + 1):
-        chord, root = CHORDS[b % 4], ROOTS[b % 4]
-        e = env(len(t_bar), 0.25, 0.4)
-        l = sum(np.sin(2 * np.pi * midi(m) * t_bar) + 0.3 * np.sin(4 * np.pi * midi(m) * t_bar) for m in chord)
-        r = sum(np.sin(2 * np.pi * midi(m) * 1.003 * t_bar) + 0.3 * np.sin(4 * np.pi * midi(m) * 1.003 * t_bar) for m in chord)
-        add(pad_l, b * bar, 0.05 * l * e)
-        add(pad_r, b * bar, 0.05 * r * e)
-        for k in range(4):  # 베이스 · 킥 · 하이햇 · 아르페지오
-            t0 = b * bar + k * BEAT
-            tb = np.arange(int(BEAT * SR)) / SR
-            if k in (0, 2):
-                add(beat, t0, 0.16 * np.sin(2 * np.pi * midi(root) * tb) * np.exp(-tb * 3))
-            tk = np.arange(int(0.18 * SR)) / SR
-            add(beat, t0, 0.22 * np.sin(2 * np.pi * (45 + 75 * np.exp(-tk * 30)) * tk) * np.exp(-tk * 18))
-            th = np.arange(int(0.03 * SR)) / SR
-            hat = np.diff(rng.standard_normal(len(th) + 1)) * np.exp(-th * 120)
-            add(beat, t0 + BEAT / 2, 0.025 * hat)
-            for j in range(2):
-                note = chord[(k * 2 + j) % 4] + 12
-                tp = np.arange(int(0.5 * SR)) / SR
-                add(beat, t0 + j * BEAT / 2, 0.035 * np.sin(2 * np.pi * midi(note) * tp) * np.exp(-tp * 7))
-    pad_l, pad_r = lowpass(pad_l, 1800), lowpass(pad_r, 1800)
-    return np.stack([pad_l + beat, pad_r + beat], axis=1)
+    tb = np.arange(int(bar * SR)) / SR
+    bars = int(total / bar) + 1
+    for b in range(bars):
+        chord, root, t0 = CHORDS[b % 4], ROOTS[b % 4], b * bar
+        add(pad, t0, sum(saw(midi(m), tb) for m in chord) * env(len(tb), 0.08, 0.25) * 0.10)
+        for k in range(8):  # 하이햇 8분음표(세기 흔들기)
+            th = np.arange(int(0.04 * SR)) / SR
+            add(hats, t0 + k * BEAT / 2, rng.standard_normal(len(th)) * np.exp(-th * 90) * (0.05 if k % 2 else 0.03))
+        if b == 0:
+            continue  # 첫 마디는 들어오는 부분
+        for k in range(4):
+            tk = np.arange(int(0.25 * SR)) / SR
+            if k in (0, 2):  # 킥 + 사이드체인
+                kick = np.sin(2 * np.pi * (48 + 110 * np.exp(-tk * 28)) * tk) * np.exp(-tk * 11)
+                kick[: int(0.004 * SR)] += 0.4
+                add(drums, t0 + k * BEAT, kick * 0.55)
+                d = np.minimum(1, 0.35 + tk / 0.22 * 0.65)
+                s = int((t0 + k * BEAT) * SR)
+                pump[s: s + len(d)] = np.minimum(pump[s: s + len(d)], d[: max(0, n - s)])
+            else:  # 클랩 2·4박
+                tc = np.arange(int(0.2 * SR)) / SR
+                clap = band(rng.standard_normal(len(tc)), 900, 4500) * np.exp(-tc * 22)
+                clap += 0.3 * np.sin(2 * np.pi * 190 * tc) * np.exp(-tc * 30)
+                add(drums, t0 + k * BEAT, clap * 0.35)
+        for beat in (0, 1.5, 2, 3, 3.5):  # 베이스 당김음
+            tl = np.arange(int(BEAT * 0.45 * SR)) / SR
+            add(bass, t0 + beat * BEAT, saw(midi(root + 12), tl, voices=1) * env(len(tl), 0.005, 0.05) * 0.5)
+        half = ((b - 1) % 2) * 4  # 멜로디 두 마디 중 이번 마디가 앞(0)인지 뒤(4)인지
+        for beat, note in HOOK:
+            if half <= beat < half + 4:
+                tp = np.arange(int(0.6 * SR)) / SR
+                f = midi(note)
+                pluck = (np.sin(2 * np.pi * f * tp) + 0.4 * np.sin(4 * np.pi * f * tp) + 0.15 * np.sin(6 * np.pi * f * tp)) * np.exp(-tp * 6)
+                add(lead, t0 + (beat - half) * BEAT, pluck * 0.22)
+    pad = reverb(lowpass(pad, 1400), 1.6, 0.35) * pump
+    bass = lowpass(bass, 380) * pump
+    delay = int(BEAT * 0.75 * SR)  # 점8분 딜레이
+    echo = np.zeros(n)
+    echo[delay:] = lead[:-delay] * 0.35
+    echo[2 * delay:] += lead[:-2 * delay] * 0.15
+    lead = reverb(lead + echo, 1.2, 0.3)
+    hats = band(hats, 6000, 15000) * 2.6
+    mono = pad + bass + drums + hats
+    left = mono + lead * 0.9 + np.roll(pad, 220) * 0.15
+    right = mono + np.roll(lead, 300) * 0.9 + np.roll(pad, 400) * 0.15
+    return np.tanh(np.stack([left, right], axis=1) * 1.2) / 1.2
 
 
 def sfx(total, durations):
@@ -133,7 +178,7 @@ def main():
             s = int((t + FADE) * SR)
             e = min(n, s + len(v))
             narration[s:e] += v[: e - s] * 0.9
-            duck[max(0, s - int(0.15 * SR)): e + int(0.2 * SR)] = 0.45
+            duck[max(0, s - int(0.15 * SR)): e + int(0.2 * SR)] = 0.25  # 목소리가 음악보다 약 10dB 크게(0.45는 5.6dB뿐 — 2026-11-03 실측)
             t += d
         duck = lowpass(duck, 8)  # 갑자기 바뀌지 않게
     mix = bed * duck[:, None] + sfx(total, durations)[:n] + narration[:, None]
