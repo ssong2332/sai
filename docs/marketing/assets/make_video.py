@@ -1,7 +1,8 @@
 """장면 PNG(video.html 렌더)를 이어 붙여 세로 mp4를 만든다 (2026-11-03).
 
-쓰는 법(저장소 루트): python -I docs/marketing/assets/make_video.py <장면 폴더> <v1|v2> <출력.mp4>
-효과: 장면마다 1.04배 → 1배로 살짝 당겨지며 등장(0.6초), 장면 사이 흰 화면을 거치는 전환(나갈 때·들어올 때 각 0.35초). 소리 없음 — 음악은 앱에서 얹는다.
+쓰는 법(저장소 루트): python -I docs/marketing/assets/make_video.py <장면 폴더> <v1|v2> <출력.mp4> [장면 길이 쉼표 목록]
+장면 길이를 안 주면 DURATIONS. 소리는 make_audio.py가 같은 길이로 만들어 따로 붙인다.
+효과: 장면마다 1.04배 → 1배로 살짝 당겨지며 등장(0.6초), 장면 사이 흰 화면을 거치는 전환(나갈 때·들어올 때 각 0.35초). 소리는 없다 — make_audio.py 결과를 ffmpeg로 붙인다(README).
 필요: numpy · opencv-python · imageio-ffmpeg(H.264 인코더가 들어 있다).
 """
 import sys
@@ -39,12 +40,13 @@ def zoomed(img, t):
 
 def main():
     folder, name, out = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+    durations = [float(x) for x in sys.argv[4].split(",")] if len(sys.argv) > 4 else DURATIONS
     scenes = [load(folder / f"{name}-{i}.png") for i in range(1, 6)]
     writer = imageio_ffmpeg.write_frames(out, (W, H), fps=FPS, codec="libx264", pix_fmt_out="yuv420p",
                                          quality=None, bitrate="6M", macro_block_size=8)
     writer.send(None)
     frames = 0
-    for i, (img, dur) in enumerate(zip(scenes, DURATIONS)):
+    for i, (img, dur) in enumerate(zip(scenes, durations)):
         n = int(dur * FPS)
         for f in range(n):
             t = f / FPS
