@@ -67,11 +67,12 @@
   <div class="c mega" id="s8b" style="top:990px;font-size:220px;color:var(--dusk)">08:24</div>
   <div class="c mega" id="s8t" style="top:1290px;font-size:84px;color:var(--ink)">상대 시간까지, 한눈에.</div>
 </section>
-<!-- S9 10.8–12.0 용어집 -->
+<!-- S9 10.8–12.0 용어집 — 🔴 「배포 → ABC」는 사용자가 동작 확인용으로 넣은 시험 용어라 쓰지 않는다(2026-11-03 사용자 지적). 실제로 흔한 팀 용어 예시로 -->
 <section class="scene" id="s9" style="background:var(--ink)">
   <div class="c mega" id="s9a" style="top:760px;font-size:230px;color:#fff">배포</div>
-  <div class="c mega" id="s9b" style="top:760px;font-size:230px;color:var(--seam)">ABC</div>
-  <div class="c mega" id="s9t" style="top:1080px;font-size:90px;color:#fff">회사 용어는 그대로.</div>
+  <div class="c" id="s9tag" style="top:640px;font-size:46px;font-weight:700;color:#8b95a1">팀 용어집</div>
+  <div class="c mega" id="s9b" style="top:760px;font-size:230px;color:var(--seam)">deploy</div>
+  <div class="c mega" id="s9t" style="top:1080px;font-size:90px;color:#fff">팀이 정한 단어로.</div>
 </section>
 <!-- S10 12.0–12.9 본문 저장 안 함 -->
 <section class="scene" id="s10" style="background:var(--seam)">
@@ -174,6 +175,7 @@
       $('s9b').style.transform = `translateY(${(1 - outBack(p)) * 260}px)`;
       $('s9b').style.opacity = p;
       if (t < 11.1) slam($('s9a'), t, 10.8, 1.3);
+      slam($('s9tag'), t, 10.8, 1.1);
       slam($('s9t'), t, 11.4, 1.3);
     }
     if (cur === 's10') { slam($('s10a'), t, 12.0, 1.6); slam($('s10b'), t, 12.3, 1.6); slam($('s10c'), t, 12.6, 1.6); }

@@ -32,7 +32,7 @@ $src = (Resolve-Path 'docs/marketing/assets/cards.html').Path -replace '\','/'; 
 | 항목 | 값 |
 |---|---|
 | 규격 | 1080×1920(9:16) · 15.0초 · 30fps · H.264 CRF 18 · AAC 192k |
-| 구성 | 컷 11개(박 0.6초에 맞춤): 보내기 전에, → 한 번 더. → 톤·긴급도·뉘앙스 → 한국어 입력 → 영어 다듬기 → 노트북(실제 화면) → circle back = 보류 → 속뜻까지 → 시간대 → 배포→ABC → 본문 저장 안 함 → 로고·주소 |
+| 구성 | 컷 11개(박 0.6초에 맞춤): 보내기 전에, → 한 번 더. → 톤·긴급도·뉘앙스 → 한국어 입력 → 영어 다듬기 → 노트북(실제 화면) → circle back = 보류 → 속뜻까지 → 시간대 → 팀 용어집 배포→deploy → 본문 저장 안 함 → 로고·주소 |
 | 이미지 | `assets/gen-laptop.png` · `gen-bubbles.png` = GPT 이미지 생성(Codex CLI `codex exec -m gpt-5.6-sol`, 기본 설정 모델 `gpt-6.1-sol`은 ChatGPT 계정에서 400). 노트북 화면 안은 실제 스토어 스크린샷 1번(`laptop-sai.png`) |
 | 참고 | github.com/yihui-dev/awesome-opus5-5-videos 의 「Apple Evolution Motion Graphics」·「SaaS Launch Video」 프롬프트(줌·타이핑·빠른 전환) |
 | 소리 | `make_kinetic_audio.py` — 100bpm 합성 음악 + 컷 타격음·전환 바람 소리·타이핑·끝 장 상승음과 화음(직접 합성) |
