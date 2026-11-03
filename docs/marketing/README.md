@@ -27,3 +27,20 @@ $src = (Resolve-Path 'docs/marketing/assets/cards.html').Path -replace '\','/'; 
 🔴 cv2.imread는 Windows 한글 경로를 못 연다 — make_video.py는 바이트로 읽는다.
 
 🔴 장 번호는 쿼리(`?s=`)로 — 해시는 headless 스크린샷에서 무시돼 빈 장이 나왔다. 🔴 스크립트에서 전역 `top` 이름을 쓰지 않는다(window.top과 겹쳐 스크립트가 죽는다). 🔴 `--allow-file-access-from-files`를 빼면 글꼴·팝업 이미지를 못 읽는다.
+
+## 키네틱 홍보 영상 15초 (`out/promo-kinetic-15s.mp4`, 2026-11-03)
+| 항목 | 값 |
+|---|---|
+| 규격 | 1080×1920(9:16) · 15.0초 · 30fps · H.264 CRF 18 · AAC 192k |
+| 구성 | 컷 11개(박 0.6초에 맞춤): 보내기 전에, → 한 번 더. → 톤·긴급도·뉘앙스 → 한국어 입력 → 영어 다듬기 → 노트북(실제 화면) → circle back = 보류 → 속뜻까지 → 시간대 → 배포→ABC → 본문 저장 안 함 → 로고·주소 |
+| 이미지 | `assets/gen-laptop.png` · `gen-bubbles.png` = GPT 이미지 생성(Codex CLI `codex exec -m gpt-5.6-sol`, 기본 설정 모델 `gpt-6.1-sol`은 ChatGPT 계정에서 400). 노트북 화면 안은 실제 스토어 스크린샷 1번(`laptop-sai.png`) |
+| 참고 | github.com/yihui-dev/awesome-opus5-5-videos 의 「Apple Evolution Motion Graphics」·「SaaS Launch Video」 프롬프트(줌·타이핑·빠른 전환) |
+| 소리 | `make_kinetic_audio.py` — 100bpm 합성 음악 + 컷 타격음·전환 바람 소리·타이핑·끝 장 상승음과 화음(직접 합성) |
+
+다시 만들기:
+```
+node docs/marketing/assets/make_kinetic.mjs <프레임 폴더> 15
+python -I docs/marketing/assets/make_kinetic_audio.py <소리.wav>
+<ffmpeg> -framerate 30 -i <프레임 폴더>/f%04d.png -i <소리.wav> -map 0:v -map 1:a -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart docs/marketing/out/promo-kinetic-15s.mp4
+```
+🔴 컷 시각을 바꾸면 `kinetic.html` `SCENES`와 `make_kinetic_audio.py` `HITS`·`SCENE_CUTS`를 같이 바꾼다. 한 장면 확인: `kinetic.html?t=6.0`.

@@ -1,0 +1,198 @@
+<!doctype html>
+<!--
+  소개 사이트 홍보 영상 — 키네틱 타이포 · 빠른 컷 · 9:16 · 15초 (2026-11-03 사용자 요청 「키네틱 방식의 애플 광고 디자인 컨셉」).
+  시간 함수: render(t초)가 그 순간 화면을 그린다 — make_kinetic.mjs가 1/30초씩 찍는다. ?t=초 로 한 장면만 볼 수 있다.
+  이미지: gen-laptop.png · gen-bubbles.png = GPT 이미지 생성(Codex, 2026-11-03), 노트북 화면 안은 실제 사이 스크린샷 1번(laptop-sai.png).
+  🔴 화면의 사이 결과 글은 실제 응답만(2026-11-03 실 API · 스토어 스크린샷). 국가 단위 단정 금지.
+  🔴 위 220px·아래 380px은 릴스 UI에 가린다 — 중요한 글자를 두지 않는다.
+  박자: 100bpm(한 박 0.6초) — 컷은 박 또는 반 박에 맞춘다(make_kinetic_audio.py와 같은 표).
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-SemiBold.subset.woff2) format('woff2'); font-weight: 600; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-Bold.subset.woff2) format('woff2'); font-weight: 700; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-ExtraBold.subset.woff2) format('woff2'); font-weight: 800; }
+  :root { --ink:#0b0d12; --white:#ffffff; --seam:#f04419; --dusk:#3d5afe; --gray:#f2f4f6; --sub:#6b7684; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+  body { font-family: P, sans-serif; word-break: keep-all; }
+  .scene { position: absolute; inset: 0; display: none; overflow: hidden; }
+  .c { position: absolute; left: 0; right: 0; text-align: center; will-change: transform, opacity; }
+  .mega { font-weight: 800; letter-spacing: -0.045em; line-height: 1.02; }
+  img { display: block; }
+</style>
+</head>
+<body>
+<!-- S1 0.0–1.2 보내기 전에, -->
+<section class="scene" id="s1" style="background:var(--ink)">
+  <div class="c mega" id="s1a" style="top:700px;font-size:190px;color:#fff">보내기</div>
+  <div class="c mega" id="s1b" style="top:910px;font-size:190px;color:#fff">전에,</div>
+</section>
+<!-- S2 1.2–2.4 한 번 더. -->
+<section class="scene" id="s2" style="background:#fff">
+  <div class="c mega" id="s2a" style="top:790px;font-size:230px;color:var(--ink)">한 번 더.</div>
+  <div id="s2bar" style="position:absolute;left:140px;top:1060px;height:22px;border-radius:11px;background:var(--seam)"></div>
+</section>
+<!-- S3 2.4–3.6 단어 세 컷 -->
+<section class="scene" id="s3"><div class="c mega" id="s3w" style="top:820px;font-size:260px"></div></section>
+<!-- S4 3.6–5.4 한국어 입력 → 영어 -->
+<section class="scene" id="s4" style="background:var(--gray)">
+  <div class="c" id="s4tag" style="top:560px;font-size:44px;font-weight:700;color:var(--seam)">S·AI 다듬기</div>
+  <div id="s4ko" style="position:absolute;left:90px;right:90px;top:700px;padding:56px 60px;border-radius:48px;background:#fff;font-size:70px;font-weight:700;color:var(--ink);line-height:1.3"></div>
+  <div id="s4en" style="position:absolute;left:90px;right:90px;top:1000px;padding:56px 60px;border-radius:48px;background:var(--ink);font-size:64px;font-weight:700;color:#fff;line-height:1.3"></div>
+</section>
+<!-- S5 5.4–7.2 노트북 + 실제 화면 -->
+<section class="scene" id="s5" style="background:#fff">
+  <div class="c mega" id="s5t" style="top:330px;font-size:120px;color:var(--ink);z-index:2"></div>
+  <img id="s5img" src="laptop-sai.png" style="position:absolute;left:0;top:240px;width:1080px;height:1620px;transform-origin:72% 40%">
+</section>
+<!-- S6 7.2–8.4 circle back -->
+<section class="scene" id="s6" style="background:var(--ink)">
+  <div class="c mega" id="s6a" style="top:800px;font-size:96px;color:#fff;font-weight:700;white-space:nowrap">“Let's circle back.”</div>
+  <div id="s6strike" style="position:absolute;left:90px;top:850px;height:16px;background:var(--seam);border-radius:8px"></div>
+  <div class="c mega" id="s6b" style="top:1060px;font-size:132px;color:var(--seam)">= 지금은 보류.</div>
+</section>
+<!-- S7 8.4–9.6 속뜻 -->
+<section class="scene" id="s7" style="background:#0b0d12">
+  <img id="s7img" src="gen-bubbles.png" style="position:absolute;left:-60px;top:120px;width:1200px;height:1800px">
+  <div class="c mega" id="s7t" style="top:1380px;font-size:120px;color:#fff">속뜻까지.</div>
+</section>
+<!-- S8 9.6–10.8 시간대 -->
+<section class="scene" id="s8" style="background:#fff">
+  <div class="c" style="top:560px;font-size:46px;font-weight:700;color:var(--sub)" id="s8l1">나 · 서울</div>
+  <div class="c mega" id="s8a" style="top:620px;font-size:220px;color:var(--ink)">16:24</div>
+  <div class="c" style="top:930px;font-size:46px;font-weight:700;color:var(--dusk)" id="s8l2">상대 · 베를린</div>
+  <div class="c mega" id="s8b" style="top:990px;font-size:220px;color:var(--dusk)">08:24</div>
+  <div class="c mega" id="s8t" style="top:1290px;font-size:84px;color:var(--ink)">상대 시간까지, 한눈에.</div>
+</section>
+<!-- S9 10.8–12.0 용어집 -->
+<section class="scene" id="s9" style="background:var(--ink)">
+  <div class="c mega" id="s9a" style="top:760px;font-size:230px;color:#fff">배포</div>
+  <div class="c mega" id="s9b" style="top:760px;font-size:230px;color:var(--seam)">ABC</div>
+  <div class="c mega" id="s9t" style="top:1080px;font-size:90px;color:#fff">회사 용어는 그대로.</div>
+</section>
+<!-- S10 12.0–12.9 본문 저장 안 함 -->
+<section class="scene" id="s10" style="background:var(--seam)">
+  <div class="c mega" id="s10a" style="top:700px;font-size:150px;color:#fff">본문은</div>
+  <div class="c mega" id="s10b" style="top:880px;font-size:150px;color:#fff">저장하지</div>
+  <div class="c mega" id="s10c" style="top:1060px;font-size:150px;color:#fff">않아요.</div>
+</section>
+<!-- S11 12.9–15.0 끝 장 -->
+<section class="scene" id="s11" style="background:#fff">
+  <div id="bar1" style="position:absolute;top:640px;height:44px;background:var(--ink)"></div>
+  <div id="bar2" style="position:absolute;top:706px;height:44px;background:var(--ink)"></div>
+  <div id="bar3" style="position:absolute;top:772px;height:44px;background:var(--seam)"></div>
+  <div class="c mega" id="s11a" style="top:900px;font-size:210px;color:var(--ink)">사이</div>
+  <div class="c" id="s11b" style="top:1150px;font-size:56px;font-weight:700;color:var(--ink)">크롬 확장 · 지금 무료</div>
+  <div class="c" id="s11c" style="top:1240px;font-size:38px;font-weight:600;color:var(--sub)">sai-global-msg-2026.web.app</div>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  const outCubic = (p) => 1 - Math.pow(1 - clamp(p), 3);
+  const outBack = (p) => { p = clamp(p); const c = 1.9; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+  const prog = (t, a, d) => clamp((t - a) / d);
+  const show = (id) => document.querySelectorAll('.scene').forEach((s) => { s.style.display = s.id === id ? 'block' : 'none'; });
+  // 박에 맞춰 크게 들어오는 단어 — 1.35배에서 1배로, 위로 살짝
+  const slam = (el, t, at, from = 1.35) => {
+    const p = prog(t, at, 0.22);
+    el.style.opacity = t < at ? 0 : clamp(p * 2.5);
+    el.style.transform = `translateY(${(1 - outCubic(p)) * 40}px) scale(${from - (from - 1) * outBack(p)})`;
+  };
+  const SCENES = [
+    ['s1', 0], ['s2', 1.2], ['s3', 2.4], ['s4', 3.6], ['s5', 5.4], ['s6', 7.2],
+    ['s7', 8.4], ['s8', 9.6], ['s9', 10.8], ['s10', 12.0], ['s11', 12.9],
+  ];
+  const KO = '이거 확인 좀 빨리 해주세요.';
+  const EN = 'Could you please look into this as soon as possible?';
+
+  window.render = (t) => {
+    let cur = SCENES[0][0];
+    for (const [id, at] of SCENES) if (t >= at) cur = id;
+    show(cur);
+    if (cur === 's1') { slam($('s1a'), t, 0.0); slam($('s1b'), t, 0.3); }
+    if (cur === 's2') {
+      slam($('s2a'), t, 1.2, 1.5);
+      $('s2bar').style.width = `${outCubic(prog(t, 1.5, 0.45)) * 800}px`;
+    }
+    if (cur === 's3') {
+      const words = [['톤.', '#f04419', '#fff'], ['긴급도.', '#0b0d12', '#fff'], ['뉘앙스.', '#fff', '#0b0d12']];
+      const i = Math.min(2, Math.floor((t - 2.4) / 0.4));
+      $('s3').style.background = words[i][1];
+      $('s3w').textContent = words[i][0];
+      $('s3w').style.color = words[i][2];
+      slam($('s3w'), t, 2.4 + i * 0.4, 1.8);
+    }
+    if (cur === 's4') {
+      const n = Math.round(KO.length * prog(t, 3.65, 0.75));
+      const caret = t < 4.5 && Math.floor(t * 4) % 2 === 0 ? '<span style="color:#f04419">|</span>' : '';
+      $('s4ko').innerHTML = KO.slice(0, n) + caret;
+      const pk = prog(t, 3.6, 0.2);
+      $('s4ko').style.transform = `translateY(${(1 - outCubic(pk)) * 60}px)`;
+      $('s4ko').style.opacity = pk;
+      const tagP = prog(t, 4.5, 0.18);
+      $('s4tag').style.opacity = tagP;
+      $('s4tag').style.transform = `scale(${1.4 - 0.4 * outBack(tagP)})`;
+      // 영어 — 글자 단위로 쏟아진다
+      const pe = prog(t, 4.6, 0.6);
+      const shown = Math.round(EN.length * outCubic(pe));
+      $('s4en').style.opacity = t < 4.6 ? 0 : 1;
+      $('s4en').style.transform = `translateY(${(1 - outCubic(prog(t, 4.6, 0.25))) * 80}px)`;
+      $('s4en').innerHTML = EN.slice(0, shown) + `<span style="opacity:.0">${EN.slice(shown)}</span>`;
+    }
+    if (cur === 's5') {
+      const z = 1 + 0.32 * outCubic(prog(t, 5.6, 1.5));
+      $('s5img').style.transform = `scale(${z})`;
+      const first = t < 6.3;
+      $('s5t').textContent = first ? '상대 언어로.' : '상대 눈높이로.';
+      slam($('s5t'), t, first ? 5.4 : 6.3, 1.25);
+    }
+    if (cur === 's6') {
+      slam($('s6a'), t, 7.2, 1.2);
+      $('s6strike').style.width = `${outCubic(prog(t, 7.65, 0.2)) * 900}px`;
+      $('s6a').style.opacity = t > 7.65 ? 1 - 0.55 * prog(t, 7.65, 0.2) : $('s6a').style.opacity;
+      slam($('s6b'), t, 7.8, 1.5);
+    }
+    if (cur === 's7') {
+      const p = prog(t, 8.4, 1.2);
+      $('s7img').style.transform = `scale(${1.15 - 0.15 * outCubic(p)}) rotate(${-4 + 4 * outCubic(p)}deg)`;
+      $('s7img').style.opacity = clamp(p * 4);
+      slam($('s7t'), t, 8.7, 1.4);
+    }
+    if (cur === 's8') {
+      slam($('s8a'), t, 9.6, 1.3); slam($('s8l1'), t, 9.6, 1.1);
+      slam($('s8b'), t, 9.9, 1.3); slam($('s8l2'), t, 9.9, 1.1);
+      slam($('s8t'), t, 10.2, 1.3);
+    }
+    if (cur === 's9') {
+      const p = prog(t, 11.1, 0.3);
+      $('s9a').style.transform = `translateY(${-outCubic(p) * 260}px) scale(${1 + 0.1 * (1 - p)})`;
+      $('s9a').style.opacity = 1 - p;
+      $('s9b').style.transform = `translateY(${(1 - outBack(p)) * 260}px)`;
+      $('s9b').style.opacity = p;
+      if (t < 11.1) slam($('s9a'), t, 10.8, 1.3);
+      slam($('s9t'), t, 11.4, 1.3);
+    }
+    if (cur === 's10') { slam($('s10a'), t, 12.0, 1.6); slam($('s10b'), t, 12.3, 1.6); slam($('s10c'), t, 12.6, 1.6); }
+    if (cur === 's11') {
+      // 로고 막대 세 개가 박자에 맞춰 들어온다 (SaiMark 좌표 비율: 118·118·160, 왼쪽 14·56·14)
+      const unit = 3.2, left = 540 - (188 * unit) / 2;
+      [['bar1', 14, 118, 12.9], ['bar2', 56, 118, 13.05], ['bar3', 14, 160, 13.2]].forEach(([id, x, w, at]) => {
+        const p = outCubic(prog(t, at, 0.3));
+        $(id).style.left = `${left + x * unit - (1 - p) * 700}px`;
+        $(id).style.width = `${w * unit}px`;
+        $(id).style.opacity = p;
+      });
+      slam($('s11a'), t, 13.5, 1.3);
+      slam($('s11b'), t, 13.8, 1.15);
+      slam($('s11c'), t, 14.0, 1.1);
+    }
+  };
+  const q = new URLSearchParams(location.search).get('t');
+  window.render(q === null ? 0 : Number(q));
+</script>
+</body>
+</html>
