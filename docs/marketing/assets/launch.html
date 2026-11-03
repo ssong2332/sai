@@ -1,0 +1,176 @@
+<!doctype html>
+<!--
+  홍보 영상 ② 「한 테이크 런치 필름」 9:16 · 15초 (2026-11-03).
+  참고: awesome-opus5-5-videos 「Food Craving Product Launch Film」(@ultimaxbt) — 컷 없이 한 테이크, 글자는 마스크 선에서 올라오고,
+  버튼은 페이지로 펼쳐지고, 색은 한 물체에서 번져 다른 물체로 줄어든다. 입력창 둘레 무지갯빛 광채.
+  render(t초) — make_kinetic.mjs가 찍는다. ?t=초 로 한 장면 확인.
+  🔴 글은 실제 사이 응답(2026-11-03 실 API, 빠른 모드)·무대 페이지 대화(지어낸 인물)만.
+  박자 120bpm(0.5초). 큐: launch.cue.json
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-SemiBold.subset.woff2) format('woff2'); font-weight: 600; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-Bold.subset.woff2) format('woff2'); font-weight: 700; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-ExtraBold.subset.woff2) format('woff2'); font-weight: 800; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #f5f5f2; }
+  body { font-family: P, sans-serif; word-break: keep-all; color: #0e0e10; }
+  #cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+  .abs { position: absolute; }
+  .mask { overflow: hidden; display: block; }
+  .mask > span { display: block; will-change: transform; }
+</style>
+</head>
+<body>
+<div id="cam">
+  <!-- 입력창 + 광채 -->
+  <div class="abs" id="glow" style="left:70px;top:740px;width:940px;height:380px;border-radius:60px;filter:blur(42px);opacity:.9"></div>
+  <div class="abs" id="composer" style="left:90px;top:760px;width:900px;height:340px;border-radius:44px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.05)">
+    <div class="abs" id="ko" style="left:56px;top:52px;right:56px;font-size:58px;font-weight:700;line-height:1.38;white-space:pre-wrap"></div>
+    <div class="abs" id="icon" style="right:36px;bottom:32px;width:96px;height:96px;border-radius:28px;background:#f5f5f2;display:grid;place-items:center">
+      <svg viewBox="0 0 188 96" width="64" height="33"><rect x="14" y="20" width="118" height="16" fill="#0e0e10"/><rect x="56" y="44" width="118" height="16" fill="#0e0e10"/><rect x="14" y="68" width="160" height="16" fill="#f04419"/></svg>
+    </div>
+  </div>
+  <div class="abs" id="ring" style="border:6px solid #f04419;border-radius:50%"></div>
+  <div class="abs" id="thinking" style="left:0;right:0;top:1160px;text-align:center;font-size:44px;font-weight:700;-webkit-background-clip:text;background-clip:text;color:transparent">사이가 다듬는 중…</div>
+
+  <!-- 주황이 번지고 카드로 줄어든다 -->
+  <div class="abs" id="flood" style="background:#f04419;overflow:hidden">
+    <div class="abs" id="tag" style="left:70px;top:0;font-size:40px;font-weight:800;color:#fff;white-space:nowrap">S·AI 다듬기 <span id="crit" style="display:inline-block;margin-left:14px;padding:6px 20px;border-radius:999px;background:#fff;color:#c81e45;font-size:34px;vertical-align:4px">CRITICAL</span></div>
+    <div class="abs" id="en" style="left:70px;width:940px;font-size:76px;font-weight:800;line-height:1.16;letter-spacing:-0.02em;color:#fff;transform-origin:0 0"></div>
+  </div>
+  <div class="abs" id="back" style="left:60px;width:960px;top:1110px;border-radius:40px;background:#e6f7f0;padding:40px 48px;overflow:hidden">
+    <div class="mask"><span style="font-size:32px;font-weight:700;color:#0a7a55">역번역 — 상대에게 이렇게 읽혀요</span></div>
+    <div class="mask" style="margin-top:12px"><span style="font-size:40px;font-weight:600;line-height:1.45">이것 가능한 한 빨리 확인해 주시겠어요? 내일까지 해결되지 않으면 저희에게 실질적인 문제가 생길 것입니다.</span></div>
+  </div>
+  <div class="abs" id="apply" style="left:60px;width:960px;top:1430px;height:110px;border-radius:60px;background:#0e0e10;color:#fff;font-size:44px;font-weight:800;display:grid;place-items:center">적용하기</div>
+
+  <!-- 버튼이 대화 화면으로 펼쳐진다 -->
+  <div class="abs" id="dark" style="background:#0e0e10;border-radius:50%"></div>
+  <div class="abs" id="thread" style="left:0;top:0;width:1080px;height:1920px">
+    <div class="abs" id="tname" style="left:70px;top:330px;font-size:40px;font-weight:800;color:#fff">Daniel Weber <span style="font-size:30px;font-weight:600;color:#8b95a1">· Berlin</span></div>
+    <div class="abs" id="tmsg" style="left:70px;top:410px;width:820px;padding:36px 42px;border-radius:40px 40px 40px 10px;background:#2a2d34;color:#e5e8eb;font-size:38px;line-height:1.45;font-weight:600">Hi! Quick heads-up — the vendor pushed the delivery to next Thursday. Could you check whether that still works on your end?</div>
+    <div class="abs" id="sent" style="right:70px;top:820px;width:860px;padding:36px 42px;border-radius:40px 40px 10px 40px;background:#f04419;color:#fff;font-size:40px;line-height:1.4;font-weight:700">Could you please look into this as soon as possible? If it's not resolved by tomorrow, it will cause us real problems.</div>
+    <div class="abs" id="sentnote" style="right:74px;top:1150px;font-size:30px;font-weight:600;color:#8b95a1">방금 · 사이로 다듬음</div>
+    <div class="abs mask" id="h1" style="left:0;right:0;top:1330px;text-align:center"><span style="font-size:120px;font-weight:800;color:#fff;letter-spacing:-0.04em">보내기 전에,</span></div>
+    <div class="abs mask" id="h2" style="left:0;right:0;top:1480px;text-align:center"><span style="font-size:120px;font-weight:800;color:#fff;letter-spacing:-0.04em">한 번 더.</span></div>
+  </div>
+
+  <!-- 끝 장 -->
+  <div class="abs" id="endbg" style="background:#f5f5f2;border-radius:50%"></div>
+  <div class="abs" id="end" style="left:0;top:0;width:1080px;height:1920px">
+    <div class="abs" id="b1" style="top:640px;height:44px;background:#0e0e10"></div>
+    <div class="abs" id="b2" style="top:706px;height:44px;background:#0e0e10"></div>
+    <div class="abs" id="b3" style="top:772px;height:44px;background:#f04419"></div>
+    <div class="abs mask" style="left:0;right:0;top:900px;text-align:center"><span id="e1" style="font-size:200px;font-weight:800;letter-spacing:-0.04em">사이</span></div>
+    <div class="abs mask" style="left:0;right:0;top:1150px;text-align:center"><span id="e2" style="font-size:54px;font-weight:700">크롬 확장 · 지금 무료</span></div>
+    <div class="abs mask" style="left:0;right:0;top:1240px;text-align:center"><span id="e3" style="font-size:38px;font-weight:600;color:#6b7684">sai-global-msg-2026.web.app</span></div>
+  </div>
+</div>
+<svg class="abs" id="cursor" width="64" height="64" viewBox="0 0 24 24" style="left:0;top:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,.3))"><path d="M4 2l15 9-6.5 1.5L16 20l-3 1.5-3.5-7.5L4 18z" fill="#0e0e10" stroke="#fff" stroke-width="1.4"/></svg>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  const prog = (t, a, d) => clamp((t - a) / d);
+  const out3 = (p) => 1 - Math.pow(1 - clamp(p), 3);
+  const inOut = (p) => { p = clamp(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+  const backOut = (p) => { p = clamp(p); const c = 1.7; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+  const lerp = (a, b, p) => a + (b - a) * p;
+  const set = (el, css) => Object.assign(el.style, css);
+  const vis = (el, on) => { el.style.display = on ? 'block' : 'none'; };
+
+  const KO = '이거 확인 좀 빨리 해주세요.\n내일까지 안 되면 곤란합니다.';
+  // 자연스러운 타자 리듬 — 띄어쓰기·줄바꿈 앞에서 잠깐 멈춘다(결정적: 같은 t면 같은 화면)
+  const KEYS = []; { let at = 0.25; for (const ch of KO) { KEYS.push(at); at += ch === ' ' ? 0.1 : ch === '\n' ? 0.22 : 0.065 + ((KEYS.length * 37) % 5) * 0.006; } }
+  const EN_LINES = ['Could you please look', 'into this as soon as', "possible? If it's not", 'resolved by tomorrow,', 'it will cause us real', 'problems.'];
+  $('en').innerHTML = EN_LINES.map((l) => `<div class="mask"><span>${l}</span></div>`).join('');
+  const ICON = { x: 90 + 900 - 36 - 48, y: 760 + 340 - 32 - 48 }; // 아이콘 중심
+  const APPLY = { x: 540, y: 1485 };
+  const circle = (el, cx, cy, r) => set(el, { left: `${cx - r}px`, top: `${cy - r}px`, width: `${2 * r}px`, height: `${2 * r}px` });
+  const cursorAt = (x, y, s = 1) => set($('cursor'), { left: `${x - 8}px`, top: `${y - 6}px`, transform: `scale(${s})` });
+
+  window.render = (t) => {
+    // 카메라 — 장면마다 한 번, 한 방향으로만
+    const z = t < 3.5 ? lerp(1, 1.12, inOut(prog(t, 0, 3.4))) : t < 6.2 ? 1.12 : t < 8.8 ? lerp(1.12, 1, inOut(prog(t, 6.2, 0.8))) : 1;
+    $('cam').style.transform = `scale(${z})`;
+
+    // ① 입력창 · 광채 · 타이핑
+    $('glow').style.display = t < 3.9 ? 'block' : 'none';
+    $('composer').style.display = t < 3.9 ? 'block' : 'none'; // 주황이 덮은 뒤 카드 밑으로 비치지 않게
+    $('glow').style.background = `conic-gradient(from ${t * 120}deg, #ff5fa2, #ff9a3c, #cdf24f, #34d7ff, #8b5cff, #ff5fa2)`;
+    const typed = KEYS.filter((k) => k <= t).length;
+    const caret = t < 2.9 && Math.floor(t * 3) % 2 === 0 ? '<span style="color:#f04419">|</span>' : '';
+    $('ko').innerHTML = KO.slice(0, typed).replace('\n', '<br>') + caret;
+    // ② 커서가 사이 아이콘으로 → 누름 → 고리
+    if (t < 2.3) cursorAt(940, 1500);
+    else if (t < 3.0) { const p = inOut(prog(t, 2.3, 0.55)); cursorAt(lerp(940, ICON.x, p), lerp(1500, ICON.y, p), t > 2.88 ? 0.86 : 1); }
+    else if (t < 8.2) cursorAt(ICON.x + (t - 3) * 0, ICON.y + 900); // 화면 밖에서 대기
+    const rp = prog(t, 2.9, 0.5);
+    vis($('ring'), rp > 0 && rp < 1);
+    circle($('ring'), ICON.x, ICON.y, 48 + 160 * out3(rp)); $('ring').style.opacity = 1 - rp;
+    const th = prog(t, 3.0, 0.5);
+    vis($('thinking'), t >= 3.0 && t < 3.6);
+    set($('thinking'), { backgroundImage: `linear-gradient(90deg, #8b95a1 ${th * 100 - 30}%, #0e0e10 ${th * 100}%, #8b95a1 ${th * 100 + 30}%)` });
+
+    // ③ 주황이 아이콘에서 번져 화면을 채운다(0.35초) → 영어가 마스크 선에서 올라온다
+    const fp = out3(prog(t, 3.5, 0.35));
+    const flood = $('flood');
+    vis(flood, t >= 3.5 && t < 9.4);
+    let card = { l: 0, tp: 0, w: 1080, h: 1920, r: 0 };
+    if (t < 3.85) { const r = 2300 * fp; card = { l: ICON.x - r, tp: ICON.y - r, w: 2 * r, h: 2 * r, r }; }
+    // ④ 6.2초 — 화면 가득한 주황이 팝업 카드로 줄어든다
+    const cp = inOut(prog(t, 6.2, 0.7));
+    if (t >= 6.2) card = { l: lerp(0, 60, cp), tp: lerp(0, 360, cp), w: lerp(1080, 960, cp), h: lerp(1920, 700, cp), r: lerp(0, 48, cp) };
+    set(flood, { left: `${card.l}px`, top: `${card.tp}px`, width: `${card.w}px`, height: `${card.h}px`, borderRadius: `${card.r}px` });
+    // 글자는 화면 좌표로 고정 — 카드가 줄어도 같은 자리에서 작아진다
+    const textScale = lerp(1, 0.86, cp);
+    set($('tag'), { left: `${lerp(70, 50, cp) + 0}px`, top: `${lerp(560, 50, cp)}px` });
+    set($('en'), { left: `${lerp(70, 50, cp)}px`, top: `${lerp(660, 140, cp)}px`, transform: `scale(${textScale})` });
+    $('tag').style.transform = `translateY(${(1 - out3(prog(t, 3.9, 0.3))) * 60}px)`;
+    $('tag').style.opacity = prog(t, 3.9, 0.15);
+    [...$('en').querySelectorAll('.mask > span')].forEach((s, i) => { s.style.transform = `translateY(${(1 - out3(prog(t, 4.05 + i * 0.12, 0.38))) * 110}%)`; });
+    const cr = prog(t, 5.5, 0.25);
+    $('crit').style.transform = `scale(${t < 5.5 ? 0 : backOut(cr)})`;
+
+    // ⑤ 역번역 · 적용하기
+    vis($('back'), t >= 6.8 && t < 9.4);
+    [...$('back').querySelectorAll('.mask > span')].forEach((s, i) => { s.style.transform = `translateY(${(1 - out3(prog(t, 6.9 + i * 0.15, 0.4))) * 110}%)`; });
+    $('back').style.top = '1110px';
+    $('apply').style.display = t >= 7.6 && t < 9.4 ? 'grid' : 'none'; // 🔴 vis()는 block이라 가운데 정렬(grid)이 풀린다
+    const ap = prog(t, 7.6, 0.3);
+    set($('apply'), { transform: `translateY(${(1 - out3(ap)) * 140}px)`, opacity: ap });
+    if (t >= 8.2 && t < 9.0) { const p = inOut(prog(t, 8.2, 0.5)); cursorAt(lerp(ICON.x, APPLY.x, p), lerp(ICON.y + 900, APPLY.y, p), t > 8.75 ? 0.86 : 1); }
+    if (t >= 9.0) cursorAt(-200, -200);
+    // ⑥ 8.8초 — 적용하기가 대화 화면으로 펼쳐진다(어둠이 버튼에서 번진다)
+    const dp = out3(prog(t, 8.8, 0.45));
+    vis($('dark'), t >= 8.8 && t < 12.6);
+    circle($('dark'), APPLY.x, APPLY.y, 60 + 2200 * dp);
+    vis($('thread'), t >= 9.2 && t < 12.6);
+    const tp = out3(prog(t, 9.2, 0.4));
+    set($('tname'), { opacity: tp, transform: `translateY(${(1 - tp) * 40}px)` });
+    set($('tmsg'), { opacity: tp, transform: `translateY(${(1 - tp) * 60}px)` });
+    const sp = prog(t, 9.7, 0.5);
+    set($('sent'), { opacity: clamp(sp * 3), transform: `translateY(${(1 - backOut(sp)) * 300}px) scale(${lerp(0.6, 1, out3(sp))})`, transformOrigin: '100% 100%' });
+    $('sentnote').style.opacity = prog(t, 10.3, 0.3);
+    [['h1', 10.9], ['h2', 11.15]].forEach(([id, at]) => { $(id).firstChild.style.transform = `translateY(${(1 - out3(prog(t, at, 0.4))) * 110}%)`; });
+
+    // ⑦ 12.6초 — 보낸 말풍선에서 밝은 바탕이 번져 끝 장
+    const ep = out3(prog(t, 12.4, 0.4));
+    vis($('endbg'), t >= 12.4);
+    circle($('endbg'), 600, 960, 2300 * ep);
+    vis($('end'), t >= 12.7);
+    const unit = 3.2, left = 540 - (188 * unit) / 2;
+    [['b1', 14, 118, 12.75], ['b2', 56, 118, 12.9], ['b3', 14, 160, 13.05]].forEach(([id, x, w, at]) => {
+      const p = out3(prog(t, at, 0.32));
+      set($(id), { left: `${left + x * unit}px`, width: `${w * unit * p}px` });
+    });
+    [['e1', 13.3], ['e2', 13.55], ['e3', 13.75]].forEach(([id, at]) => { $(id).style.transform = `translateY(${(1 - out3(prog(t, at, 0.4))) * 110}%)`; });
+  };
+  const q = new URLSearchParams(location.search).get('t');
+  window.render(q === null ? 0 : Number(q));
+</script>
+</body>
+</html>

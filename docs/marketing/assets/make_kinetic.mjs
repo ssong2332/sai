@@ -1,5 +1,6 @@
 // kinetic.html을 1/30초씩 찍어 PNG 프레임으로 저장한다 (2026-11-03).
-// 쓰는 법(저장소 루트): node docs/marketing/assets/make_kinetic.mjs <프레임 폴더> [초=15]
+// 쓰는 법(저장소 루트): node docs/marketing/assets/make_kinetic.mjs <프레임 폴더> [초=15] [html=docs/marketing/assets/kinetic.html]
+// 그 html은 전역 render(t초)를 내놓아야 한다(launch.html · loop.html · widget.html도 같은 약속).
 // 크롬 하나를 headless로 띄워 DevTools 프로토콜로 render(t) → 스크린샷을 반복한다(프레임마다 새 크롬을 띄우지 않는다).
 // 이어서 make_kinetic_audio.py로 소리를 만들고 ffmpeg로 합친다(docs/marketing/README.md).
 import { spawn } from 'node:child_process';
@@ -15,7 +16,7 @@ const PORT = 9333;
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 mkdirSync(outDir, { recursive: true });
 
-const page = pathToFileURL(resolve('docs/marketing/assets/kinetic.html')).href;
+const page = pathToFileURL(resolve(process.argv[4] ?? 'docs/marketing/assets/kinetic.html')).href;
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
   '--allow-file-access-from-files', `--remote-debugging-port=${PORT}`, '--window-size=1080,1920',

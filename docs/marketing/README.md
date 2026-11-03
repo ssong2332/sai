@@ -44,3 +44,20 @@ python -I docs/marketing/assets/make_kinetic_audio.py <소리.wav>
 <ffmpeg> -framerate 30 -i <프레임 폴더>/f%04d.png -i <소리.wav> -map 0:v -map 1:a -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart docs/marketing/out/promo-kinetic-15s.mp4
 ```
 🔴 컷 시각을 바꾸면 `kinetic.html` `SCENES`와 `make_kinetic_audio.py` `HITS`·`SCENE_CUTS`를 같이 바꾼다. 한 장면 확인: `kinetic.html?t=6.0`.
+
+## 홍보 영상 3편 추가 (2026-11-03 — awesome-opus5-5-videos 프롬프트 참고)
+| 파일 | 길이 | 참고 프롬프트 | 사이로 옮긴 것 |
+|---|---|---|---|
+| `out/promo-launch-15s.mp4` | 15초 | 「Food Craving Product Launch Film」(@ultimaxbt) — 한 테이크, 마스크 선에서 올라오는 글자, 버튼이 페이지로, 색이 번졌다 줄어듦, 입력창 무지갯빛 광채 | 한국어 타이핑 → 아이콘 클릭 → 주황이 번져 영어 → 팝업 카드로 수축 → 역번역 → 적용하기가 대화 화면으로 → 보낸 말풍선 → 로고 |
+| `out/promo-loop-14s.mp4` | 14초(이음매 없는 반복) | 「UI Motion Loop Design」(@flxrnc) — 도형 하나, 컷 없음, 스프링 감쇠 0.72·0.35초 | 주황 막대 → 한국어 말풍선 → 영어 말풍선 → 08:24 시계 → 팀 용어집 카드 → 본문 저장 안 함 → 다시 막대 |
+| `out/promo-widget-12s.mp4` | 12초 | 「Widget Animation Motion Design」(@Khlaseek_dsgner) — 카드 30%→100%, 항목 차례로, 선이 그려짐, 뒤 광채, 빛 띠 두 개 | 뜻 풀기 결과 카드(스토어 스크린샷 2번의 실제 글) → 로고 |
+
+원본: `assets/launch.html` · `loop.html` · `widget.html`(각각 render(t)) · 소리 큐 `assets/*.cue.json`.
+다시 만들기(예: launch):
+```
+node docs/marketing/assets/make_kinetic.mjs <프레임 폴더> 15 docs/marketing/assets/launch.html
+python -I docs/marketing/assets/make_kinetic_audio.py <소리.wav> docs/marketing/assets/launch.cue.json
+<ffmpeg> -framerate 30 -i <프레임 폴더>/f%04d.png -i <소리.wav> -map 0:v -map 1:a -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart docs/marketing/out/promo-launch-15s.mp4
+```
+(loop은 14초 `loop.html`/`loop.cue.json`, widget은 12초 `widget.html`/`widget.cue.json`)
+🔴 실측 주의: 표시용 함수가 `display:block`을 넣으면 가운데 정렬(grid)이 풀린다 · 흰 빛 띠는 흰 카드 위에서 안 보인다 · 번진 색이 덮은 뒤에도 아래 요소가 카드 틈으로 비친다 — 숨긴다.

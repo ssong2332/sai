@@ -1,6 +1,7 @@
 """키네틱 홍보 영상(kinetic.html) 소리 — 컷마다 타격음, 장면 전환 바람 소리, 타이핑 소리, 끝 장 직전 상승음 (2026-11-03).
 
-쓰는 법(저장소 루트): python -I docs/marketing/assets/make_kinetic_audio.py <출력.wav>
+쓰는 법(저장소 루트): python -I docs/marketing/assets/make_kinetic_audio.py <출력.wav> [큐.json]
+큐 파일(없으면 아래 kinetic.html 값): {"total":초, "bpm":n, "hits":[초…], "cuts":[초…], "typing":[시작,끝,글자수] 또는 null, "riser":[시작,길이] 또는 null, "final":초 또는 null, "music":0~1}
 음악: make_audio.py의 합성기를 100bpm으로(한 박 0.6초 — kinetic.html 컷과 같은 박자). 모두 직접 합성 — 저작권 없음.
 """
 import importlib.util
@@ -59,20 +60,33 @@ def chord_hit():
 
 
 def main():
+    global TOTAL, HITS, SCENE_CUTS, TYPING
     out = sys.argv[1]
+    riser_at, final_at, music_gain = (12.3, 0.6), 12.9, 0.55
+    if len(sys.argv) > 2:
+        import json
+        cue = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+        TOTAL, HITS, SCENE_CUTS = cue["total"], cue["hits"], cue["cuts"]
+        TYPING, riser_at, final_at = cue.get("typing"), cue.get("riser"), cue.get("final")
+        music_gain = cue.get("music", 0.55)
+        ma.BPM = cue.get("bpm", 100)
+        ma.BEAT = 60 / ma.BPM
     n = int(TOTAL * SR)
-    bed = ma.music(TOTAL)[:n] * 0.55
+    bed = ma.music(TOTAL)[:n] * music_gain
     fx = np.zeros(n)
     for h in HITS:
         ma.add(fx, h, hit(0.8))
     for c in SCENE_CUTS:
         ma.add(fx, c - 0.18, whoosh(0.3))
-    a, b, k = TYPING
-    for i in range(k):
-        ma.add(fx, a + (b - a) * i / k + rng.uniform(-0.01, 0.01), click())
-    ma.add(fx, 12.3, riser(0.6))
-    ma.add(fx, 12.9, hit(1.2))
-    ma.add(fx, 12.9, chord_hit())
+    if TYPING:
+        a, b, k = TYPING
+        for i in range(k):
+            ma.add(fx, a + (b - a) * i / k + rng.uniform(-0.01, 0.01), click())
+    if riser_at:
+        ma.add(fx, riser_at[0], riser(riser_at[1]))
+    if final_at is not None:
+        ma.add(fx, final_at, hit(1.2))
+        ma.add(fx, final_at, chord_hit())
     fx = ma.reverb(fx, 0.6, 0.15)
     mix = bed + fx[:, None]
     mix *= ma.env(n, 0.02, 1.0)[:, None]
