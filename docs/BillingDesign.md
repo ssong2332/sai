@@ -35,8 +35,8 @@
 |---|---|
 | 모양 | `sr_` + 무작위 24바이트 base64url(32자) — 🔴 uid·teamId를 넣지 않는다(구매자가 바꿀 수 있고, Groble에 식별자를 넘기지 않는다) |
 | 저장 | Firestore `billingRefs/{토큰}` = `{uid, teamId|null, plan, interval, seats, optionId, createdAt, boundAt|null}` — Worker(서비스 계정)만 읽고 쓴다, 규칙에서 클라이언트 접근 0 |
-| 결제 시작마다 | 새 토큰. 결제하지 않은 토큰은 7일 뒤 무효(웹훅이 와도 `unknown-ref`) — 🔴 이 7일은 추정값, 0-7 결정 4 |
-| 첫 웹훅(`INITIAL`) | 토큰이 있고 7일 안 · 옵션 ID가 토큰의 `optionId`와 같을 때만 → `boundAt` 기록. 이후 회차는 묶인 토큰이면 기간 제한 없음 |
+| 결제 시작마다 | 새 토큰. 결제하지 않은 토큰은 **24시간** 뒤 무효(웹훅이 와도 `unknown-ref`) — 0-7 결정 4 |
+| 첫 웹훅(`INITIAL`) | 토큰이 있고 `payment.purchasedAt`이 `createdAt` + 24시간 안 · 옵션 ID가 토큰의 `optionId`와 같을 때만 → `boundAt` 기록. 이후 회차는 묶인 토큰이면 기간 제한 없음. 🔴 판정은 웹훅이 **도착한** 시각이 아니라 결제 시각으로 한다 — Groble 재시도가 최대 약 44시간 늦게 올 수 있다 |
 | 바꾼 ref | 없는 토큰 → `unknown-ref`, 쓰기 0. 남의 토큰을 알아내려면 32자 무작위를 맞혀야 한다 |
 | 다른 옵션 결제 | 토큰과 옵션이 다름(예: 2석 토큰으로 10석 결제) → `wrong-option`, 쓰기 0 + 로그(uid 없이) |
 | 환불 연결 | 환불 이벤트에는 `sellerReference`가 없다 → 회차 웹훅마다 `billingRounds/{merchantUid}` = `{ref}`를 써 두고 환불 때 찾는다 |
@@ -62,7 +62,7 @@
 | `subscription_payment.failed` | `isFinal:true` | `past_due` · `graceEnd` = `failure.gracePeriodEndsAt` | 유예 7일, 끝나면 `terminated`가 온다 |
 | `subscription.cancel_requested` | — | 상태 그대로 + `cancelScheduled:true` | 계정 삭제 허용 조건(7절)과 같은 의미 |
 | `subscription.terminated` | — | `canceled` · `endedAt` = `termination.terminatedAt` · `expireAt` = +5년 | 팀이면 좌석 해제·잠금 판정(8-3) |
-| `subscription_payment.refunded` | `billingRounds/{merchantUid}`로 토큰을 찾음 | 기록만(`lastRefundAt`) — 상태는 이어서 오는 `terminated`로 바꾼다 | 🔴 환불만 오고 해지가 안 오면 Pro가 남는다 — 0-7 결정 3 |
+| `subscription_payment.refunded` | `billingRounds/{merchantUid}`로 토큰을 찾음 · 전체·부분 환불 같음 | **바로** `canceled` · `endedAt` = `refund.refundedAt` · `expireAt` = +5년 · 팀이면 좌석 해제·잠금 판정 | 0-7 결정 3. Groble 구독은 `ACTIVE`로 남을 수 있다 — 다음 회차 `completed`가 오면(다시 돈을 냈으므로) `active`로 돌아간다 |
 | `payment.*`(단건) | — | 무시 | 사이는 정기결제만 판다 |
 - 「해지 요청 철회」 이벤트는 Groble이 아직 보내지 않는다 → 철회해도 `cancelScheduled:true`가 남다가 다음 `completed`가 `false`로 되돌린다. 그동안 영향: 계정 삭제가 허용된 상태로 보임(삭제하려면 어차피 해지 안내).
 
@@ -80,9 +80,9 @@
 | # | 결정 | 제안 |
 |---|---|---|
 | 1 | 원화 가격 — Pro 월·연, 팀 1인 월·연 | ✔ **2026-11-04 사용자 결정**: Pro **월 ₩7,900 · 연 ₩59,000** · 팀 1인 **월 ₩13,900 · 연 ₩135,000**(좌석 옵션 = 1인 가격 × 좌석 수, 예: 2석 월 ₩27,800). 부가세 포함 최종 금액(7절과 같은 원칙). 한 달 실수령 추정(Groble 정기 수수료 5.4% + 그 부가세 · 판매 부가세 10% 뺌, 일반과세자 가정 — 🔴 과세 유형은 세무 확인): Pro 월 결제 ₩6,713 · 연 결제 월 ₩4,178 / 팀 1인 월 ₩11,811 · 연 결제 월 ₩9,559. 비교: 매일 한도까지 쓰는 Pro 1명 API 원가 월 약 ₩6,664($4.76 × 1,400원 — 환율 추정) |
-| 2 | 팀 좌석 옵션 범위 | 2~10석 옵션 × 월·연. 10석 넘는 팀은 문의(추정 수요 적음) |
-| 3 | 환불 시 처리 | 환불 = 바로 Pro 끔(환불 이벤트에서 `canceled`)으로 할지, 해지 이벤트를 기다릴지 |
-| 4 | 결제하지 않은 토큰 유효 기간 | 7일 |
+| 2 | 팀 좌석 옵션 범위 | ✔ 2026-11-04 사용자 결정: **2~10석**, 옵션 18개(9단 × 월·연). 10석 넘는 팀은 문의 |
+| 3 | 환불 시 처리 | ✔ 2026-11-04 사용자 결정: **환불 알림이 오면 바로 끈다**(부분 환불 포함) — 0-5 표 |
+| 4 | 결제하지 않은 토큰 유효 기간 | ✔ 2026-11-04 사용자 결정: **24시간**(결제 시각 기준) — 0-3 표 |
 | 5 | Paddle 코드·사이트 `/checkout` | 지우지 않고 꺼 둔다(🔴 삭제는 승인 건) — Groble 실결제 확인 뒤 지울지 다시 묻는다 |
 | 6 | Groble 문의 2건 | 플랜(좌석) 변경 방법 · 주기를 옵션별로 둘 수 있는지 — 사용자가 문의 |
 
@@ -101,7 +101,7 @@
 |---|---|---|
 | G1 | 서명이 맞는 웹훅만 — 틀림·없음·±5분 밖은 401·쓰기 0, Previous 서명도 받음 | 단위 테스트(실제 HMAC) |
 | G2 | 같은 멱등 키 두 번 → 두 번째 쓰기 0 · 오래된 `occurredAt`은 덮지 않음 | 단위 테스트 |
-| G3 | 바꾼 ref(`unknown-ref`)·옵션 불일치(`wrong-option`)·7일 지난 미결제 토큰은 쓰기 0 | 단위 테스트 |
+| G3 | 바꾼 ref(`unknown-ref`)·옵션 불일치(`wrong-option`)·만든 지 24시간 지나 결제된 토큰은 쓰기 0 · 결제는 24시간 안인데 웹훅이 늦게 온 것은 처리 | 단위 테스트 |
 | G4 | 0-5 표의 이벤트 7줄이 표대로 상태를 바꾼다 · 환불은 `merchantUid`로 찾는다 | 단위 테스트(가짜 Firestore) |
 | G5 | 팀 옵션 결제가 좌석 수를 옵션 표에서 정한다 — TP2~TP4 그대로 통과 | 기존 팀 테스트 + 새 테스트 |
 | G6 | 저장·로그·응답에 구매자 이메일·전화·이름·카드·uid(로그) 없음 | 단위 테스트 |
