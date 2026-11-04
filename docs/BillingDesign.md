@@ -8,6 +8,11 @@
 ## 0. Groble 전환 (2026-11-04)
 근거: Groble 공식 가이드 `help/guides/webhook` · `webhook-events` · `payment-window` · `faq` (2026-11-04 읽음). 가이드에 없는 것은 「❓」로 둔다 — 추측으로 채우지 않는다.
 
+> 🔴 **2026-11-04 실측(Groble 상품 등록 화면) — 정기결제 상품은 가격 하나·결제 주기 하나뿐, 옵션을 둘 곳이 없다.** 사용자 결정 「상품별로 바꾸기」:
+> 요금제·주기·좌석마다 **상품을 하나씩**(Pro 월·연 2 + 팀 2~10석 × 월·연 18 = **20개**). Worker 설정은 `GROBLE_PRODUCTS`(상품 ID → `{plan, interval, seats}`) 한 표.
+> 결제 시작은 요청한 (요금제·주기·좌석) 상품의 링크를 주고, 첫 결제 웹훅의 `content.id`가 토큰의 상품과 **같아야** 묶인다(`wrong-product`). 아래 「옵션」 서술은 이 줄이 이긴다.
+> 결제창에서 받는 구매자 정보: 휴대폰 번호는 Groble 필수, 주문자명·이메일은 끈다(사이는 쓰지 않는다).
+
 ### 0-1. Paddle과 다른 점
 | 항목 | Paddle(옛) | Groble | 사이에 주는 영향 |
 |---|---|---|---|
@@ -71,8 +76,7 @@
 ### 0-6. Worker 설정 (Paddle 값 대신)
 | 이름 | 종류 | 값 |
 |---|---|---|
-| `GROBLE_PRODUCT_PRO` · `GROBLE_PRODUCT_TEAM` | var | 상품 ID(결제 링크 경로, 비밀 아님) |
-| `GROBLE_OPTIONS` | var(JSON) | 옵션 ID → `{plan, interval, seats}` 표 — 🔴 판정은 이 표 한 곳 |
+| `GROBLE_PRODUCTS` | var(JSON) | 상품 ID → `{plan, interval, seats}` 표(20줄) — 🔴 판정은 이 표 한 곳. 상품 ID는 결제 링크 경로, 비밀 아님 |
 | `GROBLE_WEBHOOK_SECRET` | 🔴 secret | 사용자가 넣는다(내 스토어 → 연동에서 한 번만 보임, 24시간에 한 번 재발급). 넣는 순서는 CLAUDE.md Paddle 시크릿 줄과 같다 |
 | `BILLING_ENFORCED` | var | 그대로 |
 - API 키는 필요 없다(Groble은 결제를 만드는 API가 없다). B1의 `sig`(API 키에서 만든 HMAC)는 0-3 토큰으로 바뀐다.

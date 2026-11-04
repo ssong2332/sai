@@ -10,7 +10,7 @@ import { MemoryCacheStore } from '../../../src/core/refine/index.js';
 import { createHandler } from '../src/handler.js';
 import { createMemoryUsageStore } from '../src/usageStore.js';
 import { resolvePlan } from '../src/billing.js';
-import { REF_TTL_MS, parseGrobleOptions, verifyGrobleSignature } from '../src/grobleBilling.js';
+import { REF_TTL_MS, parseGrobleProducts, verifyGrobleSignature } from '../src/grobleBilling.js';
 import { RestFirestore } from '../src/google/firestoreRest.js';
 import { createFakeFirestore } from './fakeFirestore.js';
 import { TEST_ENV, captureLogger, fakeAnthropicFetch, makeKeys, signIdToken } from './helpers.js';
@@ -20,20 +20,15 @@ const token = await signIdToken(keys);
 const UID = 'uid-test-123';
 const SECRET = 'groble-whsec-test-not-real';
 const NOW = Date.now();
-const OPTIONS = {
-  opt_pro_m: { plan: 'pro', interval: 'month' },
-  opt_pro_y: { plan: 'pro', interval: 'year' },
-  opt_team2_m: { plan: 'team', interval: 'month', seats: 2 },
-  opt_team3_m: { plan: 'team', interval: 'month', seats: 3 },
-  opt_team5_m: { plan: 'team', interval: 'month', seats: 5 },
+// 상품 하나 = (요금제·주기·좌석) 하나 — 2026-11-04 상품 등록 화면 실측.
+const PRODUCTS = {
+  proM: { plan: 'pro', interval: 'month' },
+  proY: { plan: 'pro', interval: 'year' },
+  team2M: { plan: 'team', interval: 'month', seats: 2 },
+  team3M: { plan: 'team', interval: 'month', seats: 3 },
+  team5M: { plan: 'team', interval: 'month', seats: 5 },
 };
-const ENV = {
-  ...TEST_ENV,
-  GROBLE_PRODUCT_PRO: 'prod-pro',
-  GROBLE_PRODUCT_TEAM: 'prod-team',
-  GROBLE_OPTIONS: JSON.stringify(OPTIONS),
-  GROBLE_WEBHOOK_SECRET: SECRET,
-};
+const ENV = { ...TEST_ENV, GROBLE_PRODUCTS: JSON.stringify(PRODUCTS), GROBLE_WEBHOOK_SECRET: SECRET };
 
 function setup() {
   const fake = createFakeFirestore();
@@ -76,13 +71,14 @@ function event(type, object, { occurredAt = new Date(NOW).toISOString() } = {}) 
   return { id: `evt_${seq}`, type, version: 1, occurredAt, data: { object } };
 }
 
-function paid(ref, { optionId = 'opt_pro_m', merchantUid = `m_${seq + 1}`, purchasedAt = new Date(NOW).toISOString(), cycle = 1, next = '2026-12-04', reason = 'INITIAL' } = {}) {
+function paid(ref, { productId = 'proM', merchantUid = `m_${seq + 1}`, purchasedAt = new Date(NOW).toISOString(), cycle = 1, next = '2026-12-04', reason = 'INITIAL' } = {}) {
   return {
     merchantUid,
     sellerReference: ref,
     buyer: { type: 'MEMBER', displayName: '구매자', email: 'buyer@example.com', phoneNumber: '010-0000-0000' },
     paymentMethod: { type: 'CARD', cardName: '테스트카드', maskedCardNumber: '1234-****' },
-    options: [{ optionId, name: '옵션', quantity: 1 }],
+    content: { id: productId, title: '사이', type: 'SERVICE', paymentType: 'SUBSCRIPTION' },
+    options: [{ optionId: 'opt-default', name: '옵션', quantity: 1 }],
     pricing: { currency: 'KRW', finalAmount: 7900 },
     payment: { purchasedAt },
     subscription: { billingReason: reason, currentRound: 1, nextBillingDate: next, status: 'ACTIVE', billingCycleMonths: cycle },
@@ -109,12 +105,15 @@ test('결제 시작 — Groble 링크·토큰(uid 없음)·토큰 저장, 로그
   const { handle, db } = setup();
   const { res, out, ref } = await startCheckout(handle);
   assert.equal(res.status, 200);
-  assert.match(out.checkoutUrl, /^https:\/\/groble\.im\/payment\/prod-pro\?ref=sr_[A-Za-z0-9_-]{32}$/);
+  assert.match(out.checkoutUrl, /^https:\/\/groble\.im\/payment\/proM\?ref=sr_[A-Za-z0-9_-]{32}$/);
   assert.ok(!out.checkoutUrl.includes(UID), '🔴 링크에 uid가 실렸다');
   const saved = await docOf(db, 'billingRefs', ref);
   assert.equal(saved.uid, UID);
   assert.equal(saved.plan, 'pro');
   assert.equal(saved.boundAt, null);
+  assert.equal(saved.productId, 'proM');
+  const year = await startCheckout(handle, { plan: 'pro', interval: 'year' });
+  assert.match(year.out.checkoutUrl, /\/payment\/proY\?ref=/, '연 결제는 연 상품 링크');
 
   const anon = await handle(new globalThis.Request('https://worker.test/v1/billing/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"plan":"pro","interval":"month"}' }), ENV);
   assert.equal(anon.status, 401);
@@ -168,9 +167,10 @@ test('G3 — 바꾼 ref·옵션 불일치·24시간 지난 토큰은 쓰기 0, �
   const cases = [
     ['없는 토큰', paid('sr_' + 'A'.repeat(32))],
     ['형식 다른 ref(uid 직접)', paid(UID)],
-    ['Pro 토큰으로 팀 옵션', paid(ref, { optionId: 'opt_team2_m' })],
-    ['표에 없는 옵션', paid(ref, { optionId: 'opt_unknown' })],
-    ['주기 값이 옵션과 다름', paid(ref, { cycle: 12 })],
+    ['Pro 월 토큰으로 팀 상품', paid(ref, { productId: 'team2M' })],
+    ['Pro 월 토큰으로 Pro 연 상품', paid(ref, { productId: 'proY', cycle: 12 })],
+    ['표에 없는 상품', paid(ref, { productId: 'nope' })],
+    ['주기 값이 표와 다름', paid(ref, { cycle: 12 })],
     ['24시간 지난 결제', paid(ref, { purchasedAt: new Date(NOW + REF_TTL_MS + 60_000).toISOString() })],
   ];
   for (const [label, obj] of cases) {
@@ -179,7 +179,7 @@ test('G3 — 바꾼 ref·옵션 불일치·24시간 지난 토큰은 쓰기 0, �
     assert.equal(await docOf(db, 'billing', UID), null, `${label} — 쓰면 안 된다`);
   }
   assert.equal((await docOf(db, 'billingRefs', ref)).boundAt, null);
-  assert.ok(logger.lines.some((l) => l.includes('unknown-ref')) && logger.lines.some((l) => l.includes('wrong-option')) && logger.lines.some((l) => l.includes('expired-ref')));
+  assert.ok(logger.lines.some((l) => l.includes('unknown-ref')) && logger.lines.some((l) => l.includes('wrong-product')) && logger.lines.some((l) => l.includes('expired-ref')));
   // 결제는 23시간 뒤(유효), 웹훅 도착은 그보다 훨씬 뒤 — 결제 시각으로 판정하므로 처리.
   const late = event('subscription_payment.completed', paid(ref, { purchasedAt: new Date(NOW + 23 * 3600_000).toISOString() }), { occurredAt: new Date(NOW + 23 * 3600_000).toISOString() });
   await send(handle, late);
@@ -233,19 +233,20 @@ test('G4 — 이벤트 판정표: 결제 → Pro, 실패 → 재청구 중 유�
   assert.equal((await send(handle, event('payment.completed', paid(ref)))).status, 200);
 });
 
-test('G5 — 팀: 팀장만 · 좌석 2~10 · 팀원 수 이상, 옵션 좌석이 최소보다 적으면 거절, 맞으면 팀 기록·좌석 배정', async () => {
+test('G5 — 팀: 팀장만 · 좌석 2~10 · 팀원 수 이상 · 그 좌석 상품 링크, 다른 상품 결제는 거절, 맞으면 팀 기록·좌석 배정', async () => {
   const { handle, db } = setup();
   await seedTeam(db);
   assert.equal((await startCheckout(handle, { plan: 'team', interval: 'month', teamId: 'team-1', seats: 11 })).res.status, 400);
   assert.equal((await startCheckout(handle, { plan: 'team', interval: 'month', teamId: 'team-1', seats: 2 })).res.status, 400, '팀원 3명인데 2석');
-  const { res, out, ref } = await startCheckout(handle, { plan: 'team', interval: 'month', teamId: 'team-1', seats: 3 });
+  assert.equal((await startCheckout(handle, { plan: 'team', interval: 'month', teamId: 'team-1', seats: 4 })).res.status, 400, '4석 상품이 표에 없다');
+  const { res, out, ref } = await startCheckout(handle, { plan: 'team', interval: 'month', teamId: 'team-1', seats: 5 });
   assert.equal(res.status, 200);
-  assert.match(out.checkoutUrl, /\/payment\/prod-team\?ref=/);
+  assert.match(out.checkoutUrl, /\/payment\/team5M\?ref=/);
 
-  await send(handle, event('subscription_payment.completed', paid(ref, { optionId: 'opt_team2_m' })));
-  assert.equal((await docOf(db, 'teams', 'team-1')).billing, undefined, '2석 옵션 — 최소 3석보다 적다');
+  await send(handle, event('subscription_payment.completed', paid(ref, { productId: 'team3M' })));
+  assert.equal((await docOf(db, 'teams', 'team-1')).billing, undefined, '5석 토큰으로 3석 상품 결제 — 거절');
 
-  await send(handle, event('subscription_payment.completed', paid(ref, { optionId: 'opt_team5_m', merchantUid: 'team-round' })));
+  await send(handle, event('subscription_payment.completed', paid(ref, { productId: 'team5M', merchantUid: 'team-round' })));
   const team = await docOf(db, 'teams', 'team-1');
   assert.equal(team.billing.status, 'active');
   assert.equal(team.billing.seats, 5);
@@ -290,10 +291,10 @@ test('G6 — 저장·로그·응답에 구매자 이메일·전화·이름·카�
   assert.ok(!logger.lines.join('\n').includes(UID), '🔴 로그에 uid');
 });
 
-test('G7 — 옵션 표: 틀린 줄은 버리고, Groble 설정이 없으면 결제 시작은 예전(Paddle) 경로 그대로', async () => {
-  const map = parseGrobleOptions(JSON.stringify({ a: { plan: 'pro', interval: 'month' }, b: { plan: 'team', interval: 'year', seats: 11 }, c: { plan: 'team', interval: 'week', seats: 3 }, d: { plan: 'gold' } }));
+test('G7 — 상품 표: 틀린 줄·겹치는 줄은 버리고, Groble 설정이 없으면 결제 시작은 예전(Paddle) 경로 그대로', async () => {
+  const map = parseGrobleProducts(JSON.stringify({ a: { plan: 'pro', interval: 'month' }, a2: { plan: 'pro', interval: 'month' }, b: { plan: 'team', interval: 'year', seats: 11 }, c: { plan: 'team', interval: 'week', seats: 3 }, d: { plan: 'gold' }, 'x/y': { plan: 'pro', interval: 'year' } }));
   assert.deepEqual([...map.keys()], ['a']);
-  assert.equal(parseGrobleOptions('not json').size, 0);
+  assert.equal(parseGrobleProducts('not json').size, 0);
   const { handle } = setup();
   const res = await handle(checkout({ plan: 'pro', interval: 'month' }), TEST_ENV);
   assert.equal(res.status, 503, 'Groble도 Paddle도 설정이 없으면 503');

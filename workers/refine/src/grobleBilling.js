@@ -4,6 +4,9 @@
  * | 경로 | 누가 부르나 | 하는 일 |
  * |---|---|---|
  * | `POST /v1/billing/checkout` | 확장(로그인 토큰) | 일회용 결제 토큰 발급(`billingRefs/{토큰}`) → `https://groble.im/payment/<상품>?ref=<토큰>` |
+ *
+ * 🔴 2026-11-04 실측(상품 등록 화면): Groble 정기결제 상품은 **가격 하나·주기 하나**뿐이고 옵션을 둘 곳이 없다.
+ *    그래서 요금제·주기·좌석마다 상품을 하나씩 만들고(Pro 2 + 팀 18), `GROBLE_PRODUCTS` 표 한 곳으로 판정한다.
  * | `POST /v1/billing/groble-webhook` | Groble 서버(서명) | 이벤트 판정표(0-5) → `billing/{uid}` 또는 `teams/{teamId}.billing` |
  *
  * 🔴 웹훅 비밀값은 시크릿에서만 읽고 응답·로그에 싣지 않는다. 로그에는 이벤트 이름·사유 코드만(uid 없음).
@@ -35,10 +38,10 @@ const CYCLE_TO_INTERVAL = { 1: 'month', 12: 'year' };
 const str = (value) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
 
 /**
- * `GROBLE_OPTIONS`(JSON: 옵션 ID → `{plan, interval, seats?}`) 읽기. 🔴 판정은 이 표 한 곳.
- * 틀린 줄은 버린다(없는 옵션 = `wrong-option`이 되어 쓰기 0 — 지어낸 요금제를 주지 않는다).
+ * `GROBLE_PRODUCTS`(JSON: 상품 ID → `{plan, interval, seats?}`) 읽기. 🔴 판정은 이 표 한 곳.
+ * 틀린 줄·같은 (요금제·주기·좌석)이 두 번 나오는 줄은 버린다 — 없는 상품 = `wrong-product`, 쓰기 0.
  */
-export function parseGrobleOptions(raw) {
+export function parseGrobleProducts(raw) {
   let obj;
   try {
     obj = JSON.parse(raw ?? '');
@@ -46,26 +49,41 @@ export function parseGrobleOptions(raw) {
     return new Map();
   }
   const out = new Map();
+  const seen = new Set();
   if (!obj || typeof obj !== 'object') return out;
   for (const [id, v] of Object.entries(obj)) {
-    if (!v || !['month', 'year'].includes(v.interval)) continue;
-    if (v.plan === 'pro') out.set(String(id), { plan: 'pro', interval: v.interval, seats: 1 });
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id) || !v || !['month', 'year'].includes(v.interval)) continue;
+    let entry = null;
+    if (v.plan === 'pro') entry = { plan: 'pro', interval: v.interval, seats: 1 };
     else if (v.plan === 'team' && Number.isInteger(v.seats) && v.seats >= GROBLE_TEAM_SEATS.min && v.seats <= GROBLE_TEAM_SEATS.max) {
-      out.set(String(id), { plan: 'team', interval: v.interval, seats: v.seats });
+      entry = { plan: 'team', interval: v.interval, seats: v.seats };
     }
+    if (!entry) continue;
+    const key = productKey(entry.plan, entry.interval, entry.seats);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.set(id, entry);
   }
   return out;
+}
+
+const productKey = (plan, interval, seats) => `${plan}|${interval}|${plan === 'team' ? seats : 1}`;
+
+/** (요금제·주기·좌석) → 상품 ID. 없으면 null. */
+export function findGrobleProduct(products, plan, interval, seats = 1) {
+  const want = productKey(plan, interval, seats);
+  for (const [id, v] of products) if (productKey(v.plan, v.interval, v.seats) === want) return id;
+  return null;
 }
 
 /** env → Groble 설정. 값 자체는 밖으로 내보내지 않는다. */
 export function readGrobleConfig(env = {}) {
   const config = {
-    products: { pro: str(env.GROBLE_PRODUCT_PRO), team: str(env.GROBLE_PRODUCT_TEAM) },
-    options: parseGrobleOptions(env.GROBLE_OPTIONS),
+    products: parseGrobleProducts(env.GROBLE_PRODUCTS),
     webhookSecret: str(env.GROBLE_WEBHOOK_SECRET),
   };
-  config.checkoutReady = Boolean(config.products.pro && config.options.size > 0);
-  config.webhookReady = Boolean(config.webhookSecret && config.options.size > 0);
+  config.checkoutReady = config.products.size > 0;
+  config.webhookReady = Boolean(config.webhookSecret && config.products.size > 0);
   return config;
 }
 
@@ -127,10 +145,11 @@ async function idempotencyDocId(key) {
 
 /**
  * 결제 시작 — 토큰을 만들어 저장하고 결제 링크를 돌려준다. 확인(로그인·팀장·좌석·이미 결제 중)은 부르는 쪽이 끝냈다.
- * @param {{plan: 'pro'|'team', interval: string, uid: string, teamId?: string|null, minSeats?: number}} want
+ * @param {{plan: 'pro'|'team', interval: string, uid: string, teamId?: string|null, seats?: number}} want
+ * @returns {Promise<{checkoutUrl: string}|null>} null = 그 (요금제·주기·좌석) 상품이 표에 없다
  */
 export async function createGrobleCheckout(db, groble, want, nowMs = Date.now()) {
-  const product = groble.products[want.plan];
+  const product = findGrobleProduct(groble.products, want.plan, want.interval, want.seats ?? 1);
   if (!product) return null;
   const ref = newRefToken();
   await db.collection('billingRefs').doc(ref).set({
@@ -138,7 +157,7 @@ export async function createGrobleCheckout(db, groble, want, nowMs = Date.now())
     teamId: want.teamId ?? null,
     plan: want.plan,
     interval: want.interval,
-    minSeats: want.plan === 'team' ? Number(want.minSeats) : 1,
+    productId: product,
     createdAt: new Date(nowMs).toISOString(),
     boundAt: null,
   });
@@ -158,20 +177,19 @@ function isStale(prev, occurredAt) {
 }
 
 /**
- * 첫 결제(`INITIAL`) 때 토큰과 결제가 맞는지.
+ * 첫 결제(`INITIAL`) 때 토큰과 결제가 맞는지. 결제 링크가 상품 하나를 가리키므로 **상품이 같아야** 한다.
  * | 조건 | 결과 |
  * |---|---|
- * | 옵션이 표에 없음 · 요금제가 토큰과 다름 · 주기 값이 옵션과 다름 | `wrong-option` |
- * | 팀인데 옵션 좌석 < 토큰의 최소 좌석(결제 시작 때 팀원 수, 2 이상) | `wrong-option` |
- * | 결제 시각이 토큰 생성 + 24시간 뒤 | `expired-ref` |
+ * | `content.id`가 토큰의 상품과 다름 · 상품이 표에 없음 · 주기 값이 표와 다름 | `wrong-product` |
+ * | 결제 시각이 토큰 생성 + 24시간 뒤 | `expired-ref`(부르는 쪽) |
  */
-function checkOption(groble, token, obj) {
-  const option = groble.options.get(String(obj?.options?.[0]?.optionId ?? ''));
-  if (!option || option.plan !== token.plan) return { error: 'wrong-option' };
+function checkProduct(groble, token, obj) {
+  const id = String(obj?.content?.id ?? '');
+  const product = groble.products.get(id);
+  if (!product || id !== String(token.productId ?? '') || product.plan !== token.plan) return { error: 'wrong-product' };
   const cycle = CYCLE_TO_INTERVAL[Number(obj?.subscription?.billingCycleMonths)];
-  if (cycle && cycle !== option.interval) return { error: 'wrong-option' };
-  if (option.plan === 'team' && option.seats < Number(token.minSeats ?? GROBLE_TEAM_SEATS.min)) return { error: 'wrong-option' };
-  return { option };
+  if (cycle && cycle !== product.interval) return { error: 'wrong-product' };
+  return { product };
 }
 
 /**
@@ -204,7 +222,7 @@ const HANDLED = new Set([
 
 /**
  * 웹훅 이벤트 하나 반영.
- * @returns {Promise<'saved'|'stale'|'ignored'|'duplicate'|'unknown-ref'|'expired-ref'|'wrong-option'>}
+ * @returns {Promise<'saved'|'stale'|'ignored'|'duplicate'|'unknown-ref'|'expired-ref'|'wrong-product'>}
  */
 export async function applyGrobleEvent(db, event, groble, idempotencyKey = null) {
   const type = String(event?.type ?? '');
@@ -232,28 +250,28 @@ export async function applyGrobleEvent(db, event, groble, idempotencyKey = null)
   if (!tokenSnap.exists) return 'unknown-ref';
   const token = tokenSnap.data() ?? {};
 
-  let option = token.optionId ? groble.options.get(String(token.optionId)) ?? null : null;
+  let product = token.boundAt ? groble.products.get(String(token.productId ?? '')) ?? null : null;
   if (!token.boundAt) {
     // 묶이지 않은 토큰은 첫 결제 완료로만 묶인다. 그 밖의 이벤트(실패·해지·환불)는 묶인 토큰에만 온다.
     if (type !== 'subscription_payment.completed') return 'unknown-ref';
-    const checked = checkOption(groble, token, obj);
+    const checked = checkProduct(groble, token, obj);
     if (checked.error) return checked.error;
     const paidAt = isoMs(obj?.payment?.purchasedAt) || isoMs(occurredAt);
     // 🔴 판정은 결제 시각 — 웹훅 도착 시각이 아니다(Groble 재시도가 최대 약 44시간 늦을 수 있다).
     if (!Number.isFinite(paidAt) || paidAt > isoMs(token.createdAt) + REF_TTL_MS) return 'expired-ref';
-    option = checked.option;
-    await tokenRef.set({ boundAt: new Date().toISOString(), optionId: String(obj.options[0].optionId) }, { merge: true });
+    product = checked.product;
+    await tokenRef.set({ boundAt: new Date().toISOString() }, { merge: true });
   }
-  if (!option) return 'wrong-option';
+  if (!product) return 'wrong-product';
 
   if (type === 'subscription_payment.completed' && merchantUid && merchantUid.length <= 128 && !merchantUid.includes('/')) {
     await db.collection('billingRounds').doc(merchantUid).set({ ref });
   }
 
   const next = stateFor(type, obj);
-  const common = { provider: 'groble', plan: option.plan, interval: option.interval, optionId: String(token.optionId ?? obj?.options?.[0]?.optionId ?? ''), ref };
+  const common = { provider: 'groble', plan: product.plan, interval: product.interval, productId: String(token.productId), ref };
   const result = token.teamId
-    ? await applyTeam(db, token, option, next, common, occurredAt)
+    ? await applyTeam(db, token, product, next, common, occurredAt)
     : await applyPersonal(db, token.uid, next, common, occurredAt);
   if (markId && result !== 'ignored') await db.collection('billingEvents').doc(markId).set({ at: new Date().toISOString() });
   return result;
@@ -285,7 +303,7 @@ async function applyPersonal(db, uid, next, common, occurredAt) {
   });
 }
 
-async function applyTeam(db, token, option, next, common, occurredAt) {
+async function applyTeam(db, token, product, next, common, occurredAt) {
   const teamId = String(token.teamId);
   const payerUid = String(token.uid ?? '');
   if (teamId.length > 128 || !payerUid) return 'ignored';
@@ -298,7 +316,7 @@ async function applyTeam(db, token, option, next, common, occurredAt) {
     const prev = snap.get('billing') ?? {};
     if (isStale(prev, occurredAt)) return 'stale';
     status = next.status ?? String(prev.status ?? '');
-    merged = { ...prev, ...common, ...next.patch, status, seats: option.seats, eventAt: occurredAt, payerUid };
+    merged = { ...prev, ...common, ...next.patch, status, seats: product.seats, eventAt: occurredAt, payerUid };
     tx.set(ref, { billing: merged }, { merge: true });
     return 'saved';
   });

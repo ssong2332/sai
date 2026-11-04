@@ -16,7 +16,7 @@ import { verifyFirebaseIdToken, bearerToken, AuthError } from './auth.js';
 import { teamShouldLock } from '../../../functions/teams.js';
 import { billingExpireAt } from '../../../functions/account.js';
 import { PLAN_LIMITS } from '../../../src/core/refine/quality.js';
-import { GROBLE_TEAM_SEATS, applyGrobleEvent, createGrobleCheckout, readGrobleConfig, verifyGrobleSignature } from './grobleBilling.js';
+import { GROBLE_TEAM_SEATS, applyGrobleEvent, createGrobleCheckout, findGrobleProduct, readGrobleConfig, verifyGrobleSignature } from './grobleBilling.js';
 
 /** 요금제별 하루 한도 — 표는 코어(`src/core/refine/quality.js`) 한 곳. 확장 설정 안내가 같은 표를 읽는다. */
 export { PLAN_LIMITS };
@@ -510,21 +510,18 @@ export async function handleBilling(request, { config, billing, db, json, logger
 
 /**
  * Groble 결제 시작(`docs/BillingDesign.md` 0-2 ①). 확인 순서는 Paddle과 같다 — 로그인 → 요금제·주기 → 팀장·좌석 → 이미 결제 중.
- * 좌석은 결제 페이지에서 구매자가 옵션으로 고른다(링크로 미리 고를 수 없다 — ❓ 가이드에 없음). 그래서 토큰에는
- * **최소 좌석**(요청 좌석과 지금 팀원 수 중 큰 값, 2 이상)을 적고, 웹훅이 그보다 적은 옵션을 거절한다.
+ * 상품 하나 = (요금제·주기·좌석) 하나(2026-11-04 실측) — 요청한 좌석 수의 상품 링크를 준다. 좌석은 지금 팀원 수 이상.
  */
 async function grobleCheckout({ db, billing, uid, body, json, logger, now }) {
   const groble = billing.groble;
   const plan = body?.plan;
   const interval = body?.interval;
-  if (!['pro', 'team'].includes(plan) || !['month', 'year'].includes(interval) || !groble.products[plan]) {
-    return json(400, { error: 'unknown plan' });
-  }
+  if (!['pro', 'team'].includes(plan) || !['month', 'year'].includes(interval)) return json(400, { error: 'unknown plan' });
   let teamId = null;
-  let minSeats = 1;
+  let seats = 1;
   if (plan === 'team') {
     teamId = typeof body?.teamId === 'string' && body.teamId.length <= 128 && !body.teamId.includes('/') ? body.teamId : null;
-    const seats = Number(body?.seats);
+    seats = Number(body?.seats);
     if (!teamId) return json(400, { error: 'bad request' });
     if (!Number.isInteger(seats) || seats < GROBLE_TEAM_SEATS.min || seats > GROBLE_TEAM_SEATS.max) {
       return json(400, { error: 'bad seats', min: GROBLE_TEAM_SEATS.min, max: GROBLE_TEAM_SEATS.max });
@@ -533,14 +530,14 @@ async function grobleCheckout({ db, billing, uid, body, json, logger, now }) {
     if (!owner.ok) return json(403, { error: 'not-owner' });
     if (liveSubscription(owner.billing)) return json(409, { error: 'already-subscribed' });
     if (seats < owner.memberCount) return json(400, { error: 'bad seats', min: owner.memberCount, max: GROBLE_TEAM_SEATS.max });
-    minSeats = Math.max(GROBLE_TEAM_SEATS.min, owner.memberCount, seats);
   } else {
     const mine = await db.collection('billing').doc(uid).get();
     const doc = mine.exists ? mine.data() ?? null : null;
     if (liveSubscription(doc) && resolvePlan(doc, billing) === 'pro') return json(409, { error: 'already-subscribed' });
   }
+  if (!findGrobleProduct(groble.products, plan, interval, seats)) return json(400, { error: 'unknown plan' });
   try {
-    const out = await createGrobleCheckout(db, groble, { plan, interval, uid, teamId, minSeats }, now());
+    const out = await createGrobleCheckout(db, groble, { plan, interval, uid, teamId, seats }, now());
     if (!out) return json(400, { error: 'unknown plan' });
     return json(200, out);
   } catch (error) {
