@@ -21,6 +21,10 @@ import {
   TEAM_SEATS_MAX,
   TEAM_SEATS_MIN,
   teamPurchaseBlocked,
+  subscriptionManageable,
+  GROBLE_ORDERS_URL,
+  REFUND_NOTE,
+  CANCEL_NOTE,
 } from '../src/lib/billingClient.js';
 import { teamErrorMessage, TEAM_ERRORS } from '../src/lib/teamClient.js';
 import { QUALITY_DOWNGRADE_NOTES } from '../src/core/refine/quality.js';
@@ -64,6 +68,21 @@ test('팀 탭 구매 칸 — 결제 중(해지 예약 없음)이면 숨김, 서�
   for (const billing of [null, undefined, { status: 'canceled' }, { status: '' }]) {
     assert.equal(teamPurchaseBlocked(billing), false, JSON.stringify(billing));
   }
+});
+
+test('환불·해지(2026-11-05) — 결제 중이면 해지 예약 뒤에도 환불 신청은 보인다 · 주문조회로 · 7일 뒤 환불 없음', () => {
+  for (const status of ['active', 'trialing', 'past_due']) {
+    assert.equal(subscriptionManageable({ status }), true, status);
+    assert.equal(subscriptionManageable({ status, cancelScheduled: true }), true, `${status} 해지 예약`);
+  }
+  for (const billing of [null, undefined, { status: 'canceled' }, { status: '' }]) {
+    assert.equal(subscriptionManageable(billing), false, JSON.stringify(billing));
+  }
+  assert.equal(GROBLE_ORDERS_URL, 'https://groble.im/account/purchases');
+  assert.match(REFUND_NOTE, /7일 안/);
+  assert.match(REFUND_NOTE, /승인/);
+  assert.match(REFUND_NOTE, /7일이 지나면 환불되지 않아요/);
+  assert.match(CANCEL_NOTE, /결제한 기간이 끝날 때까지/);
 });
 
 test('모르는 주기는 서버를 부르지 않고 거절', async () => {

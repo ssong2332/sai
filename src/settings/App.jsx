@@ -30,9 +30,12 @@ import {
   BillingClientError,
   billingErrorText,
   formatKrw,
+  CANCEL_NOTE,
   GROBLE_MANAGE_NOTE,
+  GROBLE_ORDERS_URL,
   PRICES_KRW,
   planSummary,
+  REFUND_NOTE,
   startCheckout,
 } from '../lib/billingClient.js';
 import { useMyPlan } from '../lib/useMyPlan.js';
@@ -265,6 +268,34 @@ function PlanGroup() {
           {error}
         </p>
       )}
+    </Group>
+  );
+}
+
+/**
+ * 「환불·해지」(2026-11-05 사용자 결정) — 결제한 사람에게. 표는 `billingClient.js` `GROBLE_ORDERS_URL` 머리말.
+ * 🔴 팀 요금제는 결제한 팀장만 환불·해지할 수 있다 — 여기서는 안내만, 버튼은 사이드패널 팀 탭.
+ */
+function ManageGroup({ plan }) {
+  if (plan === 'team') {
+    return (
+      <Group title="환불·해지">
+        <p className="row-hint">팀 요금제 환불·해지는 결제한 팀장이 사이드패널 「팀」 탭에서 해요.</p>
+      </Group>
+    );
+  }
+  const openOrders = () => window.open(GROBLE_ORDERS_URL, '_blank', 'noopener');
+  return (
+    <Group title="환불·해지" note={REFUND_NOTE}>
+      <div className="plan-actions">
+        <button type="button" className="btn press" onClick={openOrders}>
+          환불 신청
+        </button>
+        <button type="button" className="btn press" onClick={openOrders}>
+          구독 해지
+        </button>
+      </div>
+      <p className="row-hint">{CANCEL_NOTE} 두 버튼 모두 새 탭의 그로블 주문조회로 가요(결제할 때 쓴 휴대폰 번호로 확인).</p>
     </Group>
   );
 }
@@ -1047,6 +1078,8 @@ const PRICING_URL = 'https://sai-global-msg-2026.web.app/pricing';
 function PlanPanel({ plan }) {
   // 2026-11-01 — 결제한 사람에게는 그 요금제를(`planSummary` 표). 유료화 전·모름은 아래 출시 기간 문구 그대로.
   const paid = FEATURES.billing ? planSummary(plan) : null;
+  // 🔴 2026-11-05 — `planSummary('free')`도 값을 돌려준다. 구매 버튼·환불·해지는 「결제했나」로만 가른다.
+  const isPaid = FEATURES.billing && (plan === 'pro' || plan === 'team');
   return (
     <>
       {paid ? (
@@ -1092,7 +1125,8 @@ function PlanPanel({ plan }) {
       )}
 
       {/* 2026-11-05 — 결제한 사람(pro·team)에게는 구매 버튼을 그리지 않는다. 팀 요금제 구매는 사이드패널 팀 탭(팀장). */}
-      {FEATURES.billing && !paid && <PlanGroup />}
+      {FEATURES.billing && !isPaid && <PlanGroup />}
+      {isPaid && <ManageGroup plan={plan} />}
 
       <Group
         title={FEATURES.billing ? '요금제 비교' : '유료 플랜'}

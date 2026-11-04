@@ -8,7 +8,11 @@ import {
   billingErrorText,
   formatKrw,
   PRICES_KRW,
+  CANCEL_NOTE,
+  GROBLE_ORDERS_URL,
+  REFUND_NOTE,
   startCheckout,
+  subscriptionManageable,
   TEAM_SEATS_MAX,
   TEAM_SEATS_MIN,
   teamPurchaseBlocked,
@@ -2068,6 +2072,32 @@ function TeamPlanSection({ team, plan, onToast, onChanged }) {
               </div>
             </>
           )}
+        </>
+      )}
+      {/* 2026-11-05 사용자 결정 — 환불 신청은 늘, 구독 해지는 해지 예약 전까지(월·연 모두). 표는 billingClient.js. */}
+      {FEATURES.billing && subscriptionManageable(plan.billing) && (
+        <>
+          <p className="field-label">환불·해지</p>
+          <p className="meta">{REFUND_NOTE}</p>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="button button-quiet"
+              onClick={() => window.open(GROBLE_ORDERS_URL, '_blank', 'noopener')}
+            >
+              환불 신청
+            </button>
+            {plan.billing.cancelScheduled !== true && (
+              <button
+                type="button"
+                className="button button-quiet"
+                onClick={() => window.open(GROBLE_ORDERS_URL, '_blank', 'noopener')}
+              >
+                구독 해지
+              </button>
+            )}
+          </div>
+          <p className="meta">{plan.billing.cancelScheduled === true ? '해지 예약됨 — ' : ''}{CANCEL_NOTE}</p>
         </>
       )}
       {FEATURES.billing && <p className="field-label">팀 기본 품질 모드</p>}
