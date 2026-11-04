@@ -54,10 +54,12 @@ PADDLE_PRICE_PRO_YEAR = "pri_01m691emykvm3xb27tdn7kwq92"
 # 팀(1석당 월 $10 · 연 $96, 수량 2~100 — billing.js TEAM_SEATS와 같게, 2026-11-01 샌드박스 SAI Team 상품)
 PADDLE_PRICE_TEAM_MONTH = "pri_01m6afzggwzbmmzn7yrjv37yf7"
 PADDLE_PRICE_TEAM_YEAR = "pri_01m6ag2t6xxwdnj5k34kmh8qg8"
-# Groble(2026-11-04 사용자 결정 — `docs/BillingDesign.md` 0-6). 값이 생기면 주석을 푼다. 상품·옵션 ID는 비밀이 아니다.
+# Groble(2026-11-04 사용자 결정 — `docs/BillingDesign.md` 0-6). 상품 ID는 비밀이 아니다.
 # 🔴 비밀값은 `npx wrangler secret put GROBLE_WEBHOOK_SECRET`(사용자, 넣는 순서는 CLAUDE.md Paddle 시크릿 줄과 같다).
 # 🔴 상품 하나 = 가격 하나·주기 하나(2026-11-04 실측) — Pro 월·연 + 팀 2~10석 × 월·연 = 20개.
-# GROBLE_PRODUCTS = '{"<상품 ID>":{"plan":"pro","interval":"month"},"<상품 ID>":{"plan":"team","interval":"month","seats":2}}'
+# 2026-11-05 그로블 스토어 등록·판매중 확인(20/20). 가격: Pro 7,900/월·59,000/연 · 팀 1석 13,900/월·135,000/연 × 석수.
+# 이 값이 있으면 결제창은 Paddle 대신 Groble로 간다(billing.js). 상품을 새로 만들면 ID를 여기서 바꾼다.
+GROBLE_PRODUCTS = '{"x8KncK":{"plan":"pro","interval":"month"},"8XE47f":{"plan":"pro","interval":"year"},"hmsHft":{"plan":"team","interval":"month","seats":2},"Hsn2Mr":{"plan":"team","interval":"month","seats":3},"Wu22vT":{"plan":"team","interval":"month","seats":4},"rDp34q":{"plan":"team","interval":"month","seats":5},"GLxeC9":{"plan":"team","interval":"month","seats":6},"6MNnWn":{"plan":"team","interval":"month","seats":7},"PZvdqp":{"plan":"team","interval":"month","seats":8},"9pZmRh":{"plan":"team","interval":"month","seats":9},"FWjnYD":{"plan":"team","interval":"month","seats":10},"QS6snF":{"plan":"team","interval":"year","seats":2},"EkeNVv":{"plan":"team","interval":"year","seats":3},"atgCpJ":{"plan":"team","interval":"year","seats":4},"KEtXDL":{"plan":"team","interval":"year","seats":5},"4G3jBV":{"plan":"team","interval":"year","seats":6},"qhHtSP":{"plan":"team","interval":"year","seats":7},"VFiSLk":{"plan":"team","interval":"year","seats":8},"JA7hkR":{"plan":"team","interval":"year","seats":9},"CJcSEY":{"plan":"team","interval":"year","seats":10}}'
 # BILLING_ENFORCED = "1"   # 켜면 구독 없는 사용자 = free(하루 20 · 빠른만). 꺼져 있으면 beta(지금과 같음)
 # BILLING_ENFORCED_AT = "2026-12-01T00:00:00+09:00"   # 유료 출시 시각 — 이 전에 만든 팀은 30일 유예. 🔴 켤 때 반드시 함께(없으면 유예·잠금 판정 안 함)
 # 사고(thinking) — 2026-10-23부터 코어 기본이 **끔**이라 적지 않는다(L30 실측: 끔 건당 $0.00070·중앙값 2.4~2.5초 /
