@@ -16,6 +16,7 @@ import { verifyFirebaseIdToken, bearerToken, AuthError } from './auth.js';
 import { teamShouldLock } from '../../../functions/teams.js';
 import { billingExpireAt } from '../../../functions/account.js';
 import { PLAN_LIMITS } from '../../../src/core/refine/quality.js';
+import { GROBLE_TEAM_SEATS, applyGrobleEvent, createGrobleCheckout, readGrobleConfig, verifyGrobleSignature } from './grobleBilling.js';
 
 /** 요금제별 하루 한도 — 표는 코어(`src/core/refine/quality.js`) 한 곳. 확장 설정 안내가 같은 표를 읽는다. */
 export { PLAN_LIMITS };
@@ -50,6 +51,8 @@ export function readBillingConfig(env = {}) {
   };
   config.checkoutReady = Boolean(config.apiBase && config.apiKey && config.prices.month && config.prices.year);
   config.webhookReady = Boolean(config.webhookSecret);
+  // 2026-11-04 Groble 전환(`docs/BillingDesign.md` 0절) — Groble 설정이 있으면 결제 시작은 Groble로 간다. Paddle은 꺼 둔 옛 경로.
+  config.groble = readGrobleConfig(env);
   return config;
 }
 
@@ -63,6 +66,8 @@ export function resolvePlan(doc, { enforced = false, prices = {} } = {}) {
   if (doc?.teamSeat?.paid === true) return 'team';
   const proPrices = [prices.month, prices.year].filter(Boolean);
   if (doc && PAID_STATUSES.has(doc.status) && proPrices.includes(doc.priceId)) return 'pro';
+  // Groble(2026-11-04) — 가격 ID 대신 웹훅이 옵션 표로 정한 `plan`을 적는다.
+  if (doc && PAID_STATUSES.has(doc.status) && doc.provider === 'groble' && doc.plan === 'pro') return 'pro';
   return enforced ? 'free' : 'beta';
 }
 
@@ -365,6 +370,42 @@ export async function handleBilling(request, { config, billing, db, json, logger
   const path = new URL(request.url).pathname;
   if (request.method !== 'POST') return json(405, { error: 'method not allowed' });
 
+  if (path === '/v1/billing/groble-webhook') {
+    const groble = billing.groble ?? {};
+    if (!groble.webhookReady || !db) return json(503, { error: 'billing-unavailable' });
+    const raw = await request.text();
+    const ok = await verifyGrobleSignature(
+      raw,
+      {
+        signature: request.headers.get('X-Groble-Signature'),
+        previous: request.headers.get('X-Groble-Signature-Previous'),
+        timestamp: request.headers.get('X-Groble-Timestamp'),
+      },
+      groble.webhookSecret,
+      now(),
+    );
+    if (!ok) {
+      logger.warn('[billing] Groble 웹훅 서명 거절');
+      return json(401, { error: 'bad signature' });
+    }
+    let event;
+    try {
+      event = JSON.parse(raw);
+    } catch {
+      return json(400, { error: 'bad request' });
+    }
+    try {
+      const result = await applyGrobleEvent(db, event, groble, request.headers.get('X-Groble-Idempotency-Key'));
+      // 🔴 모르는 토큰·옵션 불일치도 200 — 다시 보내도 결과가 같다(0-4). 로그는 이벤트 이름·결과만.
+      logger.log(`[billing] groble ${String(event?.type ?? '-').slice(0, 64)} → ${result}`);
+      return json(200, { ok: true });
+    } catch (error) {
+      logger.error(`[billing] Groble 기록 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+      // 503 — Groble이 다시 보낸다(408·429·5xx 재시도).
+      return json(503, { error: 'store failed' });
+    }
+  }
+
   if (path === '/v1/billing/webhook') {
     if (!billing.webhookReady || !db) return json(503, { error: 'billing-unavailable' });
     const raw = await request.text();
@@ -409,7 +450,8 @@ export async function handleBilling(request, { config, billing, db, json, logger
   }
 
   if (path === '/v1/billing/checkout') {
-    if (!billing.checkoutReady) return json(503, { error: 'billing-unavailable' });
+    const viaGroble = Boolean(billing.groble?.checkoutReady && db);
+    if (!viaGroble && !billing.checkoutReady) return json(503, { error: 'billing-unavailable' });
     let uid;
     try {
       ({ uid } = await verifyFirebaseIdToken(bearerToken(request), { projectId: config.projectId, ...(jwks ? { jwks } : {}), now }));
@@ -422,6 +464,7 @@ export async function handleBilling(request, { config, billing, db, json, logger
     } catch {
       return json(400, { error: 'bad request' });
     }
+    if (viaGroble) return grobleCheckout({ db, billing, uid, body, json, logger, now });
     let priceId = null;
     let teamId = null;
     let quantity = 1;
@@ -463,4 +506,45 @@ export async function handleBilling(request, { config, billing, db, json, logger
   }
 
   return json(404, { error: 'not found' });
+}
+
+/**
+ * Groble 결제 시작(`docs/BillingDesign.md` 0-2 ①). 확인 순서는 Paddle과 같다 — 로그인 → 요금제·주기 → 팀장·좌석 → 이미 결제 중.
+ * 좌석은 결제 페이지에서 구매자가 옵션으로 고른다(링크로 미리 고를 수 없다 — ❓ 가이드에 없음). 그래서 토큰에는
+ * **최소 좌석**(요청 좌석과 지금 팀원 수 중 큰 값, 2 이상)을 적고, 웹훅이 그보다 적은 옵션을 거절한다.
+ */
+async function grobleCheckout({ db, billing, uid, body, json, logger, now }) {
+  const groble = billing.groble;
+  const plan = body?.plan;
+  const interval = body?.interval;
+  if (!['pro', 'team'].includes(plan) || !['month', 'year'].includes(interval) || !groble.products[plan]) {
+    return json(400, { error: 'unknown plan' });
+  }
+  let teamId = null;
+  let minSeats = 1;
+  if (plan === 'team') {
+    teamId = typeof body?.teamId === 'string' && body.teamId.length <= 128 && !body.teamId.includes('/') ? body.teamId : null;
+    const seats = Number(body?.seats);
+    if (!teamId) return json(400, { error: 'bad request' });
+    if (!Number.isInteger(seats) || seats < GROBLE_TEAM_SEATS.min || seats > GROBLE_TEAM_SEATS.max) {
+      return json(400, { error: 'bad seats', min: GROBLE_TEAM_SEATS.min, max: GROBLE_TEAM_SEATS.max });
+    }
+    const owner = await teamOwnerCheck(db, teamId, uid);
+    if (!owner.ok) return json(403, { error: 'not-owner' });
+    if (liveSubscription(owner.billing)) return json(409, { error: 'already-subscribed' });
+    if (seats < owner.memberCount) return json(400, { error: 'bad seats', min: owner.memberCount, max: GROBLE_TEAM_SEATS.max });
+    minSeats = Math.max(GROBLE_TEAM_SEATS.min, owner.memberCount, seats);
+  } else {
+    const mine = await db.collection('billing').doc(uid).get();
+    const doc = mine.exists ? mine.data() ?? null : null;
+    if (liveSubscription(doc) && resolvePlan(doc, billing) === 'pro') return json(409, { error: 'already-subscribed' });
+  }
+  try {
+    const out = await createGrobleCheckout(db, groble, { plan, interval, uid, teamId, minSeats }, now());
+    if (!out) return json(400, { error: 'unknown plan' });
+    return json(200, out);
+  } catch (error) {
+    logger.error(`[billing] Groble 토큰 저장 실패: ${error?.code ?? error?.name ?? 'unknown'}`);
+    return json(503, { error: 'billing-unavailable' });
+  }
 }
