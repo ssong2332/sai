@@ -67,18 +67,47 @@ test('토큰 — RS256 서명, iss·sub = 서비스 계정, scope = cloud-platfo
   assert.equal(payload.exp - payload.iat, 3600);
 });
 
-test('토큰 — 동시에 부르면 교환은 한 번 · 만료 1분 전이면 새로 받는다', async () => {
+test('🔴 토큰 — 진행 중인 교환을 요청끼리 나눠 기다리지 않는다(2026-11-05 장애) · 끝난 토큰만 캐시', async () => {
   const { publicKey, credentials } = await makeAccount();
+  // 첫 교환은 영원히 끝나지 않는다(Workers에서 그 요청이 끊긴 상황) — 뒤 요청은 그걸 기다리지 않고 따로 받아야 한다.
   const endpoint = fakeTokenEndpoint(publicKey, { expiresIn: 120 });
+  let calls = 0;
+  const fetchImpl = (url, init) => (++calls === 1 ? new Promise(() => {}) : endpoint.fn(url, init));
   let t = Date.now();
-  const source = createTokenSource({ credentials, fetchImpl: endpoint.fn, now: () => t });
-  const [a, b, c] = await Promise.all([source.token(), source.token(), source.token()]);
-  assert.deepEqual([a, b, c], ['tok-1', 'tok-1', 'tok-1']);
-  assert.equal(source.stats.exchanges, 1);
+  const source = createTokenSource({ credentials, fetchImpl, now: () => t });
+  void source.token(); // 매달린 첫 요청
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(await source.token(), 'tok-1', '두 번째 요청은 따로 교환해 바로 받는다');
+  assert.equal(await source.token(), 'tok-1', '끝난 토큰은 캐시에서');
   t += 59_000;
   assert.equal(await source.token(), 'tok-1', '만료 61초 전 — 그대로');
   t += 2_000;
   assert.equal(await source.token(), 'tok-2', '만료 59초 전 — 갱신');
+});
+
+test('🔴 Google 호출에는 시간 제한(signal)이 붙는다 — 토큰 교환 · Firestore REST', async () => {
+  const { publicKey, credentials } = await makeAccount();
+  const endpoint = fakeTokenEndpoint(publicKey);
+  const signals = [];
+  const source = createTokenSource({
+    credentials,
+    fetchImpl: (url, init) => {
+      signals.push(init.signal);
+      return endpoint.fn(url, init);
+    },
+  });
+  await source.token();
+  const rest = new RestFirestore({
+    projectId: 'sai-global-msg-2026',
+    token: async () => 't',
+    fetchImpl: async (_url, init) => {
+      signals.push(init.signal);
+      return new globalThis.Response('{}', { status: 404 });
+    },
+  });
+  await rest.collection('billing').doc('u1').get();
+  assert.equal(signals.length, 2);
+  for (const s of signals) assert.ok(s instanceof globalThis.AbortSignal, '시간 제한 signal');
 });
 
 test('🔴 잘못된 키 — 원문을 메시지에 싣지 않고 사유 코드로 거절', async () => {
