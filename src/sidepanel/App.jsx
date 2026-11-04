@@ -3,7 +3,16 @@ import SaiMark from '../assets/SaiMark.jsx';
 // 🔴 외부 서비스는 각자의 공식 로고로 보여준다 — 우리 팔레트로 바꾸면 알아보지 못한다.
 import { GoogleMark, GitHubMark } from '../assets/ServiceMarks.jsx';
 import { FEATURES } from '../config.js';
-import { BillingClientError, billingErrorText, startCheckout } from '../lib/billingClient.js';
+import {
+  BillingClientError,
+  billingErrorText,
+  formatKrw,
+  PRICES_KRW,
+  startCheckout,
+  TEAM_SEATS_MAX,
+  TEAM_SEATS_MIN,
+  teamPurchaseBlocked,
+} from '../lib/billingClient.js';
 import { useMyPlan } from '../lib/useMyPlan.js';
 import PlanBadge from '../components/PlanBadge.jsx';
 import { QUALITY_IDS, QUALITY_LABELS } from '../core/refine/quality.js';
@@ -1963,14 +1972,18 @@ function teamPlanLine(billing) {
 
 /**
  * 팀 요금제 — 현황(항상)·구매(🔴 `FEATURES.billing`일 때만) · 팀 기본 품질 모드 (2026-11-01, `docs/BillingDesign.md` 8절).
- * 🔴 좌석은 팀장이 정한다 — 팀원이 늘어도 자동 추가 청구 없음. 최소 2석, 지금 팀원 수 이상(서버도 같은 판정).
+ * 🔴 좌석은 팀장이 정한다 — 팀원이 늘어도 자동 추가 청구 없음. 2~10석, 지금 팀원 수 이상(서버도 같은 판정).
+ *    2026-11-05 그로블 전환 — 상품이 좌석 수마다 따로라 10석이 끝(Worker `GROBLE_PRODUCTS`). 가격은 원화.
  */
 function TeamPlanSection({ team, plan, onToast, onChanged }) {
-  const minSeats = Math.max(2, plan.members.length);
+  const minSeats = Math.max(TEAM_SEATS_MIN, plan.members.length);
+  const tooMany = minSeats > TEAM_SEATS_MAX;
   // 2026-11-01 — 저장 성공 즉시 칩을 바꾼다(서버에서 다시 불러오는 1초 동안 옛 칩이 남아 안내와 어긋났다).
   const [current, setCurrent] = useState(plan.defaultQuality);
   useEffect(() => setCurrent(plan.defaultQuality), [plan.defaultQuality]);
-  const [seats, setSeats] = useState(minSeats);
+  const [seats, setSeats] = useState(Math.min(minSeats, TEAM_SEATS_MAX));
+  const seatCount = Number(seats);
+  const seatsOk = Number.isInteger(seatCount) && seatCount >= minSeats && seatCount <= TEAM_SEATS_MAX;
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const buy = async (interval) => {
@@ -2006,27 +2019,55 @@ function TeamPlanSection({ team, plan, onToast, onChanged }) {
       {FEATURES.billing && (
         <>
           <p className="meta">{teamPlanLine(plan.billing)}</p>
-          <p className="field-label">좌석 수 (1석당 연 $96 · 월 $10)</p>
-          <div className="github-suggest-form">
-            <input
-              className="form-input"
-              type="number"
-              min={minSeats}
-              max={100}
-              value={seats}
-              onChange={(event) => setSeats(event.target.value)}
-              aria-label="좌석 수"
-            />
-          </div>
-          <p className="meta">최소 {minSeats}석(2석 이상, 지금 팀원 수 이상). 좌석이 차면 새 팀원은 들어올 수 없어요.</p>
-          <div className="form-actions">
-            <button type="button" className="button" disabled={busy !== ''} onClick={() => buy('year')}>
-              {busy === 'year' ? '여는 중…' : '연 결제로 구매'}
-            </button>
-            <button type="button" className="button button-quiet" disabled={busy !== ''} onClick={() => buy('month')}>
-              {busy === 'month' ? '여는 중…' : '월 결제로 구매'}
-            </button>
-          </div>
+          {!teamPurchaseBlocked(plan.billing) && (
+            <p className="field-label">
+              좌석 수 (1석당 연 {formatKrw(PRICES_KRW.teamSeatYear)} · 월 {formatKrw(PRICES_KRW.teamSeatMonth)})
+            </p>
+          )}
+          {teamPurchaseBlocked(plan.billing) ? (
+            <p className="meta">
+              좌석 수를 바꾸려면 그로블 주문조회(groble.im)에서 지금 구독을 해지한 뒤, 해지 예약이 되면 여기서 새 좌석 수로 다시
+              구매해 주세요.
+            </p>
+          ) : tooMany ? (
+            <p className="meta">
+              팀원이 {TEAM_SEATS_MAX}명을 넘어 지금은 팀 요금제를 살 수 없어요 — 문의해 주시면 따로 도와 드릴게요.
+            </p>
+          ) : (
+            <>
+              <div className="github-suggest-form">
+                <input
+                  className="form-input"
+                  type="number"
+                  min={minSeats}
+                  max={TEAM_SEATS_MAX}
+                  value={seats}
+                  onChange={(event) => setSeats(event.target.value)}
+                  aria-label="좌석 수"
+                />
+              </div>
+              <p className="meta">
+                {minSeats}~{TEAM_SEATS_MAX}석(지금 팀원 수 이상). 좌석이 차면 새 팀원은 들어올 수 없어요. 결제는 새 탭의 그로블에서 해요.
+              </p>
+              <div className="form-actions">
+                <button type="button" className="button" disabled={busy !== '' || !seatsOk} onClick={() => buy('year')}>
+                  {busy === 'year'
+                    ? '여는 중…'
+                    : `연 결제로 구매 · ${seatsOk ? formatKrw(PRICES_KRW.teamSeatYear * seatCount) : '—'}`}
+                </button>
+                <button
+                  type="button"
+                  className="button button-quiet"
+                  disabled={busy !== '' || !seatsOk}
+                  onClick={() => buy('month')}
+                >
+                  {busy === 'month'
+                    ? '여는 중…'
+                    : `월 결제로 구매 · ${seatsOk ? formatKrw(PRICES_KRW.teamSeatMonth * seatCount) : '—'}`}
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
       {FEATURES.billing && <p className="field-label">팀 기본 품질 모드</p>}

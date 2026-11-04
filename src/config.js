@@ -23,7 +23,7 @@ export const DEPLOYED_ENDPOINT = `${WORKER_ORIGIN}/v1/refine`;
  */
 export const TEAM_ENDPOINT = `${WORKER_ORIGIN}/v1/team`;
 
-/** 결제 시작(Paddle 거래 생성, 2026-10-31 `docs/BillingDesign.md`) — 같은 오리진이라 권한 추가 없음. */
+/** 결제 시작(Groble 결제창 주소 발급, 2026-11-04 — 옛 Paddle 거래 생성 2026-10-31, `docs/BillingDesign.md`) — 같은 오리진이라 권한 추가 없음. */
 export const BILLING_CHECKOUT_ENDPOINT = `${WORKER_ORIGIN}/v1/billing/checkout`;
 
 /** 내 요금제(2026-11-01) — 사이드패널 로고 옆 배지(`pro`·`team`). 같은 오리진. */
@@ -177,12 +177,12 @@ export const FEATURES = {
    */
   calendar: false,
   /**
-   * 🔴 **결제(「Pro로 업그레이드」) — 실판매 전까지 끈다** (2026-10-31, `docs/BillingDesign.md`).
-   *    Worker는 지금 Paddle **샌드박스**에 연결돼 있다 — 켜진 공개 빌드에서 누르면 실제 사용자가 테스트 결제창으로 간다.
-   *    샌드박스 실결제 확인(P7)은 이 값만 true로 바꾼 로컬 빌드로 한다(🔴 그 변경은 커밋하지 않는다).
-   *    다시 켤 조건: 실판매 전환(Paddle 도메인 승인 · `PADDLE_ENV=live` · 실판매 가격 ID·토큰) — 사용자 승인.
+   * 🔴 **결제(「Pro로 업그레이드」·팀 요금제 구매) — 켠다** (2026-11-05 사용자 결정 「진행」, `docs/BillingDesign.md` 0절).
+   *    Worker가 Groble 실판매 상품(20개, `GROBLE_PRODUCTS`)으로 결제창 주소를 준다 — 🔴 누르면 **실제 돈이 나간다**.
+   *    (옛 기록: 2026-10-31~11-04 Paddle 샌드박스 시절에는 꺼 두었다.)
+   *    끄면: 설정 「요금제」의 결제 버튼·사이드패널 팀 요금제 구매·「지금 플랜」 결제 요금제 표시가 사라진다.
    */
-  billing: false,
+  billing: true,
 };
 
 /**

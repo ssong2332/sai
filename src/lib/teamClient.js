@@ -90,10 +90,10 @@ export function teamErrorMessage(reason, detail = '') {
       return '이 팀은 팀 요금제가 필요해요 — 팀장이 팀 요금제를 구매하면 참가할 수 있어요';
     case TEAM_ERRORS.SUBSCRIPTION_ACTIVE:
       // 🔴 막는 이유와 할 일 — 결제가 계속 나가는데 계정만 사라지면 안 된다.
-      return '사용 중인 구독(Pro 또는 내가 결제한 팀 요금제)이 있어요 — 결제 영수증 메일의 Paddle 링크(paddle.net)에서 먼저 구독을 해지해 주세요. 해지 예약이 되면 계정을 지울 수 있어요';
+      return '사용 중인 구독(Pro 또는 내가 결제한 팀 요금제)이 있어요 — 그로블 주문조회(groble.im)에서 먼저 구독을 해지해 주세요. 해지 예약이 되면 계정을 지울 수 있어요';
     case TEAM_ERRORS.TEAM_SUBSCRIPTION_ACTIVE:
       // 🔴 팀이 지워지면 청구만 계속 나간다 — 먼저 해지(예약)하게 한다.
-      return '이 팀은 팀 요금제를 결제 중이에요 — 결제 영수증 메일의 Paddle 링크(paddle.net)에서 먼저 해지해 주세요. 해지 예약이 되면 팀을 지울 수 있어요';
+      return '이 팀은 팀 요금제를 결제 중이에요 — 그로블 주문조회(groble.im)에서 먼저 해지해 주세요. 해지 예약이 되면 팀을 지울 수 있어요';
     case TEAM_ERRORS.NOT_CONFIRMED:
       return '삭제 확인이 전달되지 않았어요 — 다시 시도해 주세요';
     case TEAM_ERRORS.NETWORK:
