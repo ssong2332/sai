@@ -5,12 +5,54 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { readFileSync } from 'node:fs';
+
 import { FEATURES } from '../src/config.js';
-import { BILLING_ERRORS, billingErrorText, getMyPlan, planBadgeLabel, planSummary, startCheckout } from '../src/lib/billingClient.js';
+import {
+  BILLING_ERRORS,
+  billingErrorText,
+  formatKrw,
+  GROBLE_MANAGE_NOTE,
+  getMyPlan,
+  planBadgeLabel,
+  planSummary,
+  PRICES_KRW,
+  startCheckout,
+  TEAM_SEATS_MAX,
+  TEAM_SEATS_MIN,
+} from '../src/lib/billingClient.js';
+import { teamErrorMessage, TEAM_ERRORS } from '../src/lib/teamClient.js';
 import { QUALITY_DOWNGRADE_NOTES } from '../src/core/refine/quality.js';
 
-test('🔴 공개 빌드에서 결제 진입점은 꺼져 있다(실판매 전 — 샌드박스에 연결됨)', () => {
-  assert.equal(FEATURES.billing, false);
+test('🔴 결제 진입점은 켜져 있다 — 2026-11-05 Groble 실판매 전환(사용자 결정 「진행」)', () => {
+  assert.equal(FEATURES.billing, true);
+});
+
+test('🔴 화면 문구에 옛 Paddle·달러 안내가 남지 않는다 — 해지는 그로블 주문조회', () => {
+  const texts = [
+    ...Object.values(BILLING_ERRORS).map(billingErrorText),
+    planSummary('pro').note,
+    GROBLE_MANAGE_NOTE,
+    teamErrorMessage(TEAM_ERRORS.SUBSCRIPTION_ACTIVE),
+    teamErrorMessage(TEAM_ERRORS.TEAM_SUBSCRIPTION_ACTIVE),
+  ];
+  for (const t of texts) assert.doesNotMatch(t, /paddle|\$\d/i, t);
+  assert.match(planSummary('pro').note, /그로블 주문조회/);
+  for (const file of ['src/settings/App.jsx', 'src/sidepanel/App.jsx']) {
+    assert.doesNotMatch(readFileSync(file, 'utf8').replace(/: '개인 Pro\(연 결제 시 월 \$4 · 월 결제 \$6 예정\)[^']*'/, ''), /\$\d/, file);
+  }
+});
+
+test('🔴 화면 가격·좌석 = 결정값(Spec §0) · 좌석 범위 = Worker GROBLE_PRODUCTS 팀 상품', () => {
+  assert.deepEqual(PRICES_KRW, { proMonth: 7900, proYear: 59000, teamSeatMonth: 13900, teamSeatYear: 135000 });
+  assert.equal(formatKrw(PRICES_KRW.proYear / 12), '₩4,917');
+  assert.equal(formatKrw(PRICES_KRW.teamSeatYear * 10), '₩1,350,000');
+  const toml = readFileSync('workers/refine/wrangler.toml', 'utf8');
+  const products = Object.values(JSON.parse(toml.match(/^GROBLE_PRODUCTS = '(.*)'$/m)[1]));
+  for (const interval of ['month', 'year']) {
+    const seats = products.filter((p) => p.plan === 'team' && p.interval === interval).map((p) => p.seats).sort((a, b) => a - b);
+    assert.deepEqual(seats, Array.from({ length: TEAM_SEATS_MAX - TEAM_SEATS_MIN + 1 }, (_, i) => TEAM_SEATS_MIN + i), interval);
+  }
 });
 
 test('모르는 주기는 서버를 부르지 않고 거절', async () => {

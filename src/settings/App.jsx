@@ -26,7 +26,15 @@ import {
 } from '../lib/siteGate.js';
 import { useSettingsData } from './useSettingsData.js';
 import { FEATURES } from '../config.js';
-import { BillingClientError, billingErrorText, planSummary, startCheckout } from '../lib/billingClient.js';
+import {
+  BillingClientError,
+  billingErrorText,
+  formatKrw,
+  GROBLE_MANAGE_NOTE,
+  PRICES_KRW,
+  planSummary,
+  startCheckout,
+} from '../lib/billingClient.js';
 import { useMyPlan } from '../lib/useMyPlan.js';
 import PlanBadge from '../components/PlanBadge.jsx';
 
@@ -217,8 +225,9 @@ const QUALITY_OPTIONS = [
 ];
 
 /**
- * 요금제 — 「Pro로 업그레이드」(2026-10-31, `docs/BillingDesign.md`). 🔴 `FEATURES.billing`이 꺼져 있으면 그리지 않는다.
- * 결제창은 새 탭의 소개 사이트(`/checkout`)에서 열린다. 가격 표시는 Spec §0 확정값.
+ * 「Pro로 업그레이드」(2026-10-31, `docs/BillingDesign.md`). 🔴 `FEATURES.billing`이 꺼져 있으면 그리지 않는다.
+ * 2026-11-05 — 그로블 전환: 결제창은 새 탭의 그로블(`groble.im/payment/…?ref=…`)에서 열린다. 가격은 원화(`PRICES_KRW`).
+ * 「요금제」 패널(`PlanPanel`)에 둔다 — 결제한 사람(pro·team)에게는 그리지 않는다.
  */
 function PlanGroup() {
   const [busy, setBusy] = useState(null);
@@ -237,17 +246,20 @@ function PlanGroup() {
   };
   return (
     <Group
-      title="요금제"
-      note={`Pro는 하루 200번까지 다듬고, 기본 모드 하루 ${PREMIUM_DAILY_LIMITS.standard}번 · 심층 모드 하루 ${PREMIUM_DAILY_LIMITS.deep}번을 쓸 수 있어요. 결제일로부터 14일 안에는 전액 환불돼요.`}
+      title="Pro로 업그레이드"
+      note={`Pro는 하루 200번까지 다듬고, 기본 모드 하루 ${PREMIUM_DAILY_LIMITS.standard}번 · 심층 모드 하루 ${PREMIUM_DAILY_LIMITS.deep}번을 쓸 수 있어요. 결제는 새 탭의 그로블에서 휴대폰 인증 후 카드·카카오페이·네이버페이로 해요. 결제일로부터 14일 안에는 전액 환불돼요.`}
     >
       <div className="plan-actions">
         <button type="button" className="btn primary press" disabled={busy !== null} onClick={() => open('year')}>
-          {busy === 'year' ? '여는 중…' : 'Pro 연 결제 · $48 (월 $4 꼴)'}
+          {busy === 'year'
+            ? '여는 중…'
+            : `Pro 연 결제 · ${formatKrw(PRICES_KRW.proYear)} (월 ${formatKrw(PRICES_KRW.proYear / 12)} 꼴)`}
         </button>
         <button type="button" className="btn press" disabled={busy !== null} onClick={() => open('month')}>
-          {busy === 'month' ? '여는 중…' : 'Pro 월 결제 · $6'}
+          {busy === 'month' ? '여는 중…' : `Pro 월 결제 · ${formatKrw(PRICES_KRW.proMonth)}`}
         </button>
       </div>
+      <p className="row-hint">{GROBLE_MANAGE_NOTE}</p>
       {error && (
         <p className="row-hint" role="alert">
           {error}
@@ -273,8 +285,6 @@ function GeneralPanel({ data, act }) {
           onChange={toggle('threadContext')}
         />
       </Group>
-
-      {FEATURES.billing && <PlanGroup />}
 
       <Group
         title="다듬기 품질"
@@ -1056,7 +1066,14 @@ function PlanPanel({ plan }) {
           </dl>
         </Group>
       ) : (
-      <Group title="지금 플랜" note="출시 기간에는 개인 기능과 팀 기능을 모두 무료로 써요. 결제 수단을 등록하는 곳도 없어요.">
+      <Group
+        title="지금 플랜"
+        note={
+          FEATURES.billing
+            ? '출시 기간에는 개인 기능과 팀 기능을 모두 무료로 써요. 더 많이 쓰려면 아래에서 Pro로 올릴 수 있어요.'
+            : '출시 기간에는 개인 기능과 팀 기능을 모두 무료로 써요. 결제 수단을 등록하는 곳도 없어요.'
+        }
+      >
         <dl className="conn">
           <div>
             <dt>플랜</dt>
@@ -1074,7 +1091,17 @@ function PlanPanel({ plan }) {
       </Group>
       )}
 
-      <Group title="유료 플랜" note="개인 Pro(연 결제 시 월 $4 · 월 결제 $6 예정)와 팀 플랜을 준비하고 있어요. 유료 플랜이 나와도 무료 플랜은 남아요.">
+      {/* 2026-11-05 — 결제한 사람(pro·team)에게는 구매 버튼을 그리지 않는다. 팀 요금제 구매는 사이드패널 팀 탭(팀장). */}
+      {FEATURES.billing && !paid && <PlanGroup />}
+
+      <Group
+        title={FEATURES.billing ? '요금제 비교' : '유료 플랜'}
+        note={
+          FEATURES.billing
+            ? `팀 요금제는 1석당 월 ${formatKrw(PRICES_KRW.teamSeatMonth)} · 연 ${formatKrw(PRICES_KRW.teamSeatYear)}이고, 팀장이 사이드패널 「팀」 탭에서 좌석 수를 골라 결제해요. 유료 플랜이 나와도 무료 플랜은 남아요.`
+            : '개인 Pro(연 결제 시 월 $4 · 월 결제 $6 예정)와 팀 플랜을 준비하고 있어요. 유료 플랜이 나와도 무료 플랜은 남아요.'
+        }
+      >
         <a className="btn press plan-link" href={PRICING_URL} target="_blank" rel="noopener noreferrer">
           요금제 자세히 보기
         </a>

@@ -2,7 +2,8 @@
  * 결제 시작 — Worker `/v1/billing/checkout` (2026-10-31, `docs/BillingDesign.md` ①).
  *
  * 🔴 확장은 가격 ID·키를 모른다 — 요금제 이름(`pro`)과 주기(`month`·`year`)만 보낸다. 가격 ID는 Worker 설정이 정한다.
- * 🔴 결제창은 확장이 아니라 소개 사이트(`/checkout`)에서 열린다 — MV3는 원격 스크립트(Paddle.js)를 못 싣는다.
+ * 🔴 결제창은 확장이 아니라 새 탭의 그로블(`groble.im/payment/<상품>?ref=<토큰>`)에서 열린다(2026-11-04 Groble 전환).
+ *    해지·취소 요청은 구매자가 그로블 주문조회에서 한다(그로블 결제창 연동 가이드, 2026-11-05 확인).
  * 🔴 `FEATURES.billing`이 꺼져 있으면 화면에 진입점이 없다(`src/config.js`).
  */
 
@@ -19,6 +20,22 @@ export const BILLING_ERRORS = {
   ALREADY_SUBSCRIBED: 'already-subscribed', // 2026-11-01 코드 검토 — 결제 중이면 두 번째 구독을 만들지 않는다
   UNKNOWN: 'unknown',
 };
+
+/**
+ * 화면 가격·좌석(2026-11-04 사용자 결정 — Spec §0 · `docs/BillingDesign.md` 0-7). 🔴 실제 청구 금액은 그로블 상품이 정한다 —
+ * 그로블 상품 가격을 바꾸면 여기도 같이 바꾼다. 좌석 범위는 Worker `GROBLE_PRODUCTS`(팀 2~10석)와 같다.
+ */
+export const PRICES_KRW = { proMonth: 7900, proYear: 59000, teamSeatMonth: 13900, teamSeatYear: 135000 };
+export const TEAM_SEATS_MIN = 2;
+export const TEAM_SEATS_MAX = 10;
+
+/** 원화 표기 — `₩7,900`. */
+export function formatKrw(amount) {
+  return `₩${Math.round(amount).toLocaleString('ko-KR')}`;
+}
+
+/** 해지·변경 안내 — 구매자는 그로블 계정 없이 휴대폰 인증으로 결제하고, 주문조회에서 관리한다. */
+export const GROBLE_MANAGE_NOTE = '해지·취소 요청은 그로블 주문조회(groble.im)에서 할 수 있어요.';
 
 export class BillingClientError extends Error {
   constructor(reason) {
@@ -98,7 +115,7 @@ export function planSummary(plan) {
   const modes = limits.standard + limits.deep > 0 ? ` · 기본 ${limits.standard} · 심층 ${limits.deep}` : ' · 빠른 모드만';
   const daily = `${limits.daily}회${modes}`;
   if (plan === 'team') return { name: '팀 요금제', daily, note: '팀장이 산 좌석으로 써요. 좌석은 팀 탭에서 팀장이 관리해요.' };
-  if (plan === 'pro') return { name: 'Pro', daily, note: '바꾸거나 해지하려면 영수증 메일의 Paddle 링크(paddle.net)를 열어 주세요.' };
+  if (plan === 'pro') return { name: 'Pro', daily, note: GROBLE_MANAGE_NOTE };
   return { name: '무료', daily, note: '다 쓰면 다음 날(한국 시간 자정) 다시 채워져요.' };
 }
 
@@ -108,7 +125,7 @@ export function billingErrorText(reason) {
   if (reason === BILLING_ERRORS.NETWORK) return '서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
   if (reason === BILLING_ERRORS.UNAVAILABLE) return '지금은 결제를 받을 수 없어요. 잠시 뒤 다시 시도해 주세요.';
   if (reason === BILLING_ERRORS.NOT_OWNER) return '팀 요금제는 팀장만 구매할 수 있어요.';
-  if (reason === BILLING_ERRORS.BAD_SEATS) return '좌석은 2석 이상, 지금 팀원 수 이상이어야 해요.';
-  if (reason === BILLING_ERRORS.ALREADY_SUBSCRIBED) return '이미 결제 중인 구독이 있어요 — 바꾸려면 영수증 메일의 Paddle 링크(paddle.net)에서 관리해 주세요.';
+  if (reason === BILLING_ERRORS.BAD_SEATS) return `좌석은 ${TEAM_SEATS_MIN}~${TEAM_SEATS_MAX}석, 지금 팀원 수 이상이어야 해요.`;
+  if (reason === BILLING_ERRORS.ALREADY_SUBSCRIBED) return '이미 결제 중인 구독이 있어요 — 바꾸려면 그로블 주문조회(groble.im)에서 지금 구독을 먼저 해지해 주세요.';
   return '결제창을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.';
 }
