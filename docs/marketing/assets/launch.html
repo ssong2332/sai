@@ -66,7 +66,6 @@
     <div class="abs" id="b3" style="top:772px;height:44px;background:#f04419"></div>
     <div class="abs mask" style="left:0;right:0;top:900px;text-align:center"><span id="e1" style="font-size:200px;font-weight:800;letter-spacing:-0.04em">사이</span></div>
     <div class="abs mask" style="left:0;right:0;top:1150px;text-align:center"><span id="e2" style="font-size:54px;font-weight:700">크롬 확장 · 지금 무료</span></div>
-    <div class="abs mask" style="left:0;right:0;top:1240px;text-align:center"><span id="e3" style="font-size:38px;font-weight:600;color:#6b7684">sai-global-msg-2026.web.app</span></div>
   </div>
 </div>
 <svg class="abs" id="cursor" width="64" height="64" viewBox="0 0 24 24" style="left:0;top:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,.3))"><path d="M4 2l15 9-6.5 1.5L16 20l-3 1.5-3.5-7.5L4 18z" fill="#0e0e10" stroke="#fff" stroke-width="1.4"/></svg>
@@ -167,7 +166,7 @@
       const p = out3(prog(t, at, 0.32));
       set($(id), { left: `${left + x * unit}px`, width: `${w * unit * p}px` });
     });
-    [['e1', 13.3], ['e2', 13.55], ['e3', 13.75]].forEach(([id, at]) => { $(id).style.transform = `translateY(${(1 - out3(prog(t, at, 0.4))) * 110}%)`; });
+    [['e1', 13.3], ['e2', 13.55]].forEach(([id, at]) => { $(id).style.transform = `translateY(${(1 - out3(prog(t, at, 0.4))) * 110}%)`; });
   };
   const q = new URLSearchParams(location.search).get('t');
   window.render(q === null ? 0 : Number(q));

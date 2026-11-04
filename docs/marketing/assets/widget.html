@@ -71,7 +71,6 @@
     <div class="abs" id="e3" style="top:832px;height:44px;background:#f04419"></div>
     <div class="head" style="top:950px;height:230px"><span id="t1" style="font-size:200px">사이</span></div>
     <div class="head" style="top:1200px;height:80px"><span id="t2" style="font-size:54px;font-weight:700">크롬 확장 · 지금 무료</span></div>
-    <div class="head" style="top:1290px;height:60px"><span id="t3" style="font-size:38px;font-weight:600;color:#8b95a1">sai-global-msg-2026.web.app</span></div>
   </div>
 </div>
 <script>
@@ -122,7 +121,7 @@
       const p = out3(prog(t, at, 0.32));
       Object.assign($(id).style, { left: `${left + x * unit}px`, width: `${w * unit * p}px` });
     });
-    [['t1', 9.5], ['t2', 9.75], ['t3', 9.95]].forEach(([id, at]) => rise($(id), t, at));
+    [['t1', 9.5], ['t2', 9.75]].forEach(([id, at]) => rise($(id), t, at));
   };
   const q = new URLSearchParams(location.search).get('t');
   window.render(q === null ? 0 : Number(q));
