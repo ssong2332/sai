@@ -91,6 +91,7 @@
 | 4 | 결제하지 않은 토큰 유효 기간 | ✔ 2026-11-04 사용자 결정: **24시간**(결제 시각 기준) — 0-3 표 |
 | 5 | Paddle 코드·사이트 `/checkout` | 지우지 않고 꺼 둔다(🔴 삭제는 승인 건) — Groble 실결제 확인 뒤 지울지 다시 묻는다 |
 | 6 | Groble 문의 2건 | 플랜(좌석) 변경 방법 · 주기를 옵션별로 둘 수 있는지 — 사용자가 문의 |
+| 7 | 환불 기간 | ✔ 2026-11-05 사용자 결정: **결제일로부터 7일 이내 전액**(이용 여부 무관 · 첫·갱신 결제 모두) — 그로블 표준 규정(7일 이내 · 이용 전)과 기간을 맞추고 조건은 더 넓다. 옛 14일(Paddle 시절)은 폐기. `dashboard/public/refund.html` |
 
 ### 0-8. 같이 바꿔야 하는 곳 (구현 PR에서)
 | 곳 | 바꿀 것 |
@@ -98,7 +99,7 @@
 | `workers/refine/src/billing.js` | `verifyGrobleSignature` · 토큰 발급·검증 · 이벤트 판정표(0-5) — 판정표 2절·좌석·잠금 함수는 재사용 |
 | `workers/refine/src/handler.js` | `/v1/billing/groble-webhook` 경로 |
 | `functions/account.js` 안내 문구 | 「Paddle에서 해지」 → 「Groble 주문조회에서 해지」 |
-| 처리방침·약관·환불 정책(`site/src/legal/*` · `dashboard/public/*`) | 결제 위탁처 Paddle → Groble, 판매자·환불 주체 — 🔴 실판매 전 필수, 법적 문구라 사용자 확인 |
+| 처리방침·약관·환불 정책(`site/src/legal/*` · `dashboard/public/*`) | 결제 위탁처 Paddle → Groble, 판매자·환불 주체 — 🔴 실판매 전 필수, 법적 문구라 사용자 확인 · 2026-11-05 초안(PR #182, 처리방침 시행일은 사용자 결정 대기) |
 | `firestore.rules` | `billingRefs`·`billingRounds`·`billingEvents` 클라이언트 접근 0 |
 | 확장 | 결제 버튼이 받은 주소를 새 탭으로 여는 것은 그대로 — 변경 거의 없음(추정, 구현 때 확인) |
 
