@@ -11,6 +11,7 @@ import {
   startCheckout,
   TEAM_SEATS_MAX,
   TEAM_SEATS_MIN,
+  teamPurchaseBlocked,
 } from '../lib/billingClient.js';
 import { useMyPlan } from '../lib/useMyPlan.js';
 import PlanBadge from '../components/PlanBadge.jsx';
@@ -2018,10 +2019,17 @@ function TeamPlanSection({ team, plan, onToast, onChanged }) {
       {FEATURES.billing && (
         <>
           <p className="meta">{teamPlanLine(plan.billing)}</p>
-          <p className="field-label">
-            좌석 수 (1석당 연 {formatKrw(PRICES_KRW.teamSeatYear)} · 월 {formatKrw(PRICES_KRW.teamSeatMonth)})
-          </p>
-          {tooMany ? (
+          {!teamPurchaseBlocked(plan.billing) && (
+            <p className="field-label">
+              좌석 수 (1석당 연 {formatKrw(PRICES_KRW.teamSeatYear)} · 월 {formatKrw(PRICES_KRW.teamSeatMonth)})
+            </p>
+          )}
+          {teamPurchaseBlocked(plan.billing) ? (
+            <p className="meta">
+              좌석 수를 바꾸려면 그로블 주문조회(groble.im)에서 지금 구독을 해지한 뒤, 해지 예약이 되면 여기서 새 좌석 수로 다시
+              구매해 주세요.
+            </p>
+          ) : tooMany ? (
             <p className="meta">
               팀원이 {TEAM_SEATS_MAX}명을 넘어 지금은 팀 요금제를 살 수 없어요 — 문의해 주시면 따로 도와 드릴게요.
             </p>

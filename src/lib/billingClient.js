@@ -29,6 +29,18 @@ export const PRICES_KRW = { proMonth: 7900, proYear: 59000, teamSeatMonth: 13900
 export const TEAM_SEATS_MIN = 2;
 export const TEAM_SEATS_MAX = 10;
 
+/**
+ * 팀 탭 구매 칸을 숨길지 — 서버 `liveSubscription`(결제 중 · 해지 예약 없음 → 409 `already-subscribed`)과 같은 판정(2026-11-05).
+ * | 팀 구독 | 결과 |
+ * |---|---|
+ * | 없음 · 끝남(`canceled` 등) | 보임 |
+ * | `active`·`trialing`·`past_due` + 해지 예약 | 보임 — 서버가 새 구매를 받는다 |
+ * | `active`·`trialing`·`past_due` + 해지 예약 없음 | **숨김** — 좌석 변경은 해지 후 다시 구매 |
+ */
+export function teamPurchaseBlocked(billing) {
+  return Boolean(billing) && ['active', 'trialing', 'past_due'].includes(billing.status) && billing.cancelScheduled !== true;
+}
+
 /** 원화 표기 — `₩7,900`. */
 export function formatKrw(amount) {
   return `₩${Math.round(amount).toLocaleString('ko-KR')}`;

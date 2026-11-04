@@ -20,6 +20,7 @@ import {
   startCheckout,
   TEAM_SEATS_MAX,
   TEAM_SEATS_MIN,
+  teamPurchaseBlocked,
 } from '../src/lib/billingClient.js';
 import { teamErrorMessage, TEAM_ERRORS } from '../src/lib/teamClient.js';
 import { QUALITY_DOWNGRADE_NOTES } from '../src/core/refine/quality.js';
@@ -52,6 +53,16 @@ test('🔴 화면 가격·좌석 = 결정값(Spec §0) · 좌석 범위 = Worker
   for (const interval of ['month', 'year']) {
     const seats = products.filter((p) => p.plan === 'team' && p.interval === interval).map((p) => p.seats).sort((a, b) => a - b);
     assert.deepEqual(seats, Array.from({ length: TEAM_SEATS_MAX - TEAM_SEATS_MIN + 1 }, (_, i) => TEAM_SEATS_MIN + i), interval);
+  }
+});
+
+test('팀 탭 구매 칸 — 결제 중(해지 예약 없음)이면 숨김, 서버 409 판정과 같다', () => {
+  for (const status of ['active', 'trialing', 'past_due']) {
+    assert.equal(teamPurchaseBlocked({ status, seats: 2, used: 1 }), true, status);
+    assert.equal(teamPurchaseBlocked({ status, cancelScheduled: true }), false, `${status} 해지 예약`);
+  }
+  for (const billing of [null, undefined, { status: 'canceled' }, { status: '' }]) {
+    assert.equal(teamPurchaseBlocked(billing), false, JSON.stringify(billing));
   }
 });
 
