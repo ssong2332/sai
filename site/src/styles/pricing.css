@@ -93,6 +93,9 @@
   font-size: 36px;
   font-weight: 800;
   letter-spacing: -0.03em;
+  /* 원화 금액(₩11,250)이 좁은 카드에서 숫자 중간에 줄바꿈되지 않게 — 줄이 모자라면 단위 쪽이 접힌다(2026-11-04) */
+  white-space: nowrap;
+  flex: none;
 }
 .pr-unit {
   font-size: 14px;

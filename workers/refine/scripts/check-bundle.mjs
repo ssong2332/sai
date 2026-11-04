@@ -9,7 +9,7 @@
  * | 번들 파일 없음 | exit 2 (먼저 `npm run build:dry`) |
  * | 원문에 `node_modules/@anthropic-ai/` 경로 주석 | exit 1 — SDK가 번들됐다 |
  * | 대역 `src/anthropicFetch.js` 주석 없음 | exit 1 — alias가 안 걸렸다 |
- * | 크기 > 300 KiB | exit 1 — 🔴 기준선 112.8 KiB(2026-10-23). 무거운 의존성이 새로 들어왔다는 신호 |
+ * | 크기 > 350 KiB | exit 1 — 🔴 기준선 112.8 KiB(2026-10-23). 무거운 의존성이 새로 들어왔다는 신호. 2026-11-04 사용자 결정으로 300 → 350(Groble 결제 코드 +14.9 KiB로 308.2 KiB) |
  * | 그 밖 | exit 0 + 크기·의존성별 원문 크기 출력 |
  *
  * 실행: `npm run check:bundle` (workers/refine 안에서 — build:dry를 먼저 돌린다)
@@ -19,7 +19,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 
 const BUNDLE = new URL('../.wrangler/dry/index.js', import.meta.url);
 const MAP = new URL('../.wrangler/dry/index.js.map', import.meta.url);
-const LIMIT_KIB = 300;
+const LIMIT_KIB = 350;
 
 if (!existsSync(BUNDLE)) {
   console.error('번들이 없습니다 — 먼저 npm run build:dry');

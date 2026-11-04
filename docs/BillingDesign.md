@@ -8,6 +8,11 @@
 ## 0. Groble 전환 (2026-11-04)
 근거: Groble 공식 가이드 `help/guides/webhook` · `webhook-events` · `payment-window` · `faq` (2026-11-04 읽음). 가이드에 없는 것은 「❓」로 둔다 — 추측으로 채우지 않는다.
 
+> 🔴 **2026-11-04 실측(Groble 상품 등록 화면) — 정기결제 상품은 가격 하나·결제 주기 하나뿐, 옵션을 둘 곳이 없다.** 사용자 결정 「상품별로 바꾸기」:
+> 요금제·주기·좌석마다 **상품을 하나씩**(Pro 월·연 2 + 팀 2~10석 × 월·연 18 = **20개**). Worker 설정은 `GROBLE_PRODUCTS`(상품 ID → `{plan, interval, seats}`) 한 표.
+> 결제 시작은 요청한 (요금제·주기·좌석) 상품의 링크를 주고, 첫 결제 웹훅의 `content.id`가 토큰의 상품과 **같아야** 묶인다(`wrong-product`). 아래 「옵션」 서술은 이 줄이 이긴다.
+> 결제창에서 받는 구매자 정보: 휴대폰 번호는 Groble 필수, 주문자명·이메일은 끈다(사이는 쓰지 않는다).
+
 ### 0-1. Paddle과 다른 점
 | 항목 | Paddle(옛) | Groble | 사이에 주는 영향 |
 |---|---|---|---|
@@ -34,11 +39,11 @@
 | 항목 | 내용 |
 |---|---|
 | 모양 | `sr_` + 무작위 24바이트 base64url(32자) — 🔴 uid·teamId를 넣지 않는다(구매자가 바꿀 수 있고, Groble에 식별자를 넘기지 않는다) |
-| 저장 | Firestore `billingRefs/{토큰}` = `{uid, teamId|null, plan, interval, seats, optionId, createdAt, boundAt|null}` — Worker(서비스 계정)만 읽고 쓴다, 규칙에서 클라이언트 접근 0 |
+| 저장 | Firestore `billingRefs/{토큰}` = `{uid, teamId|null, plan, interval, minSeats, createdAt, boundAt|null}` (묶일 때 `optionId` 추가) — Worker(서비스 계정)만 읽고 쓴다, 규칙에서 클라이언트 접근 0 |
 | 결제 시작마다 | 새 토큰. 결제하지 않은 토큰은 **24시간** 뒤 무효(웹훅이 와도 `unknown-ref`) — 0-7 결정 4 |
-| 첫 웹훅(`INITIAL`) | 토큰이 있고 `payment.purchasedAt`이 `createdAt` + 24시간 안 · 옵션 ID가 토큰의 `optionId`와 같을 때만 → `boundAt` 기록. 이후 회차는 묶인 토큰이면 기간 제한 없음. 🔴 판정은 웹훅이 **도착한** 시각이 아니라 결제 시각으로 한다 — Groble 재시도가 최대 약 44시간 늦게 올 수 있다 |
+| 첫 웹훅(`INITIAL`) | 토큰이 있고 `payment.purchasedAt`이 `createdAt` + 24시간 안 · 결제한 옵션이 옵션 표에 있고 **요금제가 토큰과 같음**(팀이면 옵션 좌석 ≥ 토큰 `minSeats`) · `billingCycleMonths`가 옵션 주기와 같음 → `boundAt`·`optionId` 기록. 주기(월·연)는 결제 페이지에서 바꿔 골라도 받는다 — 결제 링크로 옵션을 미리 고를 수 없어서다(❓ 가이드에 없음). 이후 회차는 묶인 토큰이면 기간 제한 없음. 🔴 판정은 웹훅이 **도착한** 시각이 아니라 결제 시각으로 한다 — Groble 재시도가 최대 약 44시간 늦게 올 수 있다 |
 | 바꾼 ref | 없는 토큰 → `unknown-ref`, 쓰기 0. 남의 토큰을 알아내려면 32자 무작위를 맞혀야 한다 |
-| 다른 옵션 결제 | 토큰과 옵션이 다름(예: 2석 토큰으로 10석 결제) → `wrong-option`, 쓰기 0 + 로그(uid 없이) |
+| 다른 옵션 결제 | 요금제가 다름(Pro 토큰으로 팀 옵션) · 팀 좌석이 `minSeats`보다 적음(지금 팀원 3명인데 2석) · 표에 없는 옵션 → `wrong-option`, 쓰기 0 + 로그(uid 없이). `minSeats` = max(2, 요청 좌석, 결제 시작 때 팀원 수). 🔴 결제는 됐는데 반영이 안 되는 경우라 Groble에서 환불해야 한다 — 결제 페이지 안내 문구로 줄인다(구현 다음 단계) |
 | 환불 연결 | 환불 이벤트에는 `sellerReference`가 없다 → 회차 웹훅마다 `billingRounds/{merchantUid}` = `{ref}`를 써 두고 환불 때 찾는다 |
 
 ### 0-4. 웹훅 검증·응답
@@ -47,9 +52,11 @@
 | `X-Groble-Signature`(또는 키 교체 뒤 24시간 `X-Groble-Signature-Previous`) ≠ HEX(HMAC-SHA256(비밀값, `{X-Groble-Timestamp}.{원문 본문}`)) · 헤더 없음 | 401 | 0 |
 | 시각이 ±5분 밖 | 401 | 0 |
 | 같은 `X-Groble-Idempotency-Key`를 이미 처리 | 200 | 0 |
-| 모르는 이벤트 · `unknown-ref` · `wrong-option` | 200(재시도해도 같으므로) | 0 |
+| 모르는 이벤트 · `unknown-ref` · `expired-ref` · `wrong-option` | 200(재시도해도 같으므로) | 0 |
 | Firestore 실패 | 503(Groble이 재시도 — 7회·약 44시간) | — |
 | 정상 | 200, 10초 안 | 0-5 표 |
+- 시각 헤더 단위(초·밀리초·ISO)는 가이드에 없다 — 셋 다 받는다. 「테스트 발송」으로 확인한 뒤 하나로 좁힌다.
+- 구현: `workers/refine/src/grobleBilling.js` · 테스트 `workers/refine/test/grobleBilling.test.js`(G1~G7, 2026-11-04).
 - 비교는 상수 시간(`safeEqual` 재사용). 처리한 키는 `billingEvents/{키}` `{at}`(30일 뒤 지움 — TTL은 7절처럼 Blaze 뒤, 그 전엔 남아도 본문 없음).
 - 순서 보장 없음 → 이벤트 `occurredAt`이 저장된 것보다 오래되면 무시(지금 규칙 그대로).
 - 🔴 웹훅 본문의 `buyer.email`·`buyer.phoneNumber`·`buyer.displayName`·`paymentMethod.*`·`questionAnswers[]`는 **읽지도 저장하지도 로그하지도 않는다**(금지 3).
@@ -69,8 +76,7 @@
 ### 0-6. Worker 설정 (Paddle 값 대신)
 | 이름 | 종류 | 값 |
 |---|---|---|
-| `GROBLE_PRODUCT_PRO` · `GROBLE_PRODUCT_TEAM` | var | 상품 ID(결제 링크 경로, 비밀 아님) |
-| `GROBLE_OPTIONS` | var(JSON) | 옵션 ID → `{plan, interval, seats}` 표 — 🔴 판정은 이 표 한 곳 |
+| `GROBLE_PRODUCTS` | var(JSON) | 상품 ID → `{plan, interval, seats}` 표(20줄) — 🔴 판정은 이 표 한 곳. 상품 ID는 결제 링크 경로, 비밀 아님 |
 | `GROBLE_WEBHOOK_SECRET` | 🔴 secret | 사용자가 넣는다(내 스토어 → 연동에서 한 번만 보임, 24시간에 한 번 재발급). 넣는 순서는 CLAUDE.md Paddle 시크릿 줄과 같다 |
 | `BILLING_ENFORCED` | var | 그대로 |
 - API 키는 필요 없다(Groble은 결제를 만드는 API가 없다). B1의 `sig`(API 키에서 만든 HMAC)는 0-3 토큰으로 바뀐다.

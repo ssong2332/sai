@@ -443,8 +443,12 @@ export function createHandler(deps = {}) {
 
 /** `/health`용 — 값 없이 준비 여부만. */
 function billingStatus(billing) {
-  if (!billing.checkoutReady && !billing.webhookReady) return 'unavailable';
-  return { checkout: billing.checkoutReady, webhook: billing.webhookReady, enforced: billing.enforced };
+  const g = billing.groble ?? {};
+  if (!billing.checkoutReady && !billing.webhookReady && !g.checkoutReady && !g.webhookReady) return 'unavailable';
+  const out = { checkout: billing.checkoutReady, webhook: billing.webhookReady, enforced: billing.enforced };
+  // Groble(2026-11-04) — 설정됐을 때만 싣는다(준비 여부만, 값 없음).
+  if (g.checkoutReady || g.webhookReady) out.groble = { checkout: Boolean(g.checkoutReady), webhook: Boolean(g.webhookReady) };
+  return out;
 }
 
 /** env → 저장소. 만들다 실패하면(시크릿 형식·프로젝트 불일치) noop — 로그에는 사유 코드만. */
