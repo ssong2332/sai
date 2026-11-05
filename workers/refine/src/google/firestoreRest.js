@@ -25,6 +25,8 @@
  * 🔴 Zero Retention: 이 모듈은 받은 값을 저장소에 쓸 뿐 로그를 남기지 않는다. 오류에는 상태·gRPC 상태만 싣는다.
  */
 
+import { GOOGLE_FETCH_TIMEOUT_MS } from './serviceAccount.js';
+
 const API = 'https://firestore.googleapis.com/v1/';
 const COMMIT_CHUNK = 400; // 한 commit의 쓰기 상한 500보다 여유를 둔다
 const TX_ATTEMPTS = 5;
@@ -449,6 +451,8 @@ export class RestFirestore {
       method,
       headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
+      // 🔴 2026-11-05 — 시간 제한 없이 매달리면 사용자 화면이 「불러오는 중」에서 멈춘다. 넘으면 실패(호출부가 503으로 답한다).
+      signal: globalThis.AbortSignal.timeout(GOOGLE_FETCH_TIMEOUT_MS),
     });
     if (!response.ok) {
       const err = await response.json().catch(() => null);

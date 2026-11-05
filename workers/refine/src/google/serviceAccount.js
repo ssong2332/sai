@@ -6,7 +6,11 @@
  *    JWT를 서명해 접근 토큰을 받는다(RFC 7523 jwt-bearer). 서명은 이미 번들에 있는 `jose`(WebCrypto)로 한다.
  * 🔴 키는 Worker 시크릿 `GOOGLE_SERVICE_ACCOUNT`(JSON 원문)에서만 읽는다. 로그·오류 메시지에 키·토큰을 넣지 않는다 —
  *    오류는 사유 코드만(`ServiceAccountError.code`).
- * 🔴 토큰은 isolate 메모리에만 두고 만료 1분 전까지 재사용한다. 동시에 들어온 요청은 같은 발급을 기다린다.
+ * 🔴 토큰은 isolate 메모리에만 두고 만료 1분 전까지 재사용한다.
+ * 🔴 2026-11-05 운영 장애 — 「동시에 들어온 요청은 같은 발급을 기다린다」(공유 `inflight` Promise)를 뺐다. Workers에서
+ *    교환을 시작한 요청이 끊기면 그 하위 요청이 함께 취소돼 Promise가 끝나지 않고, 같은 isolate의 뒤 요청이 전부 매달렸다
+ *    (`/v1/billing/me`·`/v1/team`·`/v1/billing/checkout` 90~300초, cpu 0~3ms, canceled). 이제 캐시가 없으면 요청마다
+ *    따로 교환하고(만료 직후 몇 번 더 교환할 뿐), 교환에 시간 제한(`GOOGLE_FETCH_TIMEOUT_MS`)을 둔다.
  *
  * 판정표
  * | 입력 | 결과 |
@@ -22,6 +26,8 @@ import { SignJWT, importPKCS8 } from 'jose';
 export const TOKEN_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 export const DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
 const REFRESH_MARGIN_MS = 60_000;
+/** Google 호출(토큰 교환·Firestore REST·JWKS) 시간 제한 — 매달리지 않고 실패로 끝내 503/401로 답한다(2026-11-05 장애). */
+export const GOOGLE_FETCH_TIMEOUT_MS = 10_000;
 
 export class ServiceAccountError extends Error {
   constructor(code, detail = '') {
@@ -61,8 +67,7 @@ export function parseServiceAccount(raw) {
 export function createTokenSource({ credentials, fetchImpl = globalThis.fetch, now = () => Date.now(), scope = TOKEN_SCOPE }) {
   const account = parseServiceAccount(credentials);
   let keyPromise = null;
-  let cached = null; // { value, expiresAt }
-  let inflight = null;
+  let cached = null; // { value, expiresAt } — 끝난 결과(문자열)만 나눠 쓴다. 진행 중인 Promise는 나누지 않는다.
   const stats = { exchanges: 0 };
 
   async function exchange() {
@@ -84,6 +89,7 @@ export function createTokenSource({ credentials, fetchImpl = globalThis.fetch, n
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }).toString(),
+      signal: globalThis.AbortSignal.timeout(GOOGLE_FETCH_TIMEOUT_MS),
     });
     stats.exchanges += 1;
     if (!response.ok) throw new ServiceAccountError('token-exchange', String(response.status));
@@ -99,10 +105,7 @@ export function createTokenSource({ credentials, fetchImpl = globalThis.fetch, n
     projectId: account.projectId,
     async token() {
       if (cached && cached.expiresAt - REFRESH_MARGIN_MS > now()) return cached.value;
-      inflight ??= exchange().finally(() => {
-        inflight = null;
-      });
-      return inflight;
+      return exchange();
     },
   };
 }

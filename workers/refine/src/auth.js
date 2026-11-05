@@ -25,8 +25,9 @@
  *    audience?몄?)???묐떟???ｌ? ?딅뒗????怨듦꺽?먯뿉寃??뚰듃瑜?二쇱? ?딅뒗?? 濡쒓렇?먮룄 jose ?ㅻ쪟 **肄붾뱶**留?
  */
 
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createLocalJWKSet, jwtVerify } from 'jose';
 import { SECURETOKEN_JWKS_URL } from './config.js';
+import { GOOGLE_FETCH_TIMEOUT_MS } from './google/serviceAccount.js';
 
 /** ?쒓퀎 李⑥씠 ?덉슜(珥?. firebase-admin怨?鍮꾩듂???섏??쇰줈 ?묎쾶. */
 const CLOCK_TOLERANCE_SEC = 5;
@@ -46,15 +47,47 @@ export class AuthError extends Error {
  *    紐⑤Ⅴ??`kid`媛 ?ㅻ㈃(??援먯껜) ?ㅼ떆 諛쏅뒗??cooldown 30珥????꾩“ kid濡?Google???먮뱶由щ뒗 寃?諛⑹?).
  *    isolate媛 ?댁븘 ?덈뒗 ?숈븞 ?붿껌留덈떎 Google??遺瑜댁? ?딅뒗?? ?뵶 isolate媛 ?덈줈 ?⑤㈃ 泥??붿껌? ??踰?諛쏅뒗?? *    ??洹??湲곕뒗 fetch??CPU ?쒓컙?먮뒗 ???ㅼ뼱媛꾨떎(踰쎌떆怨?吏?곗뿉???ㅼ뼱媛꾨떎).
  */
-let remoteJwks = null;
-export function defaultJwks() {
-  if (!remoteJwks) {
-    remoteJwks = createRemoteJWKSet(new URL(SECURETOKEN_JWKS_URL), {
-      cacheMaxAge: 60 * 60 * 1000, // 1?쒓컙 ??Google? ?ㅻ? ?섎（ ?⑥쐞濡??뚮┛???뵶 異붿젙, ?묐떟 Cache-Control濡??뺤씤 媛??
-      cooldownDuration: 30_000,
-    });
-  }
-  return remoteJwks;
+/*
+ * 🔴 2026-11-05 운영 장애 — jose `createRemoteJWKSet`은 진행 중인 키 받기(Promise)를 isolate 전체가 나눠 기다린다.
+ *    Workers에서 그걸 시작한 요청이 끊기면 Promise가 끝나지 않아 뒤 요청이 매달릴 수 있다(토큰 교환과 같은 구조,
+ *    `google/serviceAccount.js` 머리말). 그래서 **받아 끝난 키 묶음(JSON)만** isolate에 두고, 받기는 요청마다 따로 한다.
+ * | 상태 | 동작 |
+ * |---|---|
+ * | 키 묶음이 1시간 안에 받은 것 · `kid`가 있음 | 그대로 검증(네트워크 없음) |
+ * | 키 묶음 없음 · 1시간 지남 | 이 요청에서 새로 받는다(시간 제한 `GOOGLE_FETCH_TIMEOUT_MS`) |
+ * | `kid`가 없음(키 교체) · 마지막 받기에서 30초 지남 | 새로 받아 다시 본다 · 30초 안이면 그대로 거절(조작된 kid로 Google을 두드리는 것 방지) |
+ */
+const JWKS_MAX_AGE_MS = 60 * 60 * 1000;
+const JWKS_COOLDOWN_MS = 30_000;
+const jwksCache = { local: null, at: 0 };
+
+async function fetchJwks(fetchImpl, nowMs) {
+  const response = await fetchImpl(SECURETOKEN_JWKS_URL, { signal: globalThis.AbortSignal.timeout(GOOGLE_FETCH_TIMEOUT_MS) });
+  if (!response.ok) throw new AuthError('bad-token', `jwks-${response.status}`);
+  const json = await response.json();
+  jwksCache.local = createLocalJWKSet(json);
+  jwksCache.at = nowMs;
+  return jwksCache.local;
+}
+
+/** 테스트 전용 — 키 캐시를 비운다. */
+export function resetJwksCache() {
+  jwksCache.local = null;
+  jwksCache.at = 0;
+}
+
+export function defaultJwks({ fetchImpl = globalThis.fetch, now = () => Date.now() } = {}) {
+  return async (protectedHeader, token) => {
+    const t = now();
+    let local = jwksCache.local && t - jwksCache.at < JWKS_MAX_AGE_MS ? jwksCache.local : await fetchJwks(fetchImpl, t);
+    try {
+      return await local(protectedHeader, token);
+    } catch (error) {
+      if (error?.code !== 'ERR_JWKS_NO_MATCHING_KEY' || t - jwksCache.at < JWKS_COOLDOWN_MS) throw error;
+      local = await fetchJwks(fetchImpl, t);
+      return local(protectedHeader, token);
+    }
+  };
 }
 
 /** `Authorization: Bearer <token>` ??token. ?놁쑝硫?''. */

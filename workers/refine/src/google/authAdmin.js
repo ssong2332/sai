@@ -6,6 +6,8 @@
  * 🔴 서비스 계정에 「Firebase 인증 관리자」 역할이 있어야 한다(없으면 403 → `auth/forbidden`).
  */
 
+import { GOOGLE_FETCH_TIMEOUT_MS } from './serviceAccount.js';
+
 const API = 'https://identitytoolkit.googleapis.com/v1/';
 
 export class AuthAdminError extends Error {
@@ -27,6 +29,7 @@ export function createAuthAdmin({ projectId, token, fetchImpl = globalThis.fetch
         method: 'POST',
         headers: { authorization: `Bearer ${await token()}`, 'content-type': 'application/json' },
         body: JSON.stringify({ localId: uid }),
+        signal: globalThis.AbortSignal.timeout(GOOGLE_FETCH_TIMEOUT_MS), // 2026-11-05 — 매달리지 않게(serviceAccount.js 머리말)
       });
       if (response.ok) return;
       const body = await response.json().catch(() => null);

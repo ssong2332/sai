@@ -81,3 +81,57 @@ test('🔴 프로젝트 ID 설정 누락이면 정상 토큰도 통과시키지 
 test('형식이 깨진 문자열 → bad-token', async () => {
   await rejects(verify('not-a-jwt'));
 });
+
+/* ── 🔴 2026-11-05 운영 장애 — 키 묶음(JWKS) 받기를 요청끼리 나눠 기다리지 않는다 ── */
+import { exportJWK, generateKeyPair } from 'jose';
+import { defaultJwks, resetJwksCache } from '../src/auth.js';
+
+async function jwksFixture(kid = 'jwks-kid-1') {
+  const { publicKey, privateKey } = await generateKeyPair('RS256', { extractable: true });
+  const json = { keys: [{ ...(await exportJWK(publicKey)), kid, alg: 'RS256', use: 'sig' }] };
+  return { keys: { privateKey, kid }, json };
+}
+
+test('🔴 JWKS — 첫 받기가 매달려도 뒤 요청은 따로 받아 검증한다 · 받은 뒤에는 캐시', async () => {
+  resetJwksCache();
+  const { keys: k, json } = await jwksFixture();
+  let calls = 0;
+  const signals = [];
+  const fetchImpl = (_url, init) => {
+    calls += 1;
+    signals.push(init?.signal);
+    if (calls === 1) return new Promise(() => {}); // 끊긴 요청 — 영원히 끝나지 않음
+    return Promise.resolve(new globalThis.Response(JSON.stringify(json), { status: 200 }));
+  };
+  const jwks = defaultJwks({ fetchImpl });
+  const token = await signIdToken(k);
+  void verifyFirebaseIdToken(token, { projectId: PROJECT_ID, jwks }); // 매달린 첫 요청
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal((await verifyFirebaseIdToken(token, { projectId: PROJECT_ID, jwks })).uid, 'uid-test-123');
+  assert.equal((await verifyFirebaseIdToken(token, { projectId: PROJECT_ID, jwks })).uid, 'uid-test-123');
+  assert.equal(calls, 2, '세 번째는 캐시 — 받기는 2번(매달린 1 + 성공 1)');
+  for (const s of signals) assert.ok(s instanceof globalThis.AbortSignal, '시간 제한 signal');
+  resetJwksCache();
+});
+
+test('JWKS — 모르는 kid는 30초 안에 다시 받지 않고 거절(조작된 kid로 Google을 두드리는 것 방지)', async () => {
+  resetJwksCache();
+  const { json } = await jwksFixture('known-kid');
+  const other = await jwksFixture('unknown-kid');
+  let calls = 0;
+  let t = Date.now();
+  const jwks = defaultJwks({
+    fetchImpl: async () => {
+      calls += 1;
+      return new globalThis.Response(JSON.stringify(json), { status: 200 });
+    },
+    now: () => t,
+  });
+  await rejects(verifyFirebaseIdToken(await signIdToken(other.keys), { projectId: PROJECT_ID, jwks }));
+  await rejects(verifyFirebaseIdToken(await signIdToken(other.keys), { projectId: PROJECT_ID, jwks }));
+  assert.equal(calls, 1, '30초 안 — 다시 받지 않는다');
+  t += 31_000;
+  await rejects(verifyFirebaseIdToken(await signIdToken(other.keys), { projectId: PROJECT_ID, jwks }));
+  assert.equal(calls, 2, '30초 지나 모르는 kid → 한 번 더 받아 본다');
+  resetJwksCache();
+});
