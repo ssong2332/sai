@@ -60,9 +60,32 @@ import { corsHeaders, judgeOrigin } from './cors.js';
 import { createNoopUsageStore } from './usageStore.js';
 import { budgetLevel, extraCallsMicros } from './qualityAllowance.js';
 import { handleTeam } from './teamRoute.js';
-import { resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
+import { featuresFor, resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
 import { googleClientsFromEnv } from './google/clients.js';
 import { PLAN_LIMITS, handleBilling, readBillingConfig, resolvePlan } from './billing.js';
+
+/**
+ * 무료 요금제 요청 정리(2026-11-05) — 본문을 **그 자리에서** 고친다. 본문 값은 로그에 남기지 않는다.
+ * | 필드 | 한도 있음(free) | 한도 없음 |
+ * |---|---|---|
+ * | `glossary` 중 `scope:'personal'` | 앞에서 `personalGlossary`개만 · 팀 항목은 그대로 | 그대로 |
+ * | `profile.learned` | 빈 배열(1순위 설정 `situation`·`collabStyle`은 남긴다) | 그대로 |
+ */
+export function applyPlanFeatures(body, features) {
+  if (!body || typeof body !== 'object') return body;
+  if (features.personalGlossary != null && Array.isArray(body.glossary)) {
+    let kept = 0;
+    body.glossary = body.glossary.filter((entry) => {
+      if (entry?.scope !== 'personal') return true;
+      kept += 1;
+      return kept <= features.personalGlossary;
+    });
+  }
+  if (!features.learning && body.profile && typeof body.profile === 'object' && Array.isArray(body.profile.learned)) {
+    body.profile = { ...body.profile, learned: [] };
+  }
+  return body;
+}
 
 /**
  * 🔴 `mode` 라우팅 표 — `functions/index.js` `MODES`와 **같은 코어·같은 로그 필드**다(2026-10-24 이식).
@@ -303,12 +326,13 @@ export function createHandler(deps = {}) {
     //    모르는 값·없음은 기본값(빠른). 2026-10-31부터 아래 ⑥이 상위 모드를 빠른으로 낮출 수 있다(`qualityAllowance.js`).
     let quality = modeName === 'refine' ? resolveQuality(body.quality) : null;
     let downgrade = null;
+    // 요금제 — 아래 ⑥이 구독 문서로 다시 판정한다. 그 전에 장애가 나도 구독 없음 판정(`BILLING_ENFORCED`면 free)으로 남는다.
+    let plan = resolvePlan(null, readBillingConfig(env));
 
     // ⑥ 일일 상한 + 품질 모드 허용량 — 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**(저장소를 못 만들어도 noop으로 통과).
     const store = resolveStore(storeFor, env, logger);
     try {
       // 2026-10-31 요금제별 한도 — 구독 문서가 없거나 못 읽으면 `beta`/`free`(`BILLING_ENFORCED`) 판정표 그대로.
-      let plan = 'beta';
       try {
         const billingDoc = store.getBilling ? await store.getBilling(uid) : null;
         plan = resolvePlan(billingDoc, readBillingConfig(env));
@@ -318,8 +342,14 @@ export function createHandler(deps = {}) {
       }
       // 🔴 `beta`(유료 출시 전 무료)는 한도를 넘기지 않는다 — 저장소의 원래 상한(`DAILY_REFINE_LIMIT`)·기본 표 그대로(P5).
       const limits = plan === 'beta' ? null : PLAN_LIMITS[plan];
-      const quota = store.admit ? await store.admit(uid, { quality, limits }) : await store.consumeDailyQuota(uid);
+      // 2026-11-05 무료 회신 초안 하루 N회(`PLAN_FEATURES`) — reply 요청에만.
+      const replyLimit = modeName === 'reply' ? featuresFor(plan).replyDaily : null;
+      const quota = store.admit ? await store.admit(uid, { quality, limits, replyLimit }) : await store.consumeDailyQuota(uid);
       if (!quota.ok) {
+        if (quota.reason === 'reply-limit') {
+          logger.warn('[refine] 무료 회신 초안 하루 한도 — 거절');
+          return json(429, { error: 'reply-limit', limit: quota.limit });
+        }
         // 🔴 2026-11-02 — 이달 추정이 멈춤선($95, `MONTHLY_HARD_STOP_MICROS`) 이상이면 모든 사용자를 멈춘다.
         if (quota.reason === 'monthly-limit') {
           logger.warn('[refine] 이달 예산 멈춤선 도달 — 거절');
@@ -343,6 +373,11 @@ export function createHandler(deps = {}) {
         downgrade = 'unavailable';
       }
     }
+
+    // ⑥-2 무료 요금제 정리(2026-11-05 「무료 2단계」) — 확장이 이미 거르지만 옛 확장·조작 요청도 같은 결과가 되게 서버가 한 번 더.
+    //    개인 용어는 앞에서 N개만(`PLAN_FEATURES.personalGlossary`), 학습 기록(`profile.learned`)은 버린다. 팀 용어는 건드리지 않는다
+    //    (팀 잠금은 팀 쪽이 판정 — 유예 중인 팀의 무료 팀원도 팀 용어를 쓴다).
+    applyPlanFeatures(body, featuresFor(plan));
 
     // ⑦ provider — 위 판정표. 명시 요청은 대체하지 않는다.
     const selected = resolveProvider(body.provider, config.keys);

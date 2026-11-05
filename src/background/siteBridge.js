@@ -5,7 +5,7 @@
  * 🔴 **서버가 없다.** 웹이 읽고 쓰는 것은 이 기기의 `chrome.storage.local`뿐이고, 여기서 어디로도
  *    내보내지 않는다. 로그도 남기지 않는다 — 값은 물론 메시지 type도 찍지 않는다.
  * 🔴 **프로토콜은 고정이다**(웹이 이 모양에 맞춰 만들어지고 있다). type·필드·오류 코드 이름을 바꾸지 않는다.
- *    응답: `{ok:true, ...}` 또는 `{ok:false, error}` — error ∈ `forbidden_origin`|`bad_request`|`unknown_type`|`failed`.
+ *    응답: `{ok:true, ...}` 또는 `{ok:false, error}` — error ∈ `forbidden_origin`|`bad_request`|`unknown_type`|`failed`|`plan_limit`(2026-11-05 추가).
  * 🔴 **저장은 반드시 `src/lib/*.js`를 거친다**(WebSplit 「B를 싸게 만들기 위해 지금 지킬 것」 1) — 사이드패널과
  *    같은 함수를 써야 같은 규칙(용어집 덮어쓰기, 학습 삭제 대기 기록, 말투↔기본 톤 연결)이 지켜진다.
  *
@@ -57,6 +57,7 @@ import { DIFF_CATEGORIES } from '../core/profile/diff.js';
 import { getSession } from '../lib/authClient.js';
 import { flushLearnedDeletions, SYNC_ERRORS } from '../lib/syncClient.js';
 import { BillingClientError, BILLING_ERRORS, startCheckout, TEAM_SEATS_MAX, TEAM_SEATS_MIN } from '../lib/billingClient.js';
+import { PlanLimitError } from '../lib/planCache.js';
 import { createTeam, listTeams, restoreTeamsFromServer, TeamClientError, TEAM_ERRORS } from '../lib/teamClient.js';
 
 /** 사이트에서 팀을 처음 살 때 자동으로 만드는 팀 이름 — 팀 탭에서 바꾼다(2026-11-05 사용자 결정 「B안」). */
@@ -69,6 +70,8 @@ export const SITE_ERRORS = {
   BAD_REQUEST: 'bad_request',
   UNKNOWN_TYPE: 'unknown_type',
   FAILED: 'failed',
+  /** 2026-11-05 무료 한도(개인 용어 5개)에 닿아 새로 추가를 막았다 — 화면은 「Pro에서 더 쓸 수 있어요」. */
+  PLAN_LIMIT: 'plan_limit',
 };
 
 /** 짧은 문자열(이름·직급 등) 상한 — 프로토콜 고정값. */
@@ -532,6 +535,7 @@ export async function handleSiteMessage(message, sender, overrides = {}) {
     return { ok: true, ...result };
   } catch (error) {
     // 🔴 사유·값을 응답에도 로그에도 싣지 않는다(Zero Retention — 저장소 오류 문구에 무엇이 섞일지 모른다).
+    if (error instanceof PlanLimitError) return { ok: false, error: SITE_ERRORS.PLAN_LIMIT };
     return { ok: false, error: error instanceof BadRequest ? SITE_ERRORS.BAD_REQUEST : SITE_ERRORS.FAILED };
   }
 }

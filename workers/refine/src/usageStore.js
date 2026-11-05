@@ -60,6 +60,7 @@ export function createMemoryUsageStore({
 } = {}) {
   const counts = new Map();
   const premium = new Map(); // `${날짜}:${uid}:${모드}` → 횟수
+  const replies = new Map(); // `${날짜}:${uid}` → 회신 초안 횟수(무료 한도가 있을 때만 센다)
   const budget = new Map(); // 달 → 추정 비용(백만분의 1달러)
   const billing = new Map(); // uid → billing 문서(테스트가 setBilling으로 넣는다)
   const requests = [];
@@ -75,17 +76,21 @@ export function createMemoryUsageStore({
       counts.set(key, used);
       return { ok: true, used, limit };
     },
-    async admit(uid, { quality = null, limits = null } = {}) {
+    async admit(uid, { quality = null, limits = null, replyLimit = null } = {}) {
       const key = `${today()}:${uid}`;
       const used = (counts.get(key) ?? 0) + 1;
       const dailyLimit = limits?.daily ?? limit;
       if (used > dailyLimit) return { ok: false, used: used - 1, limit: dailyLimit };
+      // 2026-11-05 무료 회신 초안 하루 N회(`PLAN_FEATURES.replyDaily`) — 하루 횟수 안에서 따로 센다. 넘으면 횟수를 깎지 않는다.
+      const replyUsed = replies.get(key) ?? 0;
+      if (replyLimit != null && replyUsed >= replyLimit) return { ok: false, reason: 'reply-limit', used: used - 1, limit: replyLimit };
       const m = month();
       const monthMicros = budget.get(m) ?? startMicros;
       if (monthMicros >= MONTHLY_HARD_STOP_MICROS) return { ok: false, reason: 'monthly-limit', used: used - 1, limit: dailyLimit };
       const premiumUsed = quality ? { [quality]: premium.get(`${key}:${quality}`) ?? 0 } : {};
       const decided = decideQuality({ requested: quality, premiumUsed, monthMicros, ...(limits ? { limits } : {}) });
       counts.set(key, used);
+      if (replyLimit != null) replies.set(key, replyUsed + 1);
       if (decided.quality && !decided.downgrade && decided.quality !== 'fast') {
         premium.set(`${key}:${decided.quality}`, (premiumUsed[decided.quality] ?? 0) + 1);
       }
@@ -124,8 +129,8 @@ export function createFirestoreUsageStore({ db, limit = DAILY_REFINE_LIMIT, now 
   return {
     kind: 'firestore',
     consumeDailyQuota: (uid) => consumeDailyQuota(db, { uid, limit, now: now() }),
-    admit: (uid, { quality = null, limits = null } = {}) =>
-      admitFirestore(db, { uid, quality, limit: limits?.daily ?? limit, limits, now: now() }),
+    admit: (uid, { quality = null, limits = null, replyLimit = null } = {}) =>
+      admitFirestore(db, { uid, quality, limit: limits?.daily ?? limit, limits, replyLimit, now: now() }),
     // 결제(`billing.js`) — 요금제 판정용 구독 문서. 요청당 읽기 1회.
     getBilling: async (uid) => {
       const snap = await db.collection('billing').doc(uid).get();
@@ -147,7 +152,7 @@ export function createFirestoreUsageStore({ db, limit = DAILY_REFINE_LIMIT, now 
  * 문서 2개: `refineQuota/{uid}_{날짜}`(기존 모양 + `premium.{standard|deep}`) · `budgetMonthly/{YYYY-MM}`(`micros`, uid 없음).
  * 🔴 쓰기가 요청당 1개 늘어난다(Spark 하루 쓰기 2만 — Spec §0 「비용 상한」).
  */
-async function admitFirestore(db, { uid, quality, limit, limits = null, now }) {
+async function admitFirestore(db, { uid, quality, limit, limits = null, replyLimit = null, now }) {
   const dateKey = seoulDateKey(now);
   const monthKey = seoulMonthKey(now);
   const quotaRef = db.collection('refineQuota').doc(`${uid}_${dateKey}`);
@@ -158,6 +163,9 @@ async function admitFirestore(db, { uid, quality, limit, limits = null, now }) {
     const q = quotaSnap.exists ? quotaSnap.data() ?? {} : {};
     const used = Number(q.count ?? 0);
     if (used >= limit) return { ok: false, used, limit };
+    // 2026-11-05 무료 회신 초안 하루 N회 — 같은 문서의 `reply` 칸(숫자만, 본문 없음). 넘으면 아무것도 쓰지 않는다.
+    const replyUsed = Number(q.reply ?? 0);
+    if (replyLimit != null && replyUsed >= replyLimit) return { ok: false, reason: 'reply-limit', used, limit: replyLimit };
     const monthMicrosNow = budgetSnap.exists ? Number(budgetSnap.data()?.micros ?? 0) : 0;
     // 🔴 2026-11-02 — 이달 추정이 멈춤선 이상이면 아무것도 쓰지 않고 거절한다(횟수도 깎지 않는다).
     if (monthMicrosNow >= MONTHLY_HARD_STOP_MICROS) return { ok: false, reason: 'monthly-limit', used, limit };
@@ -165,6 +173,7 @@ async function admitFirestore(db, { uid, quality, limit, limits = null, now }) {
     const monthMicros = budgetSnap.exists ? Number(budgetSnap.data()?.micros ?? 0) : 0;
     const decided = decideQuality({ requested: quality, premiumUsed, monthMicros, ...(limits ? { limits } : {}) });
     const quotaDoc = { uid, dateKey, count: used + 1, updatedAt: now, expireAt: quotaExpireAt(dateKey) };
+    if (replyLimit != null) quotaDoc.reply = replyUsed + 1;
     if (decided.quality && !decided.downgrade && decided.quality !== 'fast') {
       quotaDoc.premium = { [decided.quality]: (premiumUsed[decided.quality] ?? 0) + 1 };
     }

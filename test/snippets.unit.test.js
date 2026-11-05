@@ -18,6 +18,7 @@ import {
   clearSnippets,
   MAX_SNIPPETS,
 } from '../src/lib/snippets.js';
+import { setLocal, STORAGE_KEYS } from '../src/lib/storage.js';
 
 test('저장하면 목록에 최신순으로 쌓인다', async () => {
   await clearSnippets();
@@ -50,6 +51,8 @@ test('같은 문장을 또 저장하면 중복을 만들지 않고 맨 위로 �
 
 test('상한을 넘으면 저장하지 않고 이유를 알린다 — 조용히 버리지 않는다', async () => {
   await clearSnippets();
+  // 2026-11-05 — 무료 한도(3)가 아니라 전체 상한을 보는 시험이라 Pro로 둔다(무료 한도는 `freePlanLimits.unit.test.js`).
+  await setLocal(STORAGE_KEYS.PLAN, { plan: 'pro', checkedAt: Date.now() });
   for (let i = 0; i < MAX_SNIPPETS; i += 1) {
     await addSnippet({ text: `문장 ${i}` });
   }

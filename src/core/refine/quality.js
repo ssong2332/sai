@@ -45,6 +45,32 @@ export const PLAN_LIMITS = Object.freeze({
   team: Object.freeze({ daily: 200, standard: 20, deep: 5 }),
 });
 
+/**
+ * 요금제별 기능 한도(2026-11-05 사용자 결정 「무료 2단계 — B안, 개인 용어집 5 · 저장 문구 3, 나머지 추천대로」).
+ * 🔴 한 곳에만 둔다 — Worker(회신 횟수·개인 용어 수·학습 버림)와 확장(화면 숨김·추가 막기)이 같은 표를 읽는다.
+ * `null` = 제한 없음. 저장된 데이터는 지우지 않는다 — 한도는 「쓰기·새로 추가」에만 건다.
+ * | 요금제 | 회신 초안/일 | 개인 용어집 | 저장 문구 | 예약·회의 추천 | 수정 습관 학습 |
+ * |---|---|---|---|---|---|
+ * | free | 3 | 5 | 3 | 숨김 | 숨김(기록 안 함) |
+ * | beta · pro · team | 제한 없음 | 제한 없음 | 제한 없음 | 보임 | 보임 |
+ * 상대 시간대 표시 · 퇴근 시간 경고는 무료에도 보인다(표에 없음 = 모두).
+ */
+const FULL_FEATURES = Object.freeze({ replyDaily: null, personalGlossary: null, snippets: null, scheduling: true, learning: true });
+export const PLAN_FEATURES = Object.freeze({
+  free: Object.freeze({ replyDaily: 3, personalGlossary: 5, snippets: 3, scheduling: false, learning: false }),
+  beta: FULL_FEATURES,
+  pro: FULL_FEATURES,
+  team: FULL_FEATURES,
+});
+
+/** 요금제 → 기능 한도. 모르는 값은 free(🔴 잠그는 쪽 — 결제 안 한 사람에게 열어 주지 않는다). */
+export function featuresFor(plan) {
+  return Object.hasOwn(PLAN_FEATURES, plan) ? PLAN_FEATURES[plan] : PLAN_FEATURES.free;
+}
+
+/** 한도에 닿았을 때 붙이는 한 줄 — 확장 화면이 같은 말을 쓴다. */
+export const PLAN_UPSELL_NOTE = 'Pro에서 더 쓸 수 있어요';
+
 /** 서버가 모드를 낮췄을 때 팝업에 붙이는 말(응답 `qualityDowngrade`). 모르는 사유는 표시하지 않는다. */
 export const QUALITY_DOWNGRADE_NOTES = Object.freeze({
   daily: '오늘 쓸 수 있는 횟수를 다 써서 빠른 모드로 다듬었어요',

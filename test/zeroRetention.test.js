@@ -229,6 +229,9 @@ test('본문이 다르면 캐시 키도 다르다 — 해시가 실제로 입력
 
 test('🔴 학습 기록(recordEdit)은 본문을 저장하지 않는다', async () => {
   const { recordEdit, getLearnedCounts } = await import('../src/lib/profile.js');
+  // 2026-11-05 — 무료는 학습하지 않으므로 기록이 일어나는 Pro로 둔다.
+  const storage = await import('../src/lib/storage.js');
+  await storage.setLocal(storage.STORAGE_KEYS.PLAN, { plan: 'pro', checkedAt: Date.now() });
 
   // 사과 표현 제거 = 판정표 A에 걸리는 수정이라 실제로 기록이 일어난다.
   await recordEdit(`Sorry, sorry — ${SECRET_BODY}`, SECRET_BODY);
