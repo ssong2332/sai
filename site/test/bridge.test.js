@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   BRIDGE_ERRORS,
+  CHECKOUT_TIMEOUT_MS,
   EXT_ID,
+  STORE_URL,
+  describeCheckout,
   createExtensionClient,
   describeError,
   interpretHello,
@@ -173,4 +176,29 @@ test('데모 브리지 — 같은 계약을 따르고 메모리에서만 바뀐�
   // 새 브리지는 처음 값 — 저장소에 쓰지 않았다는 뜻
   const fresh = await createFakeSend({ delayMs: 0 })({ type: 'site:get' });
   assert.equal(fresh.settings.display.backTranslation, true);
+});
+
+/* ── 요금 페이지 결제(2026-11-05) ── */
+
+test('checkout — Pro·주기만 보내고, 결제는 3초가 아니라 15초까지 기다린다', async () => {
+  const { runtime, calls } = fakeRuntime({ reply: () => ({ ok: true, checkout: 'opened' }) });
+  const client = createExtensionClient({ runtime });
+  assert.deepEqual(await client.checkout('year'), { ok: true, checkout: 'opened' });
+  assert.deepEqual(calls[0].message, { type: 'site:checkout', plan: 'pro', interval: 'year' });
+  assert.equal(CHECKOUT_TIMEOUT_MS, 15000);
+  assert.equal(STORE_URL.endsWith(EXT_ID), true);
+});
+
+test('checkout 결과 문구 — 설치 안 됨은 install, 옛 확장은 update, 사유 코드별 안내', () => {
+  assert.equal(describeCheckout({ ok: true, checkout: 'opened' }).tone, 'ok');
+  assert.match(describeCheckout({ ok: true, checkout: 'not-signed-in' }).text, /로그인/);
+  assert.match(describeCheckout({ ok: true, checkout: 'already-subscribed' }).text, /이미 결제 중/);
+  assert.equal(describeCheckout({ ok: true, checkout: 'network' }).tone, 'error');
+  for (const error of [BRIDGE_ERRORS.NO_RUNTIME, BRIDGE_ERRORS.NO_RECEIVER]) {
+    assert.equal(describeCheckout({ ok: false, error }).action, 'install', error);
+  }
+  for (const error of ['unknown_type', BRIDGE_ERRORS.BAD_RESPONSE]) {
+    assert.equal(describeCheckout({ ok: false, error }).action, 'update', error);
+  }
+  assert.equal(describeCheckout({ ok: false, error: BRIDGE_ERRORS.TIMEOUT }).action, undefined);
 });

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from '../router.jsx';
+import { createExtensionClient, describeCheckout, STORE_URL } from '../bridge.js';
 
 /**
  * 요금제 (L36, 2026-10-29 사용자 결정 — Spec §0 수익화).
@@ -39,7 +40,8 @@ const PLANS = [
     saveBadge: '37% 할인',
     unit: { annual: '월 · 연 ₩59,000 결제', monthly: '월 · 월 결제' },
     featured: true,
-    cta: { label: '확장에서 결제', note: '확장 설정의 「요금제」에서 결제해요 · 부가세 포함' },
+    // 🔴 2026-11-05 사용자 결정 「A안」 — 누르면 확장이 로그인 계정으로 그로블 결제창을 연다(`site:checkout`). 라벨은 주기별.
+    cta: { label: { annual: 'Pro 연 결제하기', monthly: 'Pro 월 결제하기' }, note: '새 탭의 그로블에서 카드로 결제해요 · 확장 로그인 필요 · 부가세 포함' },
     lead: '무료의 모든 기능에 더해',
     features: [
       '회신 초안',
@@ -58,7 +60,8 @@ const PLANS = [
     price: { annual: '₩11,250', monthly: '₩13,900' },
     saveBadge: '19% 할인',
     unit: { annual: '1인당 · 월 · 연 ₩135,000 결제', monthly: '1인당 · 월 · 월 결제' },
-    cta: { label: '확장에서 결제', note: '팀장이 2~10석을 결제해요 · 부가세 포함' },
+    // 팀은 팀장 확인·좌석 선택이 필요해 사이드패널 「팀」 탭에서 — 여기서는 안내만.
+    cta: { label: '팀 결제 방법 보기', note: '팀장이 2~10석을 결제해요 · 부가세 포함' },
     lead: '개인 Pro의 모든 기능에 더해',
     features: ['팀 용어집 공유', '팀 대시보드 — 협업 지표 합계', '팀원 관리', '팀 기본 품질 모드 지정'],
   },
@@ -104,7 +107,7 @@ const COMPARE = [
 const FAQ = [
   {
     q: '지금 돈을 내야 하나요?',
-    a: '아니요. 출시 기간에는 개인 기능과 팀 기능을 모두 무료로 쓸 수 있어요. 개인 Pro와 팀은 확장 설정의 「요금제」에서 결제할 수 있게 열 예정이에요.',
+    a: '아니요. 출시 기간에는 개인 기능과 팀 기능을 모두 무료로 쓸 수 있어요. 더 많이 · 더 꼼꼼하게 다듬고 싶다면 이 페이지나 확장 설정의 「요금제」에서 개인 Pro를, 사이드패널 「팀」 탭에서 팀을 결제할 수 있어요.',
   },
   {
     q: '유료 플랜은 언제 나오나요?',
@@ -158,6 +161,25 @@ const byBilling = (value, billing) => (value && typeof value === 'object' ? valu
 export default function Pricing() {
   const [open, setOpen] = useState(0);
   const [billing, setBilling] = useState('annual');
+  const client = useMemo(() => createExtensionClient(), []);
+  /** 카드별 결제 안내 — { [planId]: {tone, text, action?} } */
+  const [notice, setNotice] = useState({});
+  const [busy, setBusy] = useState(false);
+
+  const onCta = async (planId) => {
+    if (planId === 'team') {
+      setNotice({ team: { tone: 'info', text: '팀장이 확장 사이드패널의 「팀」 탭에서 좌석 수(2~10석)를 골라 결제해요. 팀원은 결제하지 않아요.' } });
+      return;
+    }
+    if (planId !== 'pro' || busy) return;
+    setBusy(true);
+    setNotice({ pro: { tone: 'info', text: '확장에 결제창을 요청하는 중이에요…' } });
+    try {
+      setNotice({ pro: describeCheckout(await client.checkout(billing === 'annual' ? 'year' : 'month')) });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     document.title = '요금제 — 사이';
@@ -173,7 +195,7 @@ export default function Pricing() {
           <p className="pr-eyebrow">요금제</p>
           <h1 className="pr-title">지금은 모두 무료예요</h1>
           <p className="pr-lede">
-            출시 기간에는 개인·팀 기능을 모두 무료로 써요. 유료 플랜은 준비 중이고, 나와도 무료 플랜은 남아요.
+            출시 기간에는 개인·팀 기능을 모두 무료로 써요. 더 많이 · 더 꼼꼼하게 다듬으려면 지금 Pro · 팀을 결제할 수 있고, 무료 플랜은 계속 남아요.
           </p>
         </header>
 
@@ -207,14 +229,32 @@ export default function Pricing() {
                 <span className="num">{byBilling(plan.price, billing)}</span>
                 <span className="pr-unit">{byBilling(plan.unit, billing)}</span>
               </p>
-              <button
-                type="button"
-                className={`btn ${plan.id === 'free' ? 'primary' : 'ghost'} pr-cta`}
-                aria-disabled="true"
-              >
-                {plan.cta.label}
-              </button>
+              {plan.id === 'free' ? (
+                <button type="button" className="btn primary pr-cta" aria-disabled="true">
+                  {plan.cta.label}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`btn ${plan.id === 'pro' ? 'primary' : 'ghost'} press pr-cta`}
+                  disabled={plan.id === 'pro' && busy}
+                  onClick={() => onCta(plan.id)}
+                >
+                  {byBilling(plan.cta.label, billing)}
+                </button>
+              )}
               <p className="pr-note">{plan.cta.note}</p>
+              <p className={`pr-notice${notice[plan.id] ? ` ${notice[plan.id].tone}` : ''}`} role="status" aria-live="polite">
+                {notice[plan.id]?.text}
+                {notice[plan.id]?.action === 'install' && (
+                  <>
+                    {' '}
+                    <a href={STORE_URL} target="_blank" rel="noopener noreferrer">
+                      Chrome 웹 스토어에서 설치
+                    </a>
+                  </>
+                )}
+              </p>
               <hr className="pr-rule" />
               <p className="pr-lead">{plan.lead}</p>
               <ul className="pr-features">

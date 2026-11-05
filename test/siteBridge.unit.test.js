@@ -40,17 +40,18 @@ test('🔴 허용 목록 밖 오리진은 forbidden_origin — 다른 확장·�
   }
 });
 
-test('🔴 기본 빌드의 허용 목록은 비어 있다 — localhost:5180도 거절된다', async () => {
-  assert.deepEqual(SITE_ALLOWED_ORIGINS, []);
-  assert.deepEqual(SITE_EXTERNALLY_CONNECTABLE_MATCHES, []);
-  assert.equal(SITE_URL, null, '공개 빌드는 사이트 미배포라 버튼을 그리지 않는다');
+test('🔴 기본 빌드의 허용 목록은 운영 사이트 하나뿐 — localhost:5180은 거절된다(2026-11-05 사이트 결제 버튼)', async () => {
+  assert.deepEqual(SITE_ALLOWED_ORIGINS, ['https://sai-global-msg-2026.web.app']);
+  assert.deepEqual(SITE_EXTERNALLY_CONNECTABLE_MATCHES, ['https://sai-global-msg-2026.web.app/*']);
+  assert.equal(SITE_URL, 'https://sai-global-msg-2026.web.app');
   // 대역 없이 실제 기본 허용 목록으로 보낸다.
   assert.deepEqual(await handleSiteMessage({ type: 'site:hello' }, sender), { ok: false, error: 'forbidden_origin' });
 });
 
 test('개발 스위치를 켜면 localhost:5180만 붙는다', () => {
-  assert.deepEqual(siteAllowedOrigins(false), []);
-  assert.deepEqual(siteAllowedOrigins(true), ['http://localhost:5180']);
+  assert.deepEqual(siteAllowedOrigins(false, null), []);
+  assert.deepEqual(siteAllowedOrigins(true, null), ['http://localhost:5180']);
+  assert.deepEqual(siteAllowedOrigins(false), ['https://sai-global-msg-2026.web.app']);
   assert.deepEqual(siteAllowedOrigins(true, 'https://sai.example/app'), ['https://sai.example', 'http://localhost:5180']);
 });
 
@@ -393,4 +394,87 @@ test('🔴 manifest는 externally_connectable 오리진을 config에서 파생�
   const manifest = readFileSync(new URL('../src/manifest.js', import.meta.url), 'utf8');
   assert.ok(manifest.includes('externally_connectable: { matches: SITE_EXTERNALLY_CONNECTABLE_MATCHES }'));
   assert.ok(!manifest.includes('localhost:5180'), 'manifest에 개발 오리진을 손으로 적었다');
+});
+
+/* ── site:checkout (2026-11-05 요금 페이지 결제 버튼 — 사용자 결정 「A안」) ── */
+
+test('site:checkout — Pro 월·연만 받고, 확장이 결제 주소로 새 탭을 연다 · 주소는 사이트로 돌려주지 않는다', async () => {
+  for (const interval of ['month', 'year']) {
+    const calls = [];
+    const opened = [];
+    const result = await send(
+      { type: 'site:checkout', plan: 'pro', interval },
+      {
+        billingEnabled: true,
+        startCheckout: async (i, opts) => {
+          calls.push([i, opts]);
+          return 'https://groble.im/payment/x8KncK?ref=secret-token';
+        },
+        openTab: async (url) => opened.push(url),
+      },
+    );
+    assert.deepEqual(result, { ok: true, checkout: 'opened' }, interval);
+    assert.deepEqual(calls, [[interval, { plan: 'pro' }]]);
+    assert.deepEqual(opened, ['https://groble.im/payment/x8KncK?ref=secret-token']);
+    assert.equal(JSON.stringify(result).includes('secret-token'), false, '일회용 토큰이 응답에 섞였다');
+  }
+});
+
+test('site:checkout — 팀·모르는 주기는 bad_request, 서버를 부르지 않는다', async () => {
+  let called = false;
+  const startCheckout = async () => {
+    called = true;
+    return 'x';
+  };
+  for (const message of [
+    { plan: 'team', interval: 'month' },
+    { plan: 'pro', interval: 'week' },
+    { plan: 'pro' },
+    {},
+  ]) {
+    assert.deepEqual(
+      await send({ type: 'site:checkout', ...message }, { billingEnabled: true, startCheckout, openTab: async () => {} }),
+      { ok: false, error: 'bad_request' },
+      JSON.stringify(message),
+    );
+  }
+  assert.equal(called, false);
+});
+
+test('site:checkout — 로그인 안 함·이미 구독·결제 꺼짐은 사유 코드로, 탭을 열지 않는다', async () => {
+  const { BillingClientError, BILLING_ERRORS } = await import('../src/lib/billingClient.js');
+  for (const reason of [BILLING_ERRORS.NOT_SIGNED_IN, BILLING_ERRORS.ALREADY_SUBSCRIBED, BILLING_ERRORS.NETWORK]) {
+    let opened = false;
+    const result = await send(
+      { type: 'site:checkout', plan: 'pro', interval: 'year' },
+      {
+        billingEnabled: true,
+        startCheckout: async () => {
+          throw new BillingClientError(reason);
+        },
+        openTab: async () => {
+          opened = true;
+        },
+      },
+    );
+    assert.deepEqual(result, { ok: true, checkout: reason });
+    assert.equal(opened, false);
+  }
+  assert.deepEqual(
+    await send({ type: 'site:checkout', plan: 'pro', interval: 'year' }, { billingEnabled: false }),
+    { ok: true, checkout: BILLING_ERRORS.UNAVAILABLE },
+  );
+  // 예상 밖 예외는 failed — 문구를 싣지 않는다.
+  assert.deepEqual(
+    await send(
+      { type: 'site:checkout', plan: 'pro', interval: 'year' },
+      {
+        billingEnabled: true,
+        startCheckout: async () => {
+          throw new Error('토큰 abc 포함 문구');
+        },
+      },
+    ),
+    { ok: false, error: 'failed' },
+  );
 });

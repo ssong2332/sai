@@ -24,7 +24,7 @@
  * | 저장소 오류 등 그 밖의 예외 | `failed` (사유 문구를 싣지 않는다) |
  */
 
-import { SITE_ALLOWED_ORIGINS } from '../config.js';
+import { FEATURES, SITE_ALLOWED_ORIGINS } from '../config.js';
 import { getLocal, setLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
 import {
   getOnboarding,
@@ -54,6 +54,7 @@ import { LANGUAGE_LABELS } from '../lib/recipients.js';
 import { DIFF_CATEGORIES } from '../core/profile/diff.js';
 import { getSession } from '../lib/authClient.js';
 import { flushLearnedDeletions, SYNC_ERRORS } from '../lib/syncClient.js';
+import { BillingClientError, BILLING_ERRORS, startCheckout } from '../lib/billingClient.js';
 
 export const SITE_PROTOCOL_VERSION = 1;
 
@@ -327,6 +328,31 @@ const HANDLERS = {
     return { protocol: SITE_PROTOCOL_VERSION, version: deps.getVersion(), signedIn: Boolean(session) };
   },
 
+  /**
+   * 요금 페이지 「Pro 결제하기」(2026-11-05 사용자 결정 「A안」) — 확장이 로그인 토큰으로 결제 주소를 받아 **확장이** 새 탭을 연다.
+   * 🔴 결제 주소(일회용 `?ref=` 포함)는 사이트로 돌려주지 않는다 — 응답은 결과 코드 하나뿐.
+   * 🔴 팀은 받지 않는다 — 팀장 확인·좌석 선택은 사이드패널 「팀」 탭에서.
+   * | 요청 | 결과 |
+   * |---|---|
+   * | plan ≠ 'pro' · interval ∉ month·year | `bad_request` — 서버를 부르지 않는다 |
+   * | 결제 진입점 꺼짐(`FEATURES.billing`) | `{checkout:'billing-unavailable'}` |
+   * | 결제 주소 받음 | 새 탭 → `{checkout:'opened'}` |
+   * | 로그인 안 함·이미 구독 중 등 | `{checkout:<BILLING_ERRORS 코드>}` |
+   */
+  async 'site:checkout'(message, deps) {
+    if (message.plan !== 'pro' || (message.interval !== 'month' && message.interval !== 'year')) fail();
+    if (!deps.billingEnabled) return { checkout: BILLING_ERRORS.UNAVAILABLE };
+    let url;
+    try {
+      url = await deps.startCheckout(message.interval, { plan: 'pro' });
+    } catch (error) {
+      if (error instanceof BillingClientError) return { checkout: error.reason };
+      throw error;
+    }
+    await deps.openTab(url);
+    return { checkout: 'opened' };
+  },
+
   async 'site:get'(_message, deps) {
     return { settings: await readSettings(deps) };
   },
@@ -427,6 +453,9 @@ export const DEFAULT_SITE_BRIDGE_DEPS = {
   addPersonalGlossaryEntry,
   updatePersonalGlossaryEntry,
   removePersonalGlossaryEntry,
+  billingEnabled: FEATURES.billing,
+  startCheckout,
+  openTab: (url) => chrome.tabs.create({ url }),
 };
 
 /**
