@@ -11,6 +11,7 @@
  */
 
 import { getLocal, setLocal, STORAGE_KEYS } from './storage.js';
+import { getFeatures, PlanLimitError } from './planCache.js';
 
 /**
  * 🔴 **데모 시드를 제거했다** (2026-08-15 사용자 요청).
@@ -80,6 +81,11 @@ export async function addPersonalGlossaryEntry(input) {
       item.sourceText.trim().toLowerCase() === entry.sourceText.toLowerCase() &&
       (item.language ?? null) === entry.language,
   );
+  // 2026-11-05 무료 한도(`PLAN_FEATURES.personalGlossary`) — 새 항목만 막는다(같은 원문·언어 덮어쓰기는 된다).
+  if (index === -1) {
+    const { personalGlossary: planLimit } = await getFeatures();
+    if (planLimit != null && list.length >= planLimit) throw new PlanLimitError('personalGlossary', planLimit);
+  }
   const next = index === -1 ? [entry, ...list] : list.map((item, i) => (i === index ? { ...entry, id: item.id } : item));
   await setLocal(STORAGE_KEYS.GLOSSARY_PERSONAL, next);
   return next[index === -1 ? 0 : index];

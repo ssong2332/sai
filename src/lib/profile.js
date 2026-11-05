@@ -9,6 +9,7 @@
  */
 
 import { getLocal, setLocal, STORAGE_KEYS } from './storage.js';
+import { getFeatures } from './planCache.js';
 import { classifyEdit, selectLearnedHints } from '../core/profile/diff.js';
 
 /**
@@ -159,6 +160,8 @@ export async function getLearnedCounts() {
 export async function recordEdit(aiText, userText) {
   const outcome = classifyEdit(aiText, userText);
   if (outcome.categoryIds.length === 0) return outcome;
+  // 2026-11-05 무료 요금제는 학습하지 않는다(`PLAN_FEATURES.learning`) — 기록도 「반영됐어요」 알림도 없다.
+  if (!(await getFeatures()).learning) return { ...outcome, categoryIds: [] };
 
   const counts = await getLearnedCounts();
   const next = { ...counts };

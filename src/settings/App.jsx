@@ -38,7 +38,7 @@ import {
   REFUND_NOTE,
   startCheckout,
 } from '../lib/billingClient.js';
-import { useMyPlan } from '../lib/useMyPlan.js';
+import { useMyPlan, usePlanFeatures } from '../lib/useMyPlan.js';
 import PlanBadge from '../components/PlanBadge.jsx';
 
 /**
@@ -1197,6 +1197,9 @@ export default function App() {
 
   /** 로고 옆 요금제 배지(2026-11-01) — 사이드패널과 같은 훅·같은 배지. */
   const plan = useMyPlan();
+  // 2026-11-05 「무료 2단계」 — 수정 습관 학습은 Pro. 무료는 「학습 내역」 메뉴·화면을 내지 않는다(저장값은 지우지 않는다).
+  const planFeatures = usePlanFeatures();
+  const panels = PANELS.filter((p) => p.id !== 'learned' || planFeatures.learning);
 
   const current = PANELS.find((p) => p.id === panel);
   const props = { data, act, toast: setToastText };
@@ -1229,7 +1232,7 @@ export default function App() {
         <div className="console">
           <nav className="console-nav" aria-label="설정 메뉴">
             <ul>
-              {PANELS.map((p) => (
+              {panels.map((p) => (
                 <li key={p.id}>
                   <a
                     href={`#${p.id}`}
@@ -1259,7 +1262,7 @@ export default function App() {
               {panel === 'language' && <LanguagePanel {...props} />}
               {panel === 'me' && <MePanel {...props} />}
               {panel === 'glossary' && <GlossaryPanel {...props} />}
-              {panel === 'learned' && <LearnedPanel {...props} />}
+              {panel === 'learned' && planFeatures.learning && <LearnedPanel {...props} />}
               {panel === 'data' && <DataPanel {...props} />}
               {panel === 'plan' && <PlanPanel plan={plan} />}
             </div>

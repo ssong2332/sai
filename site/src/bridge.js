@@ -126,6 +126,8 @@ export function describeError(code) {
       return '이 주소는 확장이 허용하지 않은 페이지예요. 사이 공식 사이트에서 다시 열어 주세요.';
     case 'bad_request':
       return '저장하지 못했어요. 입력한 값을 확인하고 다시 시도하세요.';
+    case 'plan_limit':
+      return '무료 요금제는 개인 용어를 5개까지 저장할 수 있어요 — Pro에서 더 쓸 수 있어요.';
     case 'unknown_type':
       return '확장이 이 기능을 아직 모르는 버전이에요. 확장을 최신 버전으로 업데이트하세요.';
     default:

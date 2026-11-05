@@ -14,6 +14,7 @@
  */
 
 import { getLocal, setLocal, STORAGE_KEYS } from './storage.js';
+import { getFeatures } from './planCache.js';
 
 /** 저장 상한 — 무한히 쌓이면 사용자가 관리할 수 없고, 본문 보관량만 늘어난다. */
 export const MAX_SNIPPETS = 50;
@@ -50,6 +51,9 @@ export async function addSnippet({ text, language = null }) {
   }
 
   if (list.length >= MAX_SNIPPETS) return { ok: false, reason: 'full' };
+  // 2026-11-05 무료 한도(`PLAN_FEATURES.snippets`) — 새로 추가만 막는다. 이미 있는 문구는 그대로 쓴다.
+  const { snippets: planLimit } = await getFeatures();
+  if (planLimit != null && list.length >= planLimit) return { ok: false, reason: 'plan-limit', limit: planLimit };
 
   const entry = {
     id: makeId(),

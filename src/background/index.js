@@ -6,6 +6,9 @@ import { METRIC_MESSAGE, sendClientMetric } from '../lib/metricsClient.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from '../core/refine/fallback.js';
 // 🔴 2026-10-24 — 관리용 웹사이트 브리지(`docs/WebSplit.md` 「C — 로컬 브리지」). 처리 규칙은 그 파일에 있다.
 import { handleSiteMessage } from './siteBridge.js';
+import { refreshPlan } from '../lib/planCache.js';
+import { PLAN_FEATURES, PLAN_UPSELL_NOTE } from '../core/refine/quality.js';
+import { STORAGE_KEYS } from '../lib/storage.js';
 import { runToneReconcile } from '../lib/toneReconcile.js';
 
 // 툴바 아이콘 클릭 → 사이드 패널 열기 (Spec §1 UI 삼원화 — Side Panel 진입점)
@@ -43,7 +46,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
        * 🔴 모드를 가리지 않는다. 교정·해독·회신·결정 어느 쪽이든 사용자가 해야 할 일은 같다.
        */
       const authNotice =
-        error?.status === 429 && error?.code === 'monthly-limit' ? MONTHLY_LIMIT_NOTICE : AUTH_FAILURE_NOTICES[error?.status];
+        error?.status === 429 && error?.code === 'monthly-limit'
+          ? MONTHLY_LIMIT_NOTICE
+          : error?.status === 429 && error?.code === 'reply-limit'
+            ? REPLY_LIMIT_NOTICE
+            : AUTH_FAILURE_NOTICES[error?.status];
       if (authNotice) {
         sendResponse(buildAuthFailureResponse(message.request, mode, authNotice));
         return;
@@ -165,6 +172,15 @@ const AUTH_FAILURE_NOTICES = {
 const MONTHLY_LIMIT_NOTICE = {
   reason: 'monthly-limit',
   notice: '이번 달 무료로 운영할 수 있는 사용량을 모두 썼어요. 다음 달 1일에 다시 열려요.',
+};
+
+/**
+ * 429 `reply-limit` (2026-11-05 「무료 2단계」) — 무료 회신 초안 하루 횟수(`PLAN_FEATURES.free.replyDaily`)를 다 썼다.
+ * 다듬기·뜻 풀기는 계속 된다 — 하루 한도 문구(「교정 횟수를 다 썼어요」)와 나눈다.
+ */
+const REPLY_LIMIT_NOTICE = {
+  reason: 'reply-limit',
+  notice: `오늘 무료 회신 초안 ${PLAN_FEATURES.free.replyDaily}회를 다 썼어요 — ${PLAN_UPSELL_NOTE}. 다듬기·뜻 풀기는 계속 쓸 수 있어요.`,
 };
 
 /**
@@ -367,6 +383,29 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     // 🔴 본문(메시지)은 싣지 않는다. 누구에게 보낼 때인지까지만.
     message: `${item.recipientName}에게 보낼 시간입니다. 사이드패널에서 문장을 확인하세요.`,
   });
+});
+
+/* ── 내 요금제 저장(2026-11-05 「무료 2단계」 — `src/lib/planCache.js`) ─────────────── */
+
+/**
+ * 콘텐츠 팝업·사이드패널이 기능을 숨길지 판정하는 저장값을 맞춘다. 서버 호출은 요금제 확인 1회(본문 없음).
+ * 시작·설치·업데이트 · 로그인 상태가 바뀔 때 · 6시간마다. 🔴 실패는 조용히 — 저장값이 그대로 남는다(판정표).
+ */
+const PLAN_ALARM = 'sai-plan-refresh';
+const refreshPlanQuietly = () => refreshPlan().catch(() => {});
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.alarms.create(PLAN_ALARM, { periodInMinutes: 360 });
+  refreshPlanQuietly();
+});
+chrome.runtime.onStartup.addListener(() => {
+  chrome.alarms.create(PLAN_ALARM, { periodInMinutes: 360 });
+  refreshPlanQuietly();
+});
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === PLAN_ALARM) refreshPlanQuietly();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[STORAGE_KEYS.AUTH]) refreshPlanQuietly();
 });
 
 /* ── 웹 설정 브리지 (2026-10-24 — `docs/WebSplit.md` 「C — 로컬 브리지」) ─────────────── */

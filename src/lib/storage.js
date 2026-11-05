@@ -240,6 +240,11 @@ export const STORAGE_KEYS = {
    */
   AUTH: 'sai.auth',
   /**
+   * `{plan: 'free'|'beta'|'pro'|'team', checkedAt: number}` — 서버가 답한 내 요금제와 확인 시각(2026-11-05 「무료 2단계」).
+   * 🔴 기능 숨김 판정용. 요금제 이름뿐 — 토큰·결제 정보 없음. 판정표는 `src/lib/planCache.js`.
+   */
+  PLAN: 'sai.plan',
+  /**
    * `string[]` — 선택해도 사이 버튼이 저절로 뜨지 않을 사이트(정규화한 호스트, 하위 도메인 포함) (2026-10-25).
    * 🔴 단축키(Alt+D·Alt+X)는 이 목록과 무관하게 동작한다(사용자 결정).
    * 🔴 사용자가 **직접 넣은** 호스트뿐이다 — 방문 기록이 아니다. 경로·쿼리는 저장하지 않는다(`src/lib/siteGate.js`).

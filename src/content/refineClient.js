@@ -9,6 +9,7 @@
 
 import { REFINE_ENDPOINT } from '../config.js';
 import { listPersonalGlossary, toRefinePayloadGlossary } from '../lib/glossary.js';
+import { getFeatures } from '../lib/planCache.js';
 // Spec §3 — 팀 용어집. 🔴 팀이 없으면 빈 배열이라 아무것도 달라지지 않는다.
 import { getTeam, listTeamGlossary, toRefinePayloadTeamGlossary } from '../lib/teamClient.js';
 import { buildProfileForRefine } from '../lib/profile.js';
@@ -56,7 +57,11 @@ export async function requestRefine(request) {
   const selected = await getSelectedRecipient();
   // S13 — 프로필(1순위 설정 + 3회 이상 축적된 2순위 패턴). 과도기 규칙 적용은 이 함수 안에서
   // 끝난다: 3회 미만 카테고리는 애초에 빠져 나온다 (Spec 필수 2).
-  const profile = request.profile ?? (await buildProfileForRefine());
+  // 2026-11-05 「무료 2단계」 — 무료는 개인 용어 앞 N개만 · 학습 기록 없이(서버 `applyPlanFeatures`가 한 번 더 거른다).
+  const planFeatures = await getFeatures();
+  const builtProfile = request.profile ?? (await buildProfileForRefine());
+  const profile =
+    !planFeatures.learning && builtProfile && Array.isArray(builtProfile.learned) ? { ...builtProfile, learned: [] } : builtProfile;
   /**
    * S17 — 선택된 수신자. 🔴 **언어와 태그가 둘 다 여기서 나온다**(2026-08-16).
    * 🔴 비공개면 `toRefinePayloadRecipient`가 null을 주고 태그가 나가지 않는다 (필수 9).
@@ -102,7 +107,7 @@ export async function requestRefine(request) {
   const glossary =
     request.glossary ??
     [
-      ...toRefinePayloadGlossary(await listPersonalGlossary(), targetLanguage),
+      ...toRefinePayloadGlossary(await listPersonalGlossary(), targetLanguage).slice(0, planFeatures.personalGlossary ?? undefined),
       ...toRefinePayloadTeamGlossary(teamEntries, targetLanguage),
     ];
   /**

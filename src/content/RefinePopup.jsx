@@ -174,6 +174,8 @@ export default function RefinePopup({
   onRecipientChange,
   onToneChange,
   onSchedule,
+  /** 수정 습관 학습이 켜져 있나(무료 요금제는 끔, 2026-11-05) — 「학습에 반영돼요」 문구를 가른다. */
+  learning = true,
   onSaveSnippet,
   onRegenerate,
   regenerating = false,
@@ -1328,7 +1330,7 @@ export default function RefinePopup({
               <button type="button" className="sai-link" onClick={() => setEdited(null)}>
                 ↩ AI 교정문으로 되돌리기
               </button>
-              {isEdited && <span className="sai-meta-green">수정한 내용이 학습에 반영돼요</span>}
+              {isEdited && learning && <span className="sai-meta-green">수정한 내용이 학습에 반영돼요</span>}
             </div>
           )}
 
@@ -1664,7 +1666,7 @@ export default function RefinePopup({
             ＋ 저장 문구
           </button>
 
-          {isForcedSchedule(result, scheduleInfo) ? (
+          {onSchedule && isForcedSchedule(result, scheduleInfo) ? (
             /* 🔴 Spec 필수 6 — Low + 오프타임에서는 **즉시 넣기 경로를 없앤다**(2026-08-13 사용자
                지시). 예전에는 「그래도 지금 넣기」를 나란히 뒀는데, 그러면 제한이 아니라 권유가
                된다. 지금 보내려면 **긴급도를 직접 올려야** 하고, 그 순간 확인 문구가 뜬다. */
@@ -1686,7 +1688,7 @@ export default function RefinePopup({
                 * 🔴 **주 버튼은 「적용하기」로 둔다.** 긴급도를 Normal·Critical로 판단한 문장에서
                 *    예약을 주 동작으로 만들면, 급한 메시지를 미루도록 떠미는 화면이 된다.
                 */}
-              {scheduleInfo?.needsSchedule && (
+              {onSchedule && scheduleInfo?.needsSchedule && (
                 <button
                   type="button"
                   className="sai-button sai-button-quiet"

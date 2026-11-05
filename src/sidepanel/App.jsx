@@ -17,7 +17,8 @@ import {
   TEAM_SEATS_MIN,
   teamPurchaseBlocked,
 } from '../lib/billingClient.js';
-import { useMyPlan } from '../lib/useMyPlan.js';
+import { useMyPlan, usePlanFeatures } from '../lib/useMyPlan.js';
+import { PlanLimitError } from '../lib/planCache.js';
 import PlanBadge from '../components/PlanBadge.jsx';
 import { QUALITY_IDS, QUALITY_LABELS } from '../core/refine/quality.js';
 import { dashboardPageUrl } from '../lib/dashboardPage.js';
@@ -217,6 +218,8 @@ export default function App() {
   const [toast, setToast] = useState('');
   /** 로고 옆 요금제 배지(2026-11-01 사용자 결정) — `pro`·`team`일 때만 보인다(`useMyPlan`). */
   const plan = useMyPlan();
+  /** 2026-11-05 「무료 2단계」 — 기능 한도(`PLAN_FEATURES`). 위 `useMyPlan`이 서버에 묻고 저장하면 따라온다. */
+  const planFeatures = usePlanFeatures();
 
   /**
    * 저장된 테마를 복원한다.
@@ -546,6 +549,7 @@ export default function App() {
       <main className="panel-body" key={activeTab}>
         {activeTab === 'home' && (
           <HomeTab
+            scheduling={planFeatures.scheduling}
             onboarding={onboarding}
             onSaveOnboarding={submitOnboarding}
             onResetOnboarding={restartOnboarding}
@@ -569,6 +573,7 @@ export default function App() {
         {activeTab === 'team' && <TeamTab onToast={setToast} />}
         {activeTab === 'archive' && (
           <ArchiveTab
+            scheduling={planFeatures.scheduling}
             glossaryScope={glossaryScope}
             onGlossaryScopeChange={setGlossaryScope}
             snippets={snippets}
@@ -581,6 +586,7 @@ export default function App() {
         )}
         {activeTab === 'profile' && (
           <ProfileTab
+            learning={planFeatures.learning}
             items={learned}
             onDelete={deleteLearned}
             onClear={clearLearned}
@@ -1817,7 +1823,7 @@ function RollingNumber({ value, className }) {
   return <span className={className}>{shown}</span>;
 }
 
-function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
+function HomeTab({ scheduling = true, onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
   /**
    * S23 — 실제 적립 잔액. 🔴 목업(`POINTS.balance`)이 아니라 `chrome.storage.local`의 실제 값이다.
    *    설명 문구(`POINTS.detail`/`usage`)는 Spec §1의 정책 안내라 그대로 둔다.
@@ -1887,8 +1893,11 @@ function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
           {[
             { id: 'refined', label: '교정', value: usage.refined, accent: 'orange' },
             { id: 'decoded', label: '해독', value: usage.decoded, accent: 'green' },
-            { id: 'scheduled', label: '예약 발송', value: usage.scheduled, accent: 'ink' },
-          ].map((stat) => (
+            // 2026-11-05 — 예약은 Pro(`PLAN_FEATURES.scheduling`). 무료는 숫자 칸도 내지 않는다.
+            scheduling && { id: 'scheduled', label: '예약 발송', value: usage.scheduled, accent: 'ink' },
+          ]
+            .filter(Boolean)
+            .map((stat) => (
             <div key={stat.id} className="stat">
               <RollingNumber className={`stat-value stat-${stat.accent}`} value={stat.value} />
               <span className="stat-label">{stat.label}</span>
@@ -1896,7 +1905,7 @@ function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
           ))}
         </div>
         {/* 🔴 0일 때 이유를 말한다 — 숫자 세 개만 0으로 있으면 고장으로 읽힌다. */}
-        {usage.refined + usage.decoded + usage.scheduled === 0 && (
+        {usage.refined + usage.decoded + (scheduling ? usage.scheduled : 0) === 0 && (
           <p className="meta">오늘은 아직 없어요. 문장을 다듬거나 뜻을 풀면 여기에 쌓여요.</p>
         )}
 
@@ -1909,12 +1918,12 @@ function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
           * 🔴 **0이면 줄 자체를 내지 않는다.** 「0건 막음」은 정보가 아니라 잡음이고, 매일 보이면
           *    "이 기능이 고장났나"로 읽힌다.
           */}
-        {usage.blockedSensitive + usage.blockedOffHours > 0 && (
+        {usage.blockedSensitive + (scheduling ? usage.blockedOffHours : 0) > 0 && (
           <p className="card-text blocked-line">
             🛡 오늘 막은 것 ·{' '}
             {[
               usage.blockedSensitive > 0 && `민감정보 ${usage.blockedSensitive}건`,
-              usage.blockedOffHours > 0 && `오프타임 전송 ${usage.blockedOffHours}건`,
+              scheduling && usage.blockedOffHours > 0 && `오프타임 전송 ${usage.blockedOffHours}건`,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -1922,8 +1931,8 @@ function HomeTab({ onboarding, onSaveOnboarding, onResetOnboarding, onToast }) {
         )}
       </section>
 
-      {/* S23 / Spec 권장 12 — 상시 노출 회의 시간 추천. */}
-      <MeetingCard onAwarded={refreshPoints} onToast={onToast} />
+      {/* S23 / Spec 권장 12 — 상시 노출 회의 시간 추천. 2026-11-05부터 Pro(무료는 카드 자체를 내지 않는다). */}
+      {scheduling && <MeetingCard onAwarded={refreshPoints} onToast={onToast} />}
 
       {/* 🔴 공개 빌드는 포인트를 끈다(`FEATURES.points`, L17) — 「사용할 수 있어요」는 없는 기능이다. */}
       {FEATURES.points && (
@@ -2812,6 +2821,7 @@ function TeamGlossaryScope({ onToast }) {
   const moveOrCopy = async (remove) => {
     const targets = (entries ?? []).filter((item) => picked.has(item.id));
     let done = 0;
+    let limited = null; // 2026-11-05 무료 한도에 걸렸으면 그 안내(「Pro에서 더 쓸 수 있어요」)
     for (const item of targets) {
       try {
         await addPersonalGlossaryEntry({
@@ -2821,16 +2831,17 @@ function TeamGlossaryScope({ onToast }) {
         });
         if (remove) await removeTeamGlossaryEntry(item.id);
         done += 1;
-      } catch {
+      } catch (error) {
         /* 건너뛴다 */
+        if (error instanceof PlanLimitError) limited = error.message;
       }
     }
     setPicked(new Set());
     if (remove) await load();
     onToast(
-      remove
+      (remove
         ? `${done}개를 개인 용어집으로 옮겼어요`
-        : `${done}개를 개인 용어집에 복사했어요 — 개인 것이 우선 적용돼요`,
+        : `${done}개를 개인 용어집에 복사했어요 — 개인 것이 우선 적용돼요`) + (limited ? ` · ${limited}` : ''),
     );
   };
 
@@ -3171,14 +3182,16 @@ function LinkedGlossaryScope({ onToast }) {
                 const teamTarget = teams.find((item) => item.teamId === target) ?? null;
                 if (teamTarget) await setActiveTeam(teamTarget.teamId);
                 let added = 0;
+                let limited = null; // 2026-11-05 무료 한도에 걸렸으면 그 안내
                 for (const entry of preview.entries) {
                   // 🔴 실패한 항목에서 멈추지 않는다 — 한 줄이 규칙에 안 맞아도 나머지는 들어가야 한다.
                   try {
                     if (teamTarget) await saveTeamGlossaryEntry(entry);
                     else await addPersonalGlossaryEntry(entry);
                     added += 1;
-                  } catch {
+                  } catch (error) {
                     /* 건너뛴다 */
+                    if (error instanceof PlanLimitError) limited = error.message;
                   }
                 }
                 setBusy(false);
@@ -3188,7 +3201,7 @@ function LinkedGlossaryScope({ onToast }) {
                 onToast(
                   teamTarget
                     ? `「${teamTarget.name}」 팀 용어집에 ${added}개를 추가했어요`
-                    : `개인 용어집에 ${added}개를 추가했어요`,
+                    : `개인 용어집에 ${added}개를 추가했어요${limited ? ` — ${limited}` : ''}`,
                 );
               }}
             >
@@ -3767,6 +3780,7 @@ function ArchiveTab({
   reservations,
   onDeleteReservation,
   onToast,
+  scheduling = true,
 }) {
   return (
     <>
@@ -3778,9 +3792,12 @@ function ArchiveTab({
         <SnippetsTab items={snippets} onUse={onUseSnippet} onDelete={onDeleteSnippet} />
       </FoldSection>
 
-      <FoldSection title="예약 발송" count={reservations.length}>
-        <ScheduleTab items={reservations} onDelete={onDeleteReservation} />
-      </FoldSection>
+      {/* 2026-11-05 — 예약은 Pro. 이미 걸어 둔 알림은 그대로 울린다(목록만 숨김 — 지우지 않는다). */}
+      {scheduling && (
+        <FoldSection title="예약 발송" count={reservations.length}>
+          <ScheduleTab items={reservations} onDelete={onDeleteReservation} />
+        </FoldSection>
+      )}
     </>
   );
 }
@@ -3837,6 +3854,7 @@ function ProfileTab({
   onUpdateRecipient,
   onNotice,
   onOpenToneSettings,
+  learning = true,
 }) {
   /**
    * 🔴 **말투는 「기본 톤」 하나다** (2026-10-25 사용자 결정 — 「협업 성향」을 「기본 톤」으로 합쳤다).
@@ -3991,7 +4009,8 @@ function ProfileTab({
         *    긴 설명 문단」으로 **화면의 4분의 1**을 먹으면서 아무 정보도 주지 않았다.
         *    지우지는 않는다 — 왜 비어 있고 어떻게 채우는지는 계속 말해야 한다.
         */}
-      {items.length === 0 ? (
+      {/* 2026-11-05 — 수정 습관 학습은 Pro(`PLAN_FEATURES.learning`). 무료는 블록 자체를 내지 않는다(저장값은 지우지 않는다). */}
+      {!learning ? null : items.length === 0 ? (
         <div className="profile-block">
           <h3 className="card-label">2순위 — AI가 학습한 내 수정 패턴</h3>
           <p className="meta">

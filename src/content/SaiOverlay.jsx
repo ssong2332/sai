@@ -48,6 +48,8 @@ import {
 } from './threadContext.js';
 import { hasConsent as hasDecisionsConsent } from '../lib/decisions.js';
 import { FEATURES } from '../config.js';
+import { usePlanFeatures } from '../lib/useMyPlan.js';
+import { planLimitText } from '../lib/planCache.js';
 import { STORAGE_KEYS, THREAD_CONTEXT_DEFAULT, getLocal, setLocal } from '../lib/storage.js';
 import { DISPLAY_SETTINGS } from '../lib/displaySettings.js';
 import {
@@ -148,6 +150,8 @@ function failureMessage(action) {
  *   사용자가 직접 부른 것이라 이 값과 무관하게 팝업·저장 문구를 연다(DeepL과 같은 규칙, 사용자 결정).
  */
 export default function SaiOverlay({ autoButton = true }) {
+  // 2026-11-05 「무료 2단계」 — 이 기기에 저장된 요금제의 기능 한도(`planCache.js`). 서버 호출 없음.
+  const planFeatures = usePlanFeatures();
   const [anchor, setAnchor] = useState(null); // 선택 영역의 뷰포트 사각형(DOMRect 형태)
   const [selectedText, setSelectedText] = useState('');
   /**
@@ -877,6 +881,9 @@ export default function SaiOverlay({ autoButton = true }) {
       setToast('이미 저장된 문장이에요 — 목록 맨 위로 올렸어요');
     } else if (outcome.ok) {
       setToast('저장 문구에 담았어요 — 사이드패널에서 다시 쓸 수 있어요');
+    } else if (outcome.reason === 'plan-limit') {
+      // 2026-11-05 무료 한도 — 「Pro에서 더 쓸 수 있어요」 한 줄.
+      setToast(planLimitText('snippets', outcome.limit));
     } else if (outcome.reason === 'full') {
       setToast(`저장 문구가 가득 찼어요 (최대 ${MAX_SNIPPETS}개) — 사이드패널에서 정리해 주세요`);
     } else {
@@ -1910,7 +1917,10 @@ export default function SaiOverlay({ autoButton = true }) {
               onToneChange={() =>
                 runRefine(result?.urgencySource === 'user' ? result.urgency : null)
               }
-              onSchedule={acceptSchedule}
+              // 🔴 2026-11-05 「무료 2단계」 — 예약 알림은 Pro(`PLAN_FEATURES.scheduling`). 없으면 예약 버튼이 사라지고
+              //    Low + 오프타임의 강제 예약 대신 「적용하기」가 남는다(퇴근 시간 안내 배너는 무료에도 보인다).
+              onSchedule={planFeatures.scheduling ? acceptSchedule : undefined}
+              learning={planFeatures.learning}
               onSaveSnippet={saveSnippet}
               // 🔴 화면 검사(숫자·이름·위험 이모지 등)가 교정문과 비교할 원문이다. 화면 표시용이며
               //    저장·전송되지 않는다(전송 대상은 `sendTextRef` 하나로 좁혀져 있다).

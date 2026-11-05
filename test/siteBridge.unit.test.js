@@ -582,3 +582,16 @@ test('site:checkout 팀 — 로그인 안 함·명부 실패면 팀을 만들지
   });
   assert.deepEqual(seatsLow.log.opened, []);
 });
+
+test('site:glossary:add — 무료 한도(개인 용어 5개)에 닿으면 plan_limit · 저장하지 않는다(2026-11-05)', async () => {
+  await setLocal(STORAGE_KEYS.PLAN, { plan: 'free', checkedAt: Date.now() });
+  for (let i = 0; i < 5; i += 1) {
+    const ok = await send({ type: 'site:glossary:add', entry: { sourceText: `용어${i}`, targetText: `t${i}`, keepSource: false, language: null } });
+    assert.equal(ok.ok, true, `용어 ${i + 1}`);
+  }
+  assert.deepEqual(
+    await send({ type: 'site:glossary:add', entry: { sourceText: '여섯째', targetText: 'six', keepSource: false, language: null } }),
+    { ok: false, error: 'plan_limit' },
+  );
+  assert.equal((await getLocal(STORAGE_KEYS.GLOSSARY_PERSONAL, [])).length, 5);
+});
