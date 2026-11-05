@@ -13,6 +13,8 @@
  *    `sai.auth`(토큰·이메일) · 저장 문구 · 예약 · 결정 로그 · GitHub 토큰 · 수신자 · 팀 · 마찰 · 포인트 ·
  *    사용량 · 동의. 응답은 아래 `readSettings`가 **필드를 하나씩 골라** 만든다 — 저장값을 통째로 펼치지
  *    않는다. `test/siteBridge.unit.test.js`가 이 키들의 값이 어떤 응답에도 섞이지 않음을 잠근다.
+ *    `site:checkout`(2026-11-05)은 팀 목록을 **안에서만** 읽고 팀이 없으면 「내 팀」을 만든다 — 팀 이름·id·초대 코드는
+ *    응답에 싣지 않는다(결과 코드 + `teamCreated` 불리언만).
  *
  * 판정표 (요청 1건):
  * | 조건 | 결과 |
@@ -54,7 +56,11 @@ import { LANGUAGE_LABELS } from '../lib/recipients.js';
 import { DIFF_CATEGORIES } from '../core/profile/diff.js';
 import { getSession } from '../lib/authClient.js';
 import { flushLearnedDeletions, SYNC_ERRORS } from '../lib/syncClient.js';
-import { BillingClientError, BILLING_ERRORS, startCheckout } from '../lib/billingClient.js';
+import { BillingClientError, BILLING_ERRORS, startCheckout, TEAM_SEATS_MAX, TEAM_SEATS_MIN } from '../lib/billingClient.js';
+import { createTeam, listTeams, restoreTeamsFromServer, TeamClientError, TEAM_ERRORS } from '../lib/teamClient.js';
+
+/** 사이트에서 팀을 처음 살 때 자동으로 만드는 팀 이름 — 팀 탭에서 바꾼다(2026-11-05 사용자 결정 「B안」). */
+export const AUTO_TEAM_NAME = '내 팀';
 
 export const SITE_PROTOCOL_VERSION = 1;
 
@@ -329,28 +335,46 @@ const HANDLERS = {
   },
 
   /**
-   * 요금 페이지 「Pro 결제하기」(2026-11-05 사용자 결정 「A안」) — 확장이 로그인 토큰으로 결제 주소를 받아 **확장이** 새 탭을 연다.
-   * 🔴 결제 주소(일회용 `?ref=` 포함)는 사이트로 돌려주지 않는다 — 응답은 결과 코드 하나뿐.
-   * 🔴 팀은 받지 않는다 — 팀장 확인·좌석 선택은 사이드패널 「팀」 탭에서.
+   * 요금 페이지 결제(2026-11-05 사용자 결정 「A안」 + 팀 「B안」) — 확장이 로그인 토큰으로 결제 주소를 받아 **확장이** 새 탭을 연다.
+   * 🔴 결제 주소(일회용 `?ref=` 포함)·팀 이름·팀 id는 사이트로 돌려주지 않는다 — 응답은 결과 코드와 불리언 하나.
    * | 요청 | 결과 |
    * |---|---|
-   * | plan ≠ 'pro' · interval ∉ month·year | `bad_request` — 서버를 부르지 않는다 |
+   * | plan ∉ pro·team · interval ∉ month·year · 팀인데 좌석이 2~10 정수가 아님 | `bad_request` — 서버를 부르지 않는다 |
    * | 결제 진입점 꺼짐(`FEATURES.billing`) | `{checkout:'billing-unavailable'}` |
-   * | 결제 주소 받음 | 새 탭 → `{checkout:'opened'}` |
-   * | 로그인 안 함·이미 구독 중 등 | `{checkout:<BILLING_ERRORS 코드>}` |
+   * | Pro | 결제 주소 → 새 탭 → `{checkout:'opened'}` |
+   * | 팀 · 로그인 안 함 | `{checkout:'not-signed-in'}` — 팀을 만들지 않는다 |
+   * | 팀 · 서버 명부로 내 팀 목록을 먼저 맞춤(다른 기기에서 만든 팀을 두 번 만들지 않게) → 실패 | `{checkout:'network'}` — 팀을 만들지 않는다 |
+   * | 팀 · 내가 팀장인 팀 2개 이상 | `{checkout:'pick-team'}` — 사이드패널 「팀」 탭에서 골라 결제 |
+   * | 팀 · 팀장인 팀 1개 | 그 팀으로 결제 |
+   * | 팀 · 팀장인 팀 없음 | 「내 팀」을 만들고(`teamCreated:true`) 그 팀으로 결제 |
+   * | 로그인 안 함·팀장 아님·좌석 부족·이미 구독 중 등 | `{checkout:<BILLING_ERRORS 코드>}` |
    */
   async 'site:checkout'(message, deps) {
-    if (message.plan !== 'pro' || (message.interval !== 'month' && message.interval !== 'year')) fail();
+    const { plan, interval } = message;
+    if ((plan !== 'pro' && plan !== 'team') || (interval !== 'month' && interval !== 'year')) fail();
+    const seats = message.seats;
+    if (plan === 'team' && !(Number.isInteger(seats) && seats >= TEAM_SEATS_MIN && seats <= TEAM_SEATS_MAX)) fail();
     if (!deps.billingEnabled) return { checkout: BILLING_ERRORS.UNAVAILABLE };
+
+    let options = { plan: 'pro' };
+    let teamCreated = false;
+    if (plan === 'team') {
+      if (!(await deps.getSession())) return { checkout: BILLING_ERRORS.NOT_SIGNED_IN };
+      const picked = await pickTeamForCheckout(deps);
+      if (picked.checkout) return { checkout: picked.checkout };
+      teamCreated = picked.created;
+      options = { plan: 'team', teamId: picked.teamId, seats };
+    }
+
     let url;
     try {
-      url = await deps.startCheckout(message.interval, { plan: 'pro' });
+      url = await deps.startCheckout(interval, options);
     } catch (error) {
-      if (error instanceof BillingClientError) return { checkout: error.reason };
+      if (error instanceof BillingClientError) return plan === 'team' ? { checkout: error.reason, teamCreated } : { checkout: error.reason };
       throw error;
     }
     await deps.openTab(url);
-    return { checkout: 'opened' };
+    return plan === 'team' ? { checkout: 'opened', teamCreated } : { checkout: 'opened' };
   },
 
   async 'site:get'(_message, deps) {
@@ -411,6 +435,31 @@ const HANDLERS = {
 };
 
 /**
+ * 팀 결제 대상 고르기 — 위 `site:checkout` 표의 팀 행들.
+ * @returns {Promise<{teamId: string, created: boolean} | {checkout: string}>}
+ */
+async function pickTeamForCheckout(deps) {
+  const teamFailure = (error) => {
+    if (!(error instanceof TeamClientError)) throw error;
+    return { checkout: error.reason === TEAM_ERRORS.NOT_SIGNED_IN ? BILLING_ERRORS.NOT_SIGNED_IN : BILLING_ERRORS.NETWORK };
+  };
+  try {
+    await deps.restoreTeamsFromServer();
+  } catch (error) {
+    return teamFailure(error);
+  }
+  const owned = (await deps.listTeams()).filter((team) => team.role === 'owner');
+  if (owned.length > 1) return { checkout: 'pick-team' };
+  if (owned.length === 1) return { teamId: owned[0].teamId, created: false };
+  try {
+    const made = await deps.createTeam(AUTO_TEAM_NAME, await deps.getIdentity());
+    return { teamId: made.teamId, created: true };
+  } catch (error) {
+    return teamFailure(error);
+  }
+}
+
+/**
  * 사이드패널(`deleteOnServer`)처럼 지운 즉시 서버 기록도 지운다 (2026-10-25 사용자 요청).
  * 실패해도 로컬 삭제는 이미 끝났고 대기 목록이 남아 다음 동기화가 다시 지운다 — 그래서 요청은 성공이다.
  * @returns {Promise<'deleted' | 'local' | 'later'>} `local` = 로그인 안 함(서버에 지울 것이 없다)
@@ -456,6 +505,9 @@ export const DEFAULT_SITE_BRIDGE_DEPS = {
   billingEnabled: FEATURES.billing,
   startCheckout,
   openTab: (url) => chrome.tabs.create({ url }),
+  listTeams,
+  restoreTeamsFromServer,
+  createTeam,
 };
 
 /**

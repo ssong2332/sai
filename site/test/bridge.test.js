@@ -183,8 +183,10 @@ test('데모 브리지 — 같은 계약을 따르고 메모리에서만 바뀐�
 test('checkout — Pro·주기만 보내고, 결제는 3초가 아니라 15초까지 기다린다', async () => {
   const { runtime, calls } = fakeRuntime({ reply: () => ({ ok: true, checkout: 'opened' }) });
   const client = createExtensionClient({ runtime });
-  assert.deepEqual(await client.checkout('year'), { ok: true, checkout: 'opened' });
-  assert.deepEqual(calls[0].message, { type: 'site:checkout', plan: 'pro', interval: 'year' });
+  assert.deepEqual(await client.checkout({ plan: 'pro', interval: 'year', seats: 9 }), { ok: true, checkout: 'opened' });
+  assert.deepEqual(calls[0].message, { type: 'site:checkout', plan: 'pro', interval: 'year' }, 'Pro에는 좌석을 싣지 않는다');
+  await client.checkout({ plan: 'team', interval: 'month', seats: 4 });
+  assert.deepEqual(calls[1].message, { type: 'site:checkout', plan: 'team', interval: 'month', seats: 4 });
   assert.equal(CHECKOUT_TIMEOUT_MS, 15000);
   assert.equal(STORE_URL.endsWith(EXT_ID), true);
 });
@@ -194,6 +196,11 @@ test('checkout 결과 문구 — 설치 안 됨은 install, 옛 확장은 update
   assert.match(describeCheckout({ ok: true, checkout: 'not-signed-in' }).text, /로그인/);
   assert.match(describeCheckout({ ok: true, checkout: 'already-subscribed' }).text, /이미 결제 중/);
   assert.equal(describeCheckout({ ok: true, checkout: 'network' }).tone, 'error');
+  assert.match(describeCheckout({ ok: true, checkout: 'opened', teamCreated: true }).text, /「내 팀」을 만들고/);
+  assert.doesNotMatch(describeCheckout({ ok: true, checkout: 'opened', teamCreated: false }).text, /내 팀/);
+  assert.match(describeCheckout({ ok: true, checkout: 'pick-team' }).text, /여러 개/);
+  assert.match(describeCheckout({ ok: true, checkout: 'not-owner' }).text, /팀장만/);
+  assert.match(describeCheckout({ ok: true, checkout: 'bad-seats' }).text, /팀원 수 이상/);
   for (const error of [BRIDGE_ERRORS.NO_RUNTIME, BRIDGE_ERRORS.NO_RECEIVER]) {
     assert.equal(describeCheckout({ ok: false, error }).action, 'install', error);
   }

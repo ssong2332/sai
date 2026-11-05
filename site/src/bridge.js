@@ -8,7 +8,7 @@
  *
  * 프로토콜 1 (확장 쪽은 같은 계약으로 따로 만든다):
  *   site:hello · site:get · site:set · site:glossary:add|update|remove · site:learned:remove|clear
- *   · site:checkout(2026-11-05 — 요금 페이지 Pro 결제, 응답 `{ok:true, checkout:'opened'|<사유 코드>}`)
+ *   · site:checkout(2026-11-05 — 요금 페이지 Pro·팀 결제, 응답 `{ok:true, checkout:'opened'|<사유 코드>, teamCreated?}`)
  *   응답: `{ok:true, ...}` / `{ok:false, error:'forbidden_origin'|'bad_request'|'unknown_type'|'failed'}`
  */
 
@@ -140,6 +140,8 @@ export function describeError(code) {
  * | ok + `opened` | ok | — 새 탭에 그로블 결제창 |
  * | ok + `not-signed-in` | warn | — 확장에서 로그인 |
  * | ok + `already-subscribed` | warn | — 이미 결제 중 |
+ * | ok + `pick-team` · `not-owner` · `bad-seats` | warn | — 팀: 사이드패널에서 팀 고르기 · 팀장만 · 좌석 부족 |
+ * | ok + `opened` + `teamCreated` | ok | — 「내 팀」을 만들었다고 덧붙임 |
  * | ok + 그 밖 코드 | error | — 잠시 뒤 다시 |
  * | `no_runtime` · `no_receiver` | warn | `install` — 확장 설치(스토어 링크) |
  * | `unknown_type` · `bad_response` | warn | `update` — 옛 확장 |
@@ -148,7 +150,13 @@ export function describeError(code) {
  */
 export function describeCheckout(result) {
   if (result?.ok) {
-    if (result.checkout === 'opened') return { tone: 'ok', text: '새 탭에서 그로블 결제창을 열었어요. 결제가 끝나면 확장에서 바로 Pro가 적용돼요.' };
+    if (result.checkout === 'opened' && result.teamCreated === true) {
+      return { tone: 'ok', text: '「내 팀」을 만들고 새 탭에서 그로블 결제창을 열었어요. 결제가 끝나면 사이드패널 「팀」 탭에서 팀 이름을 바꾸고 초대 코드를 팀원에게 보내 주세요.' };
+    }
+    if (result.checkout === 'opened') return { tone: 'ok', text: '새 탭에서 그로블 결제창을 열었어요. 결제가 끝나면 확장에 바로 적용돼요.' };
+    if (result.checkout === 'pick-team') return { tone: 'warn', text: '팀장인 팀이 여러 개예요. 엉뚱한 팀에 결제되지 않도록 사이드패널 「팀」 탭에서 팀을 골라 결제해 주세요.' };
+    if (result.checkout === 'not-owner') return { tone: 'warn', text: '팀 요금제는 팀장만 결제할 수 있어요.' };
+    if (result.checkout === 'bad-seats') return { tone: 'warn', text: '좌석 수가 지금 팀원 수보다 적어요. 팀원 수 이상으로 골라 주세요.' };
     if (result.checkout === 'not-signed-in') return { tone: 'warn', text: '먼저 확장에서 로그인해 주세요 — 결제는 로그인한 계정에 적용돼요. 사이드패널을 열고 로그인한 뒤 다시 눌러 주세요.' };
     if (result.checkout === 'already-subscribed') return { tone: 'warn', text: '이미 결제 중인 구독이 있어요. 확장 설정의 「요금제」에서 확인할 수 있어요.' };
     return { tone: 'error', text: '결제창을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.' };
@@ -180,7 +188,9 @@ export function createClient(send) {
     removeGlossary: (id) => send({ type: 'site:glossary:remove', id }),
     removeLearned: (categoryId) => send({ type: 'site:learned:remove', categoryId }),
     clearLearned: () => send({ type: 'site:learned:clear' }),
-    checkout: (interval) => send({ type: 'site:checkout', plan: 'pro', interval }, { timeoutMs: CHECKOUT_TIMEOUT_MS }),
+    /** @param {{plan: 'pro'|'team', interval: 'month'|'year', seats?: number}} order 팀이면 seats(2~10) */
+    checkout: ({ plan, interval, seats }) =>
+      send({ type: 'site:checkout', plan, interval, ...(plan === 'team' ? { seats } : {}) }, { timeoutMs: CHECKOUT_TIMEOUT_MS }),
   };
 }
 

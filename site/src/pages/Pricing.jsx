@@ -60,8 +60,9 @@ const PLANS = [
     price: { annual: '₩11,250', monthly: '₩13,900' },
     saveBadge: '19% 할인',
     unit: { annual: '1인당 · 월 · 연 ₩135,000 결제', monthly: '1인당 · 월 · 월 결제' },
-    // 팀은 팀장 확인·좌석 선택이 필요해 사이드패널 「팀」 탭에서 — 여기서는 안내만.
-    cta: { label: '팀 결제 방법 보기', note: '팀장이 2~10석을 결제해요 · 부가세 포함' },
+    // 🔴 2026-11-05 사용자 결정 「B안」 — 좌석을 고르고 누르면 확장이 팀장인 팀으로(없으면 「내 팀」을 만들어) 결제창을 연다.
+    //    팀 탭 결제도 그대로 남는다(팀이 여러 개인 팀장 등).
+    cta: { label: { annual: '팀 연 결제하기', monthly: '팀 월 결제하기' }, note: '새 탭의 그로블에서 카드로 결제해요 · 확장 로그인 필요 · 부가세 포함' },
     lead: '개인 Pro의 모든 기능에 더해',
     features: ['팀 용어집 공유', '팀 대시보드 — 협업 지표 합계', '팀원 관리', '팀 기본 품질 모드 지정'],
   },
@@ -107,7 +108,7 @@ const COMPARE = [
 const FAQ = [
   {
     q: '지금 돈을 내야 하나요?',
-    a: '아니요. 출시 기간에는 개인 기능과 팀 기능을 모두 무료로 쓸 수 있어요. 더 많이 · 더 꼼꼼하게 다듬고 싶다면 이 페이지나 확장 설정의 「요금제」에서 개인 Pro를, 사이드패널 「팀」 탭에서 팀을 결제할 수 있어요.',
+    a: '아니요. 출시 기간에는 개인 기능과 팀 기능을 모두 무료로 쓸 수 있어요. 더 많이 · 더 꼼꼼하게 다듬고 싶다면 이 페이지에서 개인 Pro와 팀을 결제할 수 있어요(확장 설정 「요금제」·사이드패널 「팀」 탭에서도 돼요). 팀이 아직 없으면 결제할 때 「내 팀」이 자동으로 만들어져요.',
   },
   {
     q: '유료 플랜은 언제 나오나요?',
@@ -156,6 +157,11 @@ const BILLING = [
   { id: 'annual', label: '연 결제', save: true },
 ];
 
+/** 팀 좌석 — 2~10석(그로블 상품이 좌석 수마다 하나, 확장 `TEAM_SEATS_MIN`·`MAX`와 같다). 1인 가격은 확장 `PRICES_KRW`와 같다. */
+const TEAM_SEATS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+const TEAM_SEAT_PRICE = { annual: 135000, monthly: 13900 };
+const krw = (n) => `₩${n.toLocaleString('ko-KR')}`;
+
 const byBilling = (value, billing) => (value && typeof value === 'object' ? value[billing] : value);
 
 export default function Pricing() {
@@ -164,20 +170,18 @@ export default function Pricing() {
   const client = useMemo(() => createExtensionClient(), []);
   /** 카드별 결제 안내 — { [planId]: {tone, text, action?} } */
   const [notice, setNotice] = useState({});
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(null);
+  const [seats, setSeats] = useState(2);
 
   const onCta = async (planId) => {
-    if (planId === 'team') {
-      setNotice({ team: { tone: 'info', text: '팀장이 확장 사이드패널의 「팀」 탭에서 좌석 수(2~10석)를 골라 결제해요. 팀원은 결제하지 않아요.' } });
-      return;
-    }
-    if (planId !== 'pro' || busy) return;
-    setBusy(true);
-    setNotice({ pro: { tone: 'info', text: '확장에 결제창을 요청하는 중이에요…' } });
+    if ((planId !== 'pro' && planId !== 'team') || busy) return;
+    setBusy(planId);
+    setNotice({ [planId]: { tone: 'info', text: '확장에 결제창을 요청하는 중이에요…' } });
     try {
-      setNotice({ pro: describeCheckout(await client.checkout(billing === 'annual' ? 'year' : 'month')) });
+      const result = await client.checkout({ plan: planId, interval: billing === 'annual' ? 'year' : 'month', seats });
+      setNotice({ [planId]: describeCheckout(result) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -229,6 +233,21 @@ export default function Pricing() {
                 <span className="num">{byBilling(plan.price, billing)}</span>
                 <span className="pr-unit">{byBilling(plan.unit, billing)}</span>
               </p>
+              {plan.id === 'team' && (
+                <div className="pr-seats">
+                  <label htmlFor="pr-seat-count">좌석</label>
+                  <select id="pr-seat-count" value={seats} onChange={(e) => setSeats(Number(e.target.value))}>
+                    {TEAM_SEATS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}석
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pr-seats-total">
+                    합계 {krw(TEAM_SEAT_PRICE[billing] * seats)} / {billing === 'annual' ? '년' : '월'}
+                  </span>
+                </div>
+              )}
               {plan.id === 'free' ? (
                 <button type="button" className="btn primary pr-cta" aria-disabled="true">
                   {plan.cta.label}
@@ -237,7 +256,7 @@ export default function Pricing() {
                 <button
                   type="button"
                   className={`btn ${plan.id === 'pro' ? 'primary' : 'ghost'} press pr-cta`}
-                  disabled={plan.id === 'pro' && busy}
+                  disabled={busy !== null}
                   onClick={() => onCta(plan.id)}
                 >
                   {byBilling(plan.cta.label, billing)}
