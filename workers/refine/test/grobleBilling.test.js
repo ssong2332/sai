@@ -277,6 +277,15 @@ test('G5 — 이미 결제 중이면 결제 시작 409(Groble 경로도)', async
   assert.equal((await startCheckout(handle)).res.status, 409);
 });
 
+test('G5 — 결제된 팀 좌석이 있으면 Pro 결제 시작 409(얻는 게 없다, 2026-11-05) · 좌석이 풀리면 다시 된다', async () => {
+  const { handle, db } = setup();
+  await db.collection('billing').doc(UID).set({ teamSeat: { teamId: 'team-1', paid: true } });
+  const blocked = await startCheckout(handle, { plan: 'pro', interval: 'year' });
+  assert.deepEqual([blocked.res.status, blocked.out.error, blocked.out.reason], [409, 'already-subscribed', 'team-seat']);
+  await db.collection('billing').doc(UID).set({ teamSeat: { teamId: 'team-1', paid: false } });
+  assert.equal((await startCheckout(handle, { plan: 'pro', interval: 'year' })).res.status, 200);
+});
+
 test('G6 — 저장·로그·응답에 구매자 이메일·전화·이름·카드·uid(로그) 없음', async () => {
   const { handle, db, logger } = setup();
   const { ref } = await startCheckout(handle);

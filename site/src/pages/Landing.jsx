@@ -947,7 +947,7 @@ function Start() {
               1
             </b>
             <h3>설치</h3>
-            <p>Chrome 웹 스토어에서 추가하세요. 지금은 팀 기능까지 모두 무료이고, 하루 20회까지 쓸 수 있어요.</p>
+            <p>Chrome 웹 스토어에서 추가하세요. 다듬기 · 뜻 풀기는 무료로 하루 20회까지 쓸 수 있어요.</p>
             <a href={STORE_URL} className="soon-pill press" target="_blank" rel="noopener noreferrer">
               <span className="soon-dot" aria-hidden="true" />
               무료로 설치하기
