@@ -8,12 +8,17 @@
  *
  * 프로토콜 1 (확장 쪽은 같은 계약으로 따로 만든다):
  *   site:hello · site:get · site:set · site:glossary:add|update|remove · site:learned:remove|clear
+ *   · site:checkout(2026-11-05 — 요금 페이지 Pro·팀 결제, 응답 `{ok:true, checkout:'opened'|<사유 코드>, teamCreated?}`)
  *   응답: `{ok:true, ...}` / `{ok:false, error:'forbidden_origin'|'bad_request'|'unknown_type'|'failed'}`
  */
 
 export const EXT_ID = 'gdipbmakeghjecpenebjlfhgcajbikkg';
 export const PROTOCOL = 1;
 export const TIMEOUT_MS = 3000;
+/** 결제는 확장이 서버에서 결제 주소를 받아 오므로 더 기다린다(실측 0.2~1.3초 + 로그인 토큰 갱신). */
+export const CHECKOUT_TIMEOUT_MS = 15000;
+/** 확장 미설치 안내에 쓰는 스토어 주소 — `Landing.jsx` `STORE_URL`과 같다. */
+export const STORE_URL = 'https://chromewebstore.google.com/detail/gdipbmakeghjecpenebjlfhgcajbikkg';
 
 /** 브리지 자체가 만드는 오류 코드 — 확장이 돌려주는 4개와 겹치지 않는다. */
 export const BRIDGE_ERRORS = {
@@ -129,6 +134,45 @@ export function describeError(code) {
 }
 
 /**
+ * `site:checkout` 결과 → 화면 문구 · 다음 행동(2026-11-05).
+ * | 결과 | tone | action |
+ * |---|---|---|
+ * | ok + `opened` | ok | — 새 탭에 그로블 결제창 |
+ * | ok + `not-signed-in` | warn | — 확장에서 로그인 |
+ * | ok + `already-subscribed` | warn | — 이미 결제 중 |
+ * | ok + `pick-team` · `not-owner` · `bad-seats` | warn | — 팀: 사이드패널에서 팀 고르기 · 팀장만 · 좌석 부족 |
+ * | ok + `opened` + `teamCreated` | ok | — 「내 팀」을 만들었다고 덧붙임 |
+ * | ok + 그 밖 코드 | error | — 잠시 뒤 다시 |
+ * | `no_runtime` · `no_receiver` | warn | `install` — 확장 설치(스토어 링크) |
+ * | `unknown_type` · `bad_response` | warn | `update` — 옛 확장 |
+ * | `timeout` · 그 밖 | error | — |
+ * 🔴 문구는 코드로만 고른다 — 확장이 돌려준 원문을 싣지 않는다.
+ */
+export function describeCheckout(result) {
+  if (result?.ok) {
+    if (result.checkout === 'opened' && result.teamCreated === true) {
+      return { tone: 'ok', text: '「내 팀」을 만들고 새 탭에서 그로블 결제창을 열었어요. 결제가 끝나면 사이드패널 「팀」 탭에서 팀 이름을 바꾸고 초대 코드를 팀원에게 보내 주세요.' };
+    }
+    if (result.checkout === 'opened') return { tone: 'ok', text: '새 탭에서 그로블 결제창을 열었어요. 결제가 끝나면 확장에 바로 적용돼요.' };
+    if (result.checkout === 'pick-team') return { tone: 'warn', text: '팀장인 팀이 여러 개예요. 엉뚱한 팀에 결제되지 않도록 사이드패널 「팀」 탭에서 팀을 골라 결제해 주세요.' };
+    if (result.checkout === 'not-owner') return { tone: 'warn', text: '팀 요금제는 팀장만 결제할 수 있어요.' };
+    if (result.checkout === 'bad-seats') return { tone: 'warn', text: '좌석 수가 지금 팀원 수보다 적어요. 팀원 수 이상으로 골라 주세요.' };
+    if (result.checkout === 'not-signed-in') return { tone: 'warn', text: '먼저 확장에서 로그인해 주세요 — 결제는 로그인한 계정에 적용돼요. 사이드패널을 열고 로그인한 뒤 다시 눌러 주세요.' };
+    if (result.checkout === 'already-subscribed') return { tone: 'warn', text: '이미 결제 중인 구독이 있어요. 확장 설정의 「요금제」에서 확인할 수 있어요.' };
+    return { tone: 'error', text: '결제창을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.' };
+  }
+  const code = result?.error;
+  if (code === BRIDGE_ERRORS.NO_RUNTIME || code === BRIDGE_ERRORS.NO_RECEIVER) {
+    return { tone: 'warn', text: '결제는 사이 확장에서 로그인한 계정에 적용돼요. 먼저 Chrome에 사이 확장을 설치하고 로그인해 주세요.', action: 'install' };
+  }
+  if (code === 'unknown_type' || code === BRIDGE_ERRORS.BAD_RESPONSE) {
+    return { tone: 'warn', text: '설치된 사이 확장이 옛 버전이에요. chrome://extensions에서 업데이트한 뒤 이 페이지를 새로고침해 주세요.', action: 'update' };
+  }
+  if (code === BRIDGE_ERRORS.TIMEOUT) return { tone: 'error', text: '확장이 답하지 않았어요. 잠시 뒤 다시 시도해 주세요.' };
+  return { tone: 'error', text: '결제창을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.' };
+}
+
+/**
  * 화면이 쓰는 클라이언트. 실제 확장 브리지와 데모 브리지가 같은 모양이다 —
  * `send`만 다르고 위의 메서드는 같다.
  *
@@ -144,10 +188,13 @@ export function createClient(send) {
     removeGlossary: (id) => send({ type: 'site:glossary:remove', id }),
     removeLearned: (categoryId) => send({ type: 'site:learned:remove', categoryId }),
     clearLearned: () => send({ type: 'site:learned:clear' }),
+    /** @param {{plan: 'pro'|'team', interval: 'month'|'year', seats?: number}} order 팀이면 seats(2~10) */
+    checkout: ({ plan, interval, seats }) =>
+      send({ type: 'site:checkout', plan, interval, ...(plan === 'team' ? { seats } : {}) }, { timeoutMs: CHECKOUT_TIMEOUT_MS }),
   };
 }
 
 /** 실제 확장과 이야기하는 클라이언트. */
 export function createExtensionClient(deps) {
-  return createClient((message) => sendToExtension(message, deps));
+  return createClient((message, options) => sendToExtension(message, { ...deps, ...options }));
 }

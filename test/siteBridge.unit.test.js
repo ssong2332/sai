@@ -40,17 +40,18 @@ test('🔴 허용 목록 밖 오리진은 forbidden_origin — 다른 확장·�
   }
 });
 
-test('🔴 기본 빌드의 허용 목록은 비어 있다 — localhost:5180도 거절된다', async () => {
-  assert.deepEqual(SITE_ALLOWED_ORIGINS, []);
-  assert.deepEqual(SITE_EXTERNALLY_CONNECTABLE_MATCHES, []);
-  assert.equal(SITE_URL, null, '공개 빌드는 사이트 미배포라 버튼을 그리지 않는다');
+test('🔴 기본 빌드의 허용 목록은 운영 사이트 하나뿐 — localhost:5180은 거절된다(2026-11-05 사이트 결제 버튼)', async () => {
+  assert.deepEqual(SITE_ALLOWED_ORIGINS, ['https://sai-global-msg-2026.web.app']);
+  assert.deepEqual(SITE_EXTERNALLY_CONNECTABLE_MATCHES, ['https://sai-global-msg-2026.web.app/*']);
+  assert.equal(SITE_URL, 'https://sai-global-msg-2026.web.app');
   // 대역 없이 실제 기본 허용 목록으로 보낸다.
   assert.deepEqual(await handleSiteMessage({ type: 'site:hello' }, sender), { ok: false, error: 'forbidden_origin' });
 });
 
 test('개발 스위치를 켜면 localhost:5180만 붙는다', () => {
-  assert.deepEqual(siteAllowedOrigins(false), []);
-  assert.deepEqual(siteAllowedOrigins(true), ['http://localhost:5180']);
+  assert.deepEqual(siteAllowedOrigins(false, null), []);
+  assert.deepEqual(siteAllowedOrigins(true, null), ['http://localhost:5180']);
+  assert.deepEqual(siteAllowedOrigins(false), ['https://sai-global-msg-2026.web.app']);
   assert.deepEqual(siteAllowedOrigins(true, 'https://sai.example/app'), ['https://sai.example', 'http://localhost:5180']);
 });
 
@@ -393,4 +394,191 @@ test('🔴 manifest는 externally_connectable 오리진을 config에서 파생�
   const manifest = readFileSync(new URL('../src/manifest.js', import.meta.url), 'utf8');
   assert.ok(manifest.includes('externally_connectable: { matches: SITE_EXTERNALLY_CONNECTABLE_MATCHES }'));
   assert.ok(!manifest.includes('localhost:5180'), 'manifest에 개발 오리진을 손으로 적었다');
+});
+
+/* ── site:checkout (2026-11-05 요금 페이지 결제 버튼 — 사용자 결정 「A안」) ── */
+
+test('site:checkout — Pro 월·연만 받고, 확장이 결제 주소로 새 탭을 연다 · 주소는 사이트로 돌려주지 않는다', async () => {
+  for (const interval of ['month', 'year']) {
+    const calls = [];
+    const opened = [];
+    const result = await send(
+      { type: 'site:checkout', plan: 'pro', interval },
+      {
+        billingEnabled: true,
+        startCheckout: async (i, opts) => {
+          calls.push([i, opts]);
+          return 'https://groble.im/payment/x8KncK?ref=secret-token';
+        },
+        openTab: async (url) => opened.push(url),
+      },
+    );
+    assert.deepEqual(result, { ok: true, checkout: 'opened' }, interval);
+    assert.deepEqual(calls, [[interval, { plan: 'pro' }]]);
+    assert.deepEqual(opened, ['https://groble.im/payment/x8KncK?ref=secret-token']);
+    assert.equal(JSON.stringify(result).includes('secret-token'), false, '일회용 토큰이 응답에 섞였다');
+  }
+});
+
+test('site:checkout — 모르는 요금제·주기, 좌석 없는 팀은 bad_request, 서버를 부르지 않는다', async () => {
+  let called = false;
+  const startCheckout = async () => {
+    called = true;
+    return 'x';
+  };
+  for (const message of [
+    { plan: 'team', interval: 'month' },
+    { plan: 'team', interval: 'month', seats: 1 },
+    { plan: 'team', interval: 'month', seats: 11 },
+    { plan: 'team', interval: 'month', seats: '3' },
+    { plan: 'team', interval: 'month', seats: 2.5 },
+    { plan: 'enterprise', interval: 'month' },
+    { plan: 'pro', interval: 'week' },
+    { plan: 'pro' },
+    {},
+  ]) {
+    assert.deepEqual(
+      await send({ type: 'site:checkout', ...message }, { billingEnabled: true, startCheckout, openTab: async () => {} }),
+      { ok: false, error: 'bad_request' },
+      JSON.stringify(message),
+    );
+  }
+  assert.equal(called, false);
+});
+
+test('site:checkout — 로그인 안 함·이미 구독·결제 꺼짐은 사유 코드로, 탭을 열지 않는다', async () => {
+  const { BillingClientError, BILLING_ERRORS } = await import('../src/lib/billingClient.js');
+  for (const reason of [BILLING_ERRORS.NOT_SIGNED_IN, BILLING_ERRORS.ALREADY_SUBSCRIBED, BILLING_ERRORS.NETWORK]) {
+    let opened = false;
+    const result = await send(
+      { type: 'site:checkout', plan: 'pro', interval: 'year' },
+      {
+        billingEnabled: true,
+        startCheckout: async () => {
+          throw new BillingClientError(reason);
+        },
+        openTab: async () => {
+          opened = true;
+        },
+      },
+    );
+    assert.deepEqual(result, { ok: true, checkout: reason });
+    assert.equal(opened, false);
+  }
+  assert.deepEqual(
+    await send({ type: 'site:checkout', plan: 'pro', interval: 'year' }, { billingEnabled: false }),
+    { ok: true, checkout: BILLING_ERRORS.UNAVAILABLE },
+  );
+  // 예상 밖 예외는 failed — 문구를 싣지 않는다.
+  assert.deepEqual(
+    await send(
+      { type: 'site:checkout', plan: 'pro', interval: 'year' },
+      {
+        billingEnabled: true,
+        startCheckout: async () => {
+          throw new Error('토큰 abc 포함 문구');
+        },
+      },
+    ),
+    { ok: false, error: 'failed' },
+  );
+});
+
+/* ── site:checkout 팀 (2026-11-05 사용자 결정 「B안」 — 팀이 없으면 자동으로 만든다) ── */
+
+function teamDeps({ teams = [], restoreFails = null, createFails = null, signedIn = true, checkoutFails = null } = {}) {
+  const log = { created: [], checkout: [], opened: [], restored: 0 };
+  let list = [...teams];
+  return {
+    log,
+    deps: {
+      billingEnabled: true,
+      getSession: async () => (signedIn ? { uid: 'u1' } : null),
+      getIdentity: async () => ({ displayName: '홍길동', jobTitle: null }),
+      restoreTeamsFromServer: async () => {
+        log.restored += 1;
+        if (restoreFails) throw restoreFails;
+      },
+      listTeams: async () => list,
+      createTeam: async (name, profile) => {
+        if (createFails) throw createFails;
+        log.created.push([name, profile]);
+        const team = { teamId: 'new-team', name, role: 'owner' };
+        list = [...list, team];
+        return { ...team, inviteCode: 'SECRET-INVITE' };
+      },
+      startCheckout: async (interval, opts) => {
+        log.checkout.push([interval, opts]);
+        if (checkoutFails) throw checkoutFails;
+        return 'https://groble.im/payment/team3?ref=secret-token';
+      },
+      openTab: async (url) => log.opened.push(url),
+    },
+  };
+}
+
+test('site:checkout 팀 — 팀장인 팀이 없으면 「내 팀」을 만들고 그 팀으로 결제 · 이름·id·초대 코드·토큰은 응답에 없다', async () => {
+  const { deps: d, log } = teamDeps({ teams: [{ teamId: 'other', name: '남의 팀', role: 'member' }] });
+  const result = await send({ type: 'site:checkout', plan: 'team', interval: 'year', seats: 3 }, d);
+  assert.deepEqual(result, { ok: true, checkout: 'opened', teamCreated: true });
+  assert.equal(log.restored, 1, '만들기 전에 서버 명부로 맞춘다 — 다른 기기에서 만든 팀을 두 번 만들지 않게');
+  assert.deepEqual(log.created, [['내 팀', { displayName: '홍길동', jobTitle: null }]]);
+  assert.deepEqual(log.checkout, [['year', { plan: 'team', teamId: 'new-team', seats: 3 }]]);
+  assert.equal(log.opened.length, 1);
+  const text = JSON.stringify(result);
+  for (const secret of ['new-team', '내 팀', 'SECRET-INVITE', 'secret-token', '남의 팀']) assert.equal(text.includes(secret), false, secret);
+});
+
+test('site:checkout 팀 — 팀장인 팀이 하나면 만들지 않고 그 팀 · 둘 이상이면 pick-team(결제 안 함)', async () => {
+  const one = teamDeps({ teams: [{ teamId: 't1', name: 'A', role: 'owner' }, { teamId: 't2', name: 'B', role: 'member' }] });
+  assert.deepEqual(await send({ type: 'site:checkout', plan: 'team', interval: 'month', seats: 2 }, one.deps), {
+    ok: true,
+    checkout: 'opened',
+    teamCreated: false,
+  });
+  assert.deepEqual(one.log.created, []);
+  assert.deepEqual(one.log.checkout, [['month', { plan: 'team', teamId: 't1', seats: 2 }]]);
+
+  const two = teamDeps({ teams: [{ teamId: 't1', role: 'owner' }, { teamId: 't2', role: 'owner' }] });
+  assert.deepEqual(await send({ type: 'site:checkout', plan: 'team', interval: 'month', seats: 2 }, two.deps), {
+    ok: true,
+    checkout: 'pick-team',
+  });
+  assert.deepEqual([two.log.created, two.log.checkout, two.log.opened], [[], [], []]);
+});
+
+test('site:checkout 팀 — 로그인 안 함·명부 실패면 팀을 만들지 않는다 · 결제 실패 사유는 그대로', async () => {
+  const { TeamClientError, TEAM_ERRORS } = await import('../src/lib/teamClient.js');
+  const { BillingClientError, BILLING_ERRORS } = await import('../src/lib/billingClient.js');
+
+  const out = teamDeps({ signedIn: false });
+  assert.deepEqual(await send({ type: 'site:checkout', plan: 'team', interval: 'year', seats: 2 }, out.deps), {
+    ok: true,
+    checkout: 'not-signed-in',
+  });
+  assert.equal(out.log.restored, 0);
+
+  const offline = teamDeps({ restoreFails: new TeamClientError(TEAM_ERRORS.NETWORK) });
+  assert.deepEqual(await send({ type: 'site:checkout', plan: 'team', interval: 'year', seats: 2 }, offline.deps), {
+    ok: true,
+    checkout: 'network',
+  });
+  assert.deepEqual(offline.log.created, [], '명부를 못 읽었는데 만들면 다른 기기의 팀과 겹친다');
+
+  const createFail = teamDeps({ createFails: new TeamClientError(TEAM_ERRORS.NOT_SIGNED_IN) });
+  assert.deepEqual(await send({ type: 'site:checkout', plan: 'team', interval: 'year', seats: 2 }, createFail.deps), {
+    ok: true,
+    checkout: 'not-signed-in',
+  });
+
+  const seatsLow = teamDeps({
+    teams: [{ teamId: 't1', role: 'owner' }],
+    checkoutFails: new BillingClientError(BILLING_ERRORS.BAD_SEATS),
+  });
+  assert.deepEqual(await send({ type: 'site:checkout', plan: 'team', interval: 'year', seats: 2 }, seatsLow.deps), {
+    ok: true,
+    checkout: 'bad-seats',
+    teamCreated: false,
+  });
+  assert.deepEqual(seatsLow.log.opened, []);
 });

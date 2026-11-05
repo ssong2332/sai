@@ -105,6 +105,62 @@
   margin-top: 20px;
   width: 100%;
 }
+/* 팀 좌석 선택(2026-11-05) */
+.pr-seats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--sub);
+}
+.pr-seats select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.pr-seats-total {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.pr-seats + .pr-cta {
+  margin-top: 10px;
+}
+/* 결제 버튼 결과 안내(2026-11-05) — 비어 있으면 자리를 차지하지 않는다. */
+.pr-notice:empty {
+  display: none;
+}
+.pr-notice {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sub);
+  background: var(--sunken);
+}
+.pr-notice.ok {
+  color: var(--kept-ink);
+  background: var(--kept-tint);
+}
+.pr-notice.warn {
+  color: var(--check-ink);
+  background: var(--check-tint);
+}
+.pr-notice.error {
+  color: var(--seam-ink);
+  background: var(--seam-tint);
+}
+.pr-notice a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
 .pr-note {
   margin-top: 8px;
   min-height: 2.8em;

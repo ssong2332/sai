@@ -193,14 +193,14 @@ export const FEATURES = {
  *
  * | 빌드 | 명령 | `SITE_URL` | `externally_connectable` |
  * |---|---|---|---|
- * | 기본 (**공개 빌드**) | `npm run build` | `PRODUCTION_SITE_URL` (지금 `null` — 사이트 미배포) | 운영 오리진만 (없으면 블록 자체가 없음) |
+ * | 기본 (**공개 빌드**) | `npm run build` | `PRODUCTION_SITE_URL` (2026-11-05 운영 사이트 — 요금 페이지 결제 버튼) | 운영 오리진만 (없으면 블록 자체가 없음) |
  * | 사이트 개발 | `npm run build:sitedev` (`SAI_SITE_DEV=1`) | `DEV_SITE_URL` | 운영 오리진 + `http://localhost:5180/*` |
  *
  * 🔴 **개발 오리진은 기본 빌드에 절대 들어가지 않는다** — 로컬 프록시 권한(`LOCAL_PROXY_HOST_PERMISSIONS`)과
  *    같은 원칙이다. 공개 빌드에 들어가면 그 기기의 localhost:5180에 뜬 아무 페이지나 내 설정을 읽고 쓴다.
  * 🔴 사이트를 배포하면 `PRODUCTION_SITE_URL`만 그 주소로 바꾼다 — manifest·허용 목록은 여기서 파생된다.
  */
-export const PRODUCTION_SITE_URL = null;
+export const PRODUCTION_SITE_URL = 'https://sai-global-msg-2026.web.app';
 
 /** 사이트 개발 서버(`site/`의 vite) 주소. 🔴 `SAI_SITE_DEV=1` 빌드에서만 쓰인다. */
 export const DEV_SITE_URL = 'http://localhost:5180';
