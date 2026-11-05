@@ -534,6 +534,9 @@ async function grobleCheckout({ db, billing, uid, body, json, logger, now }) {
     const mine = await db.collection('billing').doc(uid).get();
     const doc = mine.exists ? mine.data() ?? null : null;
     if (liveSubscription(doc) && resolvePlan(doc, billing) === 'pro') return json(409, { error: 'already-subscribed' });
+    // 🔴 2026-11-05 사용자 발견 — 결제된 팀 좌석이 있으면 Pro를 사도 얻는 게 없다(팀 한도 200·20·5 ≥ Pro 200·10·3, `resolvePlan`이 팀을 먼저 본다).
+    //    코드는 `already-subscribed` 그대로 — 스토어에 나가 있는 확장(0.1.78)이 이미 아는 사유라 새 버전 없이 안내된다. `reason`은 구분용.
+    if (doc?.teamSeat?.paid === true) return json(409, { error: 'already-subscribed', reason: 'team-seat' });
   }
   if (!findGrobleProduct(groble.products, plan, interval, seats)) return json(400, { error: 'unknown plan' });
   try {

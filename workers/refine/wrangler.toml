@@ -60,8 +60,10 @@ PADDLE_PRICE_TEAM_YEAR = "pri_01m6ag2t6xxwdnj5k34kmh8qg8"
 # 2026-11-05 그로블 스토어 등록·판매중 확인(20/20). 가격: Pro 7,900/월·59,000/연 · 팀 1석 13,900/월·135,000/연 × 석수.
 # 이 값이 있으면 결제창은 Paddle 대신 Groble로 간다(billing.js). 상품을 새로 만들면 ID를 여기서 바꾼다.
 GROBLE_PRODUCTS = '{"x8KncK":{"plan":"pro","interval":"month"},"8XE47f":{"plan":"pro","interval":"year"},"hmsHft":{"plan":"team","interval":"month","seats":2},"Hsn2Mr":{"plan":"team","interval":"month","seats":3},"Wu22vT":{"plan":"team","interval":"month","seats":4},"rDp34q":{"plan":"team","interval":"month","seats":5},"GLxeC9":{"plan":"team","interval":"month","seats":6},"6MNnWn":{"plan":"team","interval":"month","seats":7},"PZvdqp":{"plan":"team","interval":"month","seats":8},"9pZmRh":{"plan":"team","interval":"month","seats":9},"FWjnYD":{"plan":"team","interval":"month","seats":10},"QS6snF":{"plan":"team","interval":"year","seats":2},"EkeNVv":{"plan":"team","interval":"year","seats":3},"atgCpJ":{"plan":"team","interval":"year","seats":4},"KEtXDL":{"plan":"team","interval":"year","seats":5},"4G3jBV":{"plan":"team","interval":"year","seats":6},"qhHtSP":{"plan":"team","interval":"year","seats":7},"VFiSLk":{"plan":"team","interval":"year","seats":8},"JA7hkR":{"plan":"team","interval":"year","seats":9},"CJcSEY":{"plan":"team","interval":"year","seats":10}}'
-# BILLING_ENFORCED = "1"   # 켜면 구독 없는 사용자 = free(하루 20 · 빠른만). 꺼져 있으면 beta(지금과 같음)
-# BILLING_ENFORCED_AT = "2026-12-01T00:00:00+09:00"   # 유료 출시 시각 — 이 전에 만든 팀은 30일 유예. 🔴 켤 때 반드시 함께(없으면 유예·잠금 판정 안 함)
+# 🔴 2026-11-05 사용자 결정 「무료 프로모션 종료 — 1단계만 지금」: 구독 없는 사용자 = free(하루 20 · 빠른만).
+#    이 시각 이후 만든 팀은 결제 전까지 잠김 · 그 전에 만든 팀은 30일 유예(2026-12-05 17:20) 뒤 잠김(데이터 보존). 끄면 beta로 돌아간다.
+BILLING_ENFORCED = "1"
+BILLING_ENFORCED_AT = "2026-11-05T17:20:00+09:00"
 # 사고(thinking) — 2026-10-23부터 코어 기본이 **끔**이라 적지 않는다(L30 실측: 끔 건당 $0.00070·중앙값 2.4~2.5초 /
 # 켬 $0.00107·6.2~6.7초). 실험으로 켤 때만:
 # SAI_ANTHROPIC_THINKING = "adaptive"
