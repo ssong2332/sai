@@ -80,7 +80,8 @@ test('환불·해지(2026-11-05) — 결제 중이면 해지 예약 뒤에도 �
   }
   assert.equal(GROBLE_ORDERS_URL, 'https://groble.im/account/purchases');
   assert.match(REFUND_NOTE, /7일 안/);
-  assert.match(REFUND_NOTE, /승인/);
+  assert.match(REFUND_NOTE, /이유를 묻지 않고 전액 환불/); // 환불 정책 2절과 같은 약속(2026-11-05 사용자 결정)
+  assert.doesNotMatch(REFUND_NOTE, /승인/);
   assert.match(REFUND_NOTE, /7일이 지나면 환불되지 않아요/);
   assert.match(CANCEL_NOTE, /결제한 기간이 끝날 때까지/);
 });

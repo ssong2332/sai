@@ -250,7 +250,7 @@ function PlanGroup() {
   return (
     <Group
       title="Pro로 업그레이드"
-      note={`Pro는 하루 200번까지 다듬고, 기본 모드 하루 ${PREMIUM_DAILY_LIMITS.standard}번 · 심층 모드 하루 ${PREMIUM_DAILY_LIMITS.deep}번을 쓸 수 있어요. 결제는 새 탭의 그로블에서 휴대폰 인증 후 카드로 해요(정기결제라 카카오페이·네이버페이는 안 돼요). 결제일로부터 7일 안에 취소를 요청하면 운영자가 확인해 승인한 뒤 전액 환불돼요.`}
+      note={`Pro는 하루 200번까지 다듬고, 기본 모드 하루 ${PREMIUM_DAILY_LIMITS.standard}번 · 심층 모드 하루 ${PREMIUM_DAILY_LIMITS.deep}번을 쓸 수 있어요. 결제는 새 탭의 그로블에서 휴대폰 인증 후 카드로 해요(정기결제라 카카오페이·네이버페이는 안 돼요). 결제일로부터 7일 안에 취소를 요청하면 이유를 묻지 않고 전액 환불해 드려요.`}
     >
       <div className="plan-actions">
         <button type="button" className="btn primary press" disabled={busy !== null} onClick={() => open('year')}>
