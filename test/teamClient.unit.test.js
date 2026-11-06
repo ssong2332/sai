@@ -344,3 +344,22 @@ test('🔴 거절 오류에 막는 팀 이름이 담기고, 안내 문구에 붙
   assert.equal(blockedTeamsText(caught), ' (팀: 해커톤)');
   assert.equal(blockedTeamsText(null), '');
 });
+
+test('🔴 다시 불러오기가 잠금·유예 종료일·팀 기본 품질을 지우지 않는다 — 사이트 팀 결제 뒤 안내가 사라졌다 (2026-11-06 실확장)', async () => {
+  const store = installStorage({
+    'sai.teams': [{ teamId: 'h1', name: 'first', role: 'owner', canViewDashboard: true, graceUntil: '2026-12-05T08:20:00.000Z', locked: false, defaultQuality: 'standard' }],
+    'sai.teams.active': 'h1',
+  });
+  signedIn(store);
+  await restoreTeamsFromServer({
+    fetchImpl: respond(200, { teams: [
+      { teamId: 'h1', name: 'first', role: 'owner', canViewDashboard: true },
+      { teamId: 'h2', name: '내 팀', role: 'owner', canViewDashboard: true },
+    ] }),
+  });
+  const [first, mine] = await listTeams();
+  assert.equal(first.graceUntil, '2026-12-05T08:20:00.000Z');
+  assert.equal(first.locked, false);
+  assert.equal(first.defaultQuality, 'standard');
+  assert.deepEqual(mine, { teamId: 'h2', name: '내 팀', role: 'owner', canViewDashboard: true }, '새 팀은 서버 값만');
+});
