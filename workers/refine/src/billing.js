@@ -49,8 +49,12 @@ export function readBillingConfig(env = {}) {
     // 유료 출시 시각(ISO) — 베타 팀 30일 유예의 기준(`functions/teams.js` judgeTeamJoin). 없으면 유예 판정을 하지 않는다(잠그지 않음).
     enforcedAtMs: Date.parse(str(env.BILLING_ENFORCED_AT) ?? ''),
   };
-  config.checkoutReady = Boolean(config.apiBase && config.apiKey && config.prices.month && config.prices.year);
-  config.webhookReady = Boolean(config.webhookSecret);
+  // 🔴 2026-11-06 사용자 결정 「Paddle은 지우지 말고 끄기 — 나중에 필요하면 다시」. `PADDLE_ENABLED = "1"`일 때만 켠다.
+  //    꺼지면 ① 그로블 설정이 빠져도 Paddle 결제로 넘어가지 않는다(503) ② Paddle 웹훅 503 ③ Paddle 구독은 Pro로 치지 않는다.
+  //    키·가격 ID·시크릿은 그대로 둔다 — 스위치 하나로 되살린다.
+  config.paddleEnabled = str(env.PADDLE_ENABLED) === '1';
+  config.checkoutReady = Boolean(config.paddleEnabled && config.apiBase && config.apiKey && config.prices.month && config.prices.year);
+  config.webhookReady = Boolean(config.paddleEnabled && config.webhookSecret);
   // 2026-11-04 Groble 전환(`docs/BillingDesign.md` 0절) — Groble 설정이 있으면 결제 시작은 Groble로 간다. Paddle은 꺼 둔 옛 경로.
   config.groble = readGrobleConfig(env);
   return config;
@@ -61,10 +65,11 @@ export function readBillingConfig(env = {}) {
  * @param {object|null} doc `billing/{uid}`
  * @param {{enforced: boolean, prices: {month: string|null, year: string|null}}} config
  */
-export function resolvePlan(doc, { enforced = false, prices = {} } = {}) {
+export function resolvePlan(doc, { enforced = false, prices = {}, paddleEnabled = true } = {}) {
   // 팀 좌석이 개인 Pro보다 넉넉하다(200·20·5) — 둘 다 있으면 팀. 좌석 여부는 `syncTeamSeats`가 써 둔다.
   if (doc?.teamSeat?.paid === true) return 'team';
-  const proPrices = [prices.month, prices.year].filter(Boolean);
+  // Paddle 구독(가격 ID) — `PADDLE_ENABLED`가 꺼져 있으면 치지 않는다(2026-11-06, 남은 건 샌드박스 시험 구독뿐).
+  const proPrices = paddleEnabled ? [prices.month, prices.year].filter(Boolean) : [];
   if (doc && PAID_STATUSES.has(doc.status) && proPrices.includes(doc.priceId)) return 'pro';
   // Groble(2026-11-04) — 가격 ID 대신 웹훅이 옵션 표로 정한 `plan`을 적는다.
   if (doc && PAID_STATUSES.has(doc.status) && doc.provider === 'groble' && doc.plan === 'pro') return 'pro';
