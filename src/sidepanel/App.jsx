@@ -125,6 +125,7 @@ import {
   deleteAccount,
   restoreTeamsFromServer,
   blockedTeamsText,
+  graceDateText,
   listTeamGlossary,
   saveTeamGlossaryEntry,
   removeTeamGlossaryEntry,
@@ -3287,6 +3288,19 @@ function TeamPanel({ team, onToast, onChanged }) {
           <p className="meta">
             이 팀의 무료 기간이 끝나 팀 용어집과 대시보드를 잠갔어요. 데이터는 그대로 있어요 —{' '}
             {team.role === 'owner' ? '아래 「팀 관리」에서 팀 요금제를 구매하면' : '팀장이 팀 요금제를 구매하면'} 바로 다시 열려요.
+          </p>
+        </div>
+      )}
+
+      {/* 2026-11-06 유예 종료 예고 — 유료 출시(11-05) 전에 만든 미결제 팀. 잠기기 전에 날짜와 할 일을 미리 알린다. */}
+      {team.locked !== true && graceDateText(team.graceUntil) && (
+        <div className="card card-accent" role="status">
+          <p className="card-label">{graceDateText(team.graceUntil)}까지 무료로 쓸 수 있어요</p>
+          <p className="meta">
+            그 뒤에는 팀 용어집과 대시보드가 잠겨요(데이터는 지우지 않아요).{' '}
+            {team.role === 'owner'
+              ? '아래 「팀 관리」에서 팀 요금제를 구매하면 그대로 계속 쓸 수 있어요.'
+              : '팀장이 팀 요금제를 구매하면 그대로 계속 쓸 수 있어요.'}
           </p>
         </div>
       )}

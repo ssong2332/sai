@@ -73,3 +73,23 @@ test('수정 습관 학습 — 무료는 기록하지 않고 알릴 분류도 �
   assert.ok((await recordEdit('Sorry, sorry — please review.', 'please review.')).categoryIds.length > 0);
   assert.ok(Object.keys(await getLearnedCounts()).length > 0);
 });
+
+test('하루 한도 문구 — 무료·모름만 Pro 하루 횟수를 덧붙이고, 낸 사람에게는 권하지 않는다 (2026-11-06)', async () => {
+  const { dailyLimitText, DAILY_LIMIT_TEXT } = await import('../src/lib/planCache.js');
+  const { PLAN_LIMITS } = await import('../src/core/refine/quality.js');
+  for (const plan of ['free', null, undefined]) {
+    const text = dailyLimitText(plan, { billing: true });
+    assert.match(text, new RegExp(`${PLAN_LIMITS.free.daily}회`));
+    assert.match(text, new RegExp(`Pro는 하루 ${PLAN_LIMITS.pro.daily}회`));
+  }
+  for (const plan of ['pro', 'team', 'beta']) assert.equal(dailyLimitText(plan, { billing: true }), DAILY_LIMIT_TEXT);
+  assert.equal(dailyLimitText('free', { billing: false }), DAILY_LIMIT_TEXT, '결제 진입점 꺼짐');
+});
+
+test('유예 종료일 표시 — 한국 날짜 「12월 5일」, 틀린 값은 null', async () => {
+  const { graceDateText } = await import('../src/lib/teamClient.js');
+  assert.equal(graceDateText('2026-12-05T08:20:00.000Z'), '12월 5일');
+  assert.equal(graceDateText('2026-12-04T15:30:00.000Z'), '12월 5일', 'UTC 4일 15:30 = 한국 5일 00:30');
+  assert.equal(graceDateText(null), null);
+  assert.equal(graceDateText('nope'), null);
+});

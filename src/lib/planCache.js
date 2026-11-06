@@ -14,7 +14,7 @@
  * | 저장값 없음 | — | 무료(🔴 결제 안 한 사람에게 열어 주지 않는 쪽) |
  */
 import { FEATURES } from '../config.js';
-import { featuresFor, PLAN_UPSELL_NOTE } from '../core/refine/quality.js';
+import { featuresFor, PLAN_LIMITS, PLAN_UPSELL_NOTE } from '../core/refine/quality.js';
 import { getSession } from './authClient.js';
 import { getMyPlan } from './billingClient.js';
 import { getLocal, removeLocal, setLocal, STORAGE_KEYS } from './storage.js';
@@ -42,6 +42,22 @@ export function planLimitText(kind, limit) {
   return `무료 요금제는 ${label}를 ${limit}개까지 저장할 수 있어요 — ${PLAN_UPSELL_NOTE}`;
 }
 const KNOWN = ['free', 'beta', 'pro', 'team'];
+
+/** 하루 한도(429 `daily-limit`) 문구 — 요금제를 모를 때·유료 요금제의 기본 문구. */
+export const DAILY_LIMIT_TEXT = '오늘 사용할 수 있는 교정 횟수를 다 썼어요. 내일 다시 이용해 주세요.';
+
+/**
+ * 하루 한도에 닿았을 때 할 말(2026-11-06) — 무료 사용자에게만 Pro 하루 횟수를 덧붙인다.
+ * | 상황 | 문구 |
+ * |---|---|
+ * | 결제 진입점 꺼짐(`FEATURES.billing`) | 기본 문구 |
+ * | 무료 · 저장값 없음(`null`) | 무료 횟수 + 「Pro는 하루 200회」 |
+ * | beta · pro · team | 기본 문구 — 🔴 이미 낸 사람에게 결제를 권하지 않는다 |
+ */
+export function dailyLimitText(plan, { billing = FEATURES.billing } = {}) {
+  if (!billing || (plan !== null && plan !== undefined && plan !== 'free')) return DAILY_LIMIT_TEXT;
+  return `오늘 무료로 쓸 수 있는 ${PLAN_LIMITS.free.daily}회를 다 썼어요. 내일 다시 쓸 수 있고, Pro는 하루 ${PLAN_LIMITS.pro.daily}회까지 쓸 수 있어요.`;
+}
 
 /** 저장된 요금제(오래됐거나 없으면 `null`). */
 export async function getCachedPlan({ now = Date.now() } = {}) {

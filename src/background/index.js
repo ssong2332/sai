@@ -6,7 +6,7 @@ import { METRIC_MESSAGE, sendClientMetric } from '../lib/metricsClient.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from '../core/refine/fallback.js';
 // 🔴 2026-10-24 — 관리용 웹사이트 브리지(`docs/WebSplit.md` 「C — 로컬 브리지」). 처리 규칙은 그 파일에 있다.
 import { handleSiteMessage } from './siteBridge.js';
-import { refreshPlan } from '../lib/planCache.js';
+import { DAILY_LIMIT_TEXT, dailyLimitText, getCachedPlan, refreshPlan } from '../lib/planCache.js';
 import { PLAN_FEATURES, PLAN_UPSELL_NOTE } from '../core/refine/quality.js';
 import { STORAGE_KEYS } from '../lib/storage.js';
 import { runToneReconcile } from '../lib/toneReconcile.js';
@@ -52,7 +52,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             ? REPLY_LIMIT_NOTICE
             : AUTH_FAILURE_NOTICES[error?.status];
       if (authNotice) {
-        sendResponse(buildAuthFailureResponse(message.request, mode, authNotice));
+        // 2026-11-06 — 하루 한도에 닿은 무료 사용자에게만 Pro 하루 횟수를 덧붙인다(`dailyLimitText` 표).
+        //    요금제를 못 읽으면 기본 문구 그대로 — 안내 한 줄 때문에 응답을 막지 않는다.
+        const notice =
+          authNotice === AUTH_FAILURE_NOTICES[429]
+            ? { ...authNotice, notice: await getCachedPlan().then(dailyLimitText, () => DAILY_LIMIT_TEXT) }
+            : authNotice;
+        sendResponse(buildAuthFailureResponse(message.request, mode, notice));
         return;
       }
 
@@ -161,7 +167,7 @@ const AUTH_FAILURE_NOTICES = {
   },
   429: {
     reason: 'daily-limit',
-    notice: '오늘 사용할 수 있는 교정 횟수를 다 썼어요. 내일 다시 이용해 주세요.',
+    notice: DAILY_LIMIT_TEXT, // 무료 사용자는 위 catch에서 `dailyLimitText`로 바꾼다.
   },
 };
 

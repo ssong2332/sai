@@ -429,3 +429,45 @@ test('팀 이름을 바꾼다 · 빈 이름은 거절', async () => {
     (e) => e.status === 400,
   );
 });
+
+/* ── 유예 종료 예고 (2026-11-06) ─────────────────────────────── */
+
+import { teamGraceEndMs, teamShouldLock as shouldLockForGrace } from '../functions/teams.js';
+
+const ENFORCED_AT = Date.parse('2026-11-05T17:20:00+09:00');
+const GRACE_END = Date.parse('2026-12-05T17:20:00+09:00');
+const BEFORE = Date.parse('2026-10-01T00:00:00+09:00');
+
+test('유예 종료 시각 — 출시 전에 만든 미결제 팀만, 유예 안에서만', () => {
+  const base = { enforced: true, enforcedAtMs: ENFORCED_AT, createdAtMs: BEFORE, nowMs: Date.parse('2026-11-06T12:00:00+09:00') };
+  assert.equal(teamGraceEndMs(base), GRACE_END);
+  assert.equal(teamGraceEndMs({ ...base, billing: { status: 'active', seats: 3 } }), null, '결제 팀');
+  assert.equal(teamGraceEndMs({ ...base, enforced: false }), null, '출시 전');
+  assert.equal(teamGraceEndMs({ ...base, enforcedAtMs: NaN }), null, '출시 시각 모름');
+  assert.equal(teamGraceEndMs({ ...base, createdAtMs: ENFORCED_AT + 1 }), null, '출시 뒤에 만든 팀 — 유예 없음');
+  assert.equal(teamGraceEndMs({ ...base, createdAtMs: NaN }), null, '만든 시각 모름');
+  assert.equal(teamGraceEndMs({ ...base, nowMs: GRACE_END }), null, '유예 끝');
+});
+
+test('🔴 유예 종료 시각과 잠금 판정이 어긋나지 않는다 — 끝나기 1ms 전엔 안 잠기고, 끝나면 잠긴다', () => {
+  const base = { enforced: true, enforcedAtMs: ENFORCED_AT, createdAtMs: BEFORE };
+  assert.equal(shouldLockForGrace({ ...base, nowMs: GRACE_END - 1 }), false);
+  assert.equal(shouldLockForGrace({ ...base, nowMs: GRACE_END }), true);
+});
+
+test('me 응답에 유예 종료일이 실린다 — 잠긴 팀·teamBilling 없는 서버는 null', async () => {
+  const db = fakeDb();
+  const made = await createTeam(req({ name: '옛 팀' }), deps(db, { uid: 'owner' }));
+  await db.collection('teams').doc(made.teamId).set({ createdAt: new Date(BEFORE) }, { merge: true });
+  const teamBilling = { enforced: true, enforcedAtMs: ENFORCED_AT, now: () => Date.parse('2026-11-06T12:00:00+09:00') };
+
+  const me = await whoAmI(req({ teamId: made.teamId }), { ...deps(db, { uid: 'owner' }), teamBilling });
+  assert.equal(me.graceUntil, new Date(GRACE_END).toISOString());
+
+  const noBilling = await whoAmI(req({ teamId: made.teamId }), deps(db, { uid: 'owner' }));
+  assert.equal(noBilling.graceUntil, null);
+
+  await db.collection('teams').doc(made.teamId).set({ locked: true }, { merge: true });
+  const locked = await whoAmI(req({ teamId: made.teamId }), { ...deps(db, { uid: 'owner' }), teamBilling });
+  assert.equal(locked.graceUntil, null);
+});
