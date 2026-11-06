@@ -204,14 +204,19 @@ export async function restoreTeamsFromServer({ fetchImpl = globalThis.fetch } = 
   const serverTeams = (result?.teams ?? []).filter((team) => typeof team?.teamId === 'string');
   const local = await listTeams();
   const localIds = new Set(local.map((team) => team.teamId));
+  // 🔴 2026-11-06 실확장 — `myTeams`는 이름·역할·열람 권한만 준다. 예전엔 로컬 팀의 잠금·유예 종료일·팀 기본 품질까지
+  //    지워서, 사이트 팀 결제나 이 버튼 뒤에 「12월 5일까지 무료」 안내가 팀 탭을 다시 열 때까지 사라졌다.
+  //    서버가 주지 않는 필드는 로컬 값을 그대로 둔다(다음 `refreshAllMemberships`가 고친다).
+  const KEEP = ['locked', 'graceUntil', 'defaultQuality'];
   const merged = [
-    ...local.map((team) => serverTeams.find((s) => s.teamId === team.teamId) ?? team),
-    ...serverTeams.filter((team) => !localIds.has(team.teamId)),
-  ].map((team) => ({
+    ...local.map((team) => ({ local: team, server: serverTeams.find((s) => s.teamId === team.teamId) ?? team })),
+    ...serverTeams.filter((team) => !localIds.has(team.teamId)).map((team) => ({ local: null, server: team })),
+  ].map(({ local: kept, server: team }) => ({
     teamId: team.teamId,
     name: team.name ?? '이름 없는 팀',
     role: team.role === 'owner' ? 'owner' : 'member',
     canViewDashboard: team.canViewDashboard === true,
+    ...Object.fromEntries(KEEP.filter((key) => kept && key in kept).map((key) => [key, kept[key]])),
   }));
   await setLocal(STORAGE_KEYS.TEAMS, merged);
   if (!(await getLocal(STORAGE_KEYS.ACTIVE_TEAM, null)) && merged[0]) {
