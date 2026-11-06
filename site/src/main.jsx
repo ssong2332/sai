@@ -47,7 +47,7 @@ function App() {
   else if (path === '/privacy') page = <Legal doc="privacy" />;
   else if (path === '/terms') page = <Legal doc="terms" />;
   else if (path === '/refund') page = <Legal doc="refund" />;
-  else if (path === '/checkout') page = <Checkout search={search} />;
+  else if (path === '/checkout') page = <Checkout />;
   else page = <NotFound />;
 
   return (
