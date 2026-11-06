@@ -48,6 +48,8 @@ EXTENSION_ID = "gdipbmakeghjecpenebjlfhgcajbikkg"
 # 결제(Paddle, 2026-10-31 — docs/BillingDesign.md). 🔴 키·웹훅 비밀값은 여기 쓰지 않는다(시크릿):
 #   npx wrangler secret put PADDLE_API_KEY · npx wrangler secret put PADDLE_WEBHOOK_SECRET
 # 가격 ID는 비밀이 아니다. 🔴 실판매 전환(PADDLE_ENV = "live" · 실판매 가격 ID · BILLING_ENFORCED = "1")은 사용자 승인 건.
+# 🔴 2026-11-06 사용자 결정 — Paddle은 꺼 둔다(결제는 그로블). 지우지 않고 이 스위치로만 끈다. 다시 쓰려면 "1"(사용자 승인 건).
+PADDLE_ENABLED = "0"
 PADDLE_ENV = "sandbox"
 PADDLE_PRICE_PRO_MONTH = "pri_01m691c650td0gbxbh224ykhda"
 PADDLE_PRICE_PRO_YEAR = "pri_01m691emykvm3xb27tdn7kwq92"

@@ -21,7 +21,7 @@ const UID = 'uid-test-123';
 const SECRET = 'whsec-test-not-real';
 const API_KEY = 'pdl-test-key-not-real';
 const PRICES = { PADDLE_PRICE_PRO_MONTH: 'pri_month_test', PADDLE_PRICE_PRO_YEAR: 'pri_year_test' };
-const BILLING_ENV = { ...TEST_ENV, PADDLE_ENV: 'sandbox', PADDLE_API_KEY: API_KEY, PADDLE_WEBHOOK_SECRET: SECRET, ...PRICES };
+const BILLING_ENV = { ...TEST_ENV, PADDLE_ENABLED: '1', PADDLE_ENV: 'sandbox', PADDLE_API_KEY: API_KEY, PADDLE_WEBHOOK_SECRET: SECRET, ...PRICES };
 const NOW = Date.now();
 
 /** `custom_data` 서명 — 코드(`signCustomData`)와 따로 node:crypto로 만든다(같은 규칙인지 확인). */
@@ -334,4 +334,25 @@ test('내 요금제(로고 옆 배지) — 로그인 필수, 판정은 resolvePl
   assert.equal(await planOf(), 'beta');
   // 결제 키가 없어도(판매 전) 읽기는 된다 — Firestore만 있으면.
   assert.equal((await handle(meRequest(), TEST_ENV)).status, 200);
+});
+
+test('🔴 PADDLE_ENABLED 꺼짐(기본) — 결제 시작 503(Paddle 호출 0) · 웹훅 503(쓰기 0) · Paddle 구독은 Pro 아님 (2026-11-06)', async () => {
+  const off = { ...BILLING_ENV, PADDLE_ENABLED: undefined };
+  const paddle = fakePaddle();
+  const { handle, db } = setup({ fetchImpl: paddle });
+
+  const checkout = await handle(checkoutRequest({ plan: 'pro', interval: 'month' }), off);
+  assert.equal(checkout.status, 503);
+  assert.equal(paddle.seen.length, 0, 'Paddle을 부르면 안 된다');
+
+  const raw = JSON.stringify(subEvent());
+  const hook = await handle(webhook(raw, sign(raw)), { ...off, PADDLE_ENABLED: '0' });
+  assert.equal(hook.status, 503);
+  assert.equal(await billingDoc(db), null);
+
+  const prices = { month: 'pri_month_test', year: 'pri_year_test' };
+  const sub = { status: 'active', priceId: 'pri_month_test' };
+  assert.equal(resolvePlan(sub, { prices, enforced: true, paddleEnabled: false }), 'free');
+  assert.equal(resolvePlan(sub, { prices, enforced: true, paddleEnabled: true }), 'pro', '켜면 다시 Pro');
+  assert.equal(resolvePlan({ status: 'active', provider: 'groble', plan: 'pro' }, { prices, enforced: true, paddleEnabled: false }), 'pro', '그로블은 그대로');
 });

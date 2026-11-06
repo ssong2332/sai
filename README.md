@@ -88,6 +88,7 @@ npm run dev
 | `GROQ_API_KEY` | 로컬 `.env` + Worker 시크릿 (Functions Secret Manager는 🔴 미등록) | **폴오버 예비**(2026-10-23, `openai/gpt-oss-120b`). 폴오버 2단계 |
 | `SAI_SERVICE_ACCOUNT_FILE` | 실행하는 셸(또는 로컬 `.env`) — **키 파일 경로**, 키 파일은 저장소 밖 | Worker 주간 점검 `npm --prefix workers/refine run report`(2026-10-27, M2) — 최근 7일 `betaMetrics` + `/health`, 경고 있으면 종료 코드 1 |
 | `PADDLE_API_KEY` · `PADDLE_WEBHOOK_SECRET` | 🔴 Worker 시크릿만(`npx wrangler secret put …`) — 로컬 `.env`·소스에 두지 않음 | 결제(Paddle, 2026-10-31 — `docs/BillingDesign.md`). 없으면 `/v1/billing/*` 503 |
+| `PADDLE_ENABLED` | `workers/refine/wrangler.toml` `[vars]` | 🔴 2026-11-06부터 `"0"`(꺼짐) — `"1"`일 때만 Paddle 결제·웹훅·Paddle 구독의 Pro 인정이 켜진다. 결제는 그로블 |
 | `PADDLE_ENV` · `PADDLE_PRICE_PRO_MONTH` · `PADDLE_PRICE_PRO_YEAR` · `PADDLE_PRICE_TEAM_MONTH` · `PADDLE_PRICE_TEAM_YEAR` · `BILLING_ENFORCED` · `BILLING_ENFORCED_AT` | `workers/refine/wrangler.toml` `[vars]`(비밀 아님) | 샌드박스/실판매 · Pro·팀(1석당) 가격 ID · `1`이면 구독 없는 사용자 = 무료 한도(꺼지면 지금과 같음). 실판매 전환은 사용자 승인 |
 | `VITE_FIREBASE_*` | `.env` | Firebase 웹 앱 구성값 (콘솔 > 프로젝트 설정) |
 | `SAI_CACHE_TTL_MS` | 로컬 `.env` | 프록시 캐시 수명(기본 10분 · 상한 6시간). 시연 촬영 때 호출을 줄이는 용도 |

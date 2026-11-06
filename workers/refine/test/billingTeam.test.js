@@ -19,6 +19,7 @@ const UID = 'uid-test-123';
 const SECRET = 'whsec-test-not-real';
 const ENV = {
   ...TEST_ENV,
+  PADDLE_ENABLED: '1',
   PADDLE_ENV: 'sandbox',
   PADDLE_API_KEY: 'pdl-test-key-not-real',
   PADDLE_WEBHOOK_SECRET: SECRET,
