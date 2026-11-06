@@ -248,6 +248,19 @@ export function teamShouldLock({ billing = null, createdAtMs = NaN, enforced = f
   return judgeTeamJoin({ billing, memberCount: 0, createdAtMs, enforced, enforcedAtMs, nowMs }) === 'team-plan-required';
 }
 
+/**
+ * 유예가 끝나는 시각(ms) — 기존 팀장에게 「12월 5일부터 잠겨요」를 미리 알리려고(2026-11-06). 순수 함수.
+ * 🔴 미결제 · 출시 뒤(`enforced`) · 출시 전에 만든 팀 · 아직 유예 안일 때만 숫자, 그 밖엔 `null`(알릴 것 없음).
+ *    판정은 `judgeTeamJoin` 5번 줄과 같은 조건이다 — 둘이 어긋나면 「잠긴다」고 했는데 안 잠기거나 그 반대가 된다.
+ */
+export function teamGraceEndMs({ billing = null, createdAtMs = NaN, enforced = false, enforcedAtMs = NaN, nowMs = Date.now() }) {
+  if (billing && PAID_TEAM_STATUSES.includes(billing.status)) return null;
+  if (!enforced || !Number.isFinite(enforcedAtMs) || !Number.isFinite(createdAtMs)) return null;
+  if (createdAtMs >= enforcedAtMs) return null;
+  const end = enforcedAtMs + TEAM_GRACE_DAYS * 86_400_000;
+  return nowMs < end ? end : null;
+}
+
 function toMillis(value) {
   if (value && typeof value.toMillis === 'function') return value.toMillis();
   if (value instanceof Date) return value.getTime();
@@ -438,6 +451,19 @@ export async function setDefaultQuality(req, deps) {
 /** 팀 문서의 이름 — 없으면 null(클라이언트는 옛 이름을 유지한다). */
 const teamName = (team) => (team.exists && typeof team.get('name') === 'string' ? team.get('name') : null);
 
+/** `teamGraceEndMs`를 팀 문서에 적용 — `deps.teamBilling`이 없으면(Functions) 알리지 않는다. 잠긴 팀도 알리지 않는다(잠금 안내가 따로 있다). */
+function graceUntilOf(team, deps) {
+  if (!team.exists || !deps.teamBilling || team.get('locked') === true) return null;
+  const end = teamGraceEndMs({
+    billing: team.get('billing') ?? null,
+    createdAtMs: toMillis(team.get('createdAt')),
+    enforced: deps.teamBilling.enforced === true,
+    enforcedAtMs: deps.teamBilling.enforcedAtMs ?? NaN,
+    nowMs: deps.teamBilling.now?.() ?? Date.now(),
+  });
+  return end === null ? null : new Date(end).toISOString();
+}
+
 export async function whoAmI(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
@@ -473,12 +499,15 @@ export async function whoAmI(req, deps) {
       defaultQuality: teamDefaultQuality(team),
       // 2026-11-01 코드 검토 D3 — 자동 복구 응답에도 잠금을 싣는다(예전엔 빠져 화면이 열린 팀으로 보였다).
       locked: team.exists && team.get('locked') === true,
+      graceUntil: graceUntilOf(team, deps),
     };
   }
 
   return {
     // 팀 기본 품질 모드(2026-11-01) — 품질을 한 번도 안 고른 팀원에게만 적용(확장 refineClient).
     defaultQuality: teamDefaultQuality(team),
+    // 유예 종료 예고(2026-11-06) — 유예 안의 미결제 팀만 ISO 시각, 그 밖엔 null. 확장 팀 탭이 미리 알린다.
+    graceUntil: graceUntilOf(team, deps),
     // 팀 기능 잠금(2026-11-01) — 유예 끝난 미결제 팀. 확장은 안내를 띄우고 팀 용어집을 싣지 않는다.
     locked: team.exists && team.get('locked') === true,
     role,

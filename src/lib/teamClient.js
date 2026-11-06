@@ -61,6 +61,14 @@ export class TeamClientError extends Error {
  * 거절 안내에 붙일 팀 이름 — 「어느 팀인지」를 말해야 사용자가 넘길 수 있다 (2026-10-02).
  * @returns {string} 예: ` (팀: 해커톤, 디자인)` — 없으면 빈 문자열.
  */
+/** 유예 종료 ISO 시각 → 「12월 5일」(한국 시간, 2026-11-06). 틀린 값이면 `null` — 팀 탭이 안내를 띄우지 않는다. */
+export function graceDateText(iso) {
+  const ms = typeof iso === 'string' ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(ms)) return null;
+  const kst = new Date(ms + 9 * 3_600_000);
+  return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일`;
+}
+
 export function blockedTeamsText(error) {
   const names = (error?.blockedTeams ?? []).map((team) => team.name || '이름 없는 팀');
   return names.length > 0 ? ` (팀: ${names.join(', ')})` : '';
@@ -345,6 +353,8 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
           defaultQuality: typeof me.defaultQuality === 'string' ? me.defaultQuality : null,
           // 팀 기능 잠금(2026-11-01) — 유예 끝난 미결제 팀. 규칙이 막지만 화면이 이유를 알게 한다.
           locked: me.locked === true,
+          // 유예 종료 예고(2026-11-06) — 유예 안의 미결제 팀만 ISO 시각. 팀 탭이 「며칠부터 잠겨요」를 미리 알린다.
+          graceUntil: typeof me.graceUntil === 'string' ? me.graceUntil : null,
         };
       } catch (error) {
         // 🔴 서버가 「팀원이 아님」을 확정한 경우만 뺀다 — 네트워크·권한·알 수 없는 오류는 옛 값 유지.
@@ -371,7 +381,8 @@ export async function refreshAllMemberships({ fetchImpl = globalThis.fetch } = {
       next.role !== teams[index].role ||
       next.canViewDashboard !== teams[index].canViewDashboard ||
       (next.defaultQuality ?? null) !== (teams[index].defaultQuality ?? null) ||
-      (next.locked === true) !== (teams[index].locked === true),
+      (next.locked === true) !== (teams[index].locked === true) ||
+      (next.graceUntil ?? null) !== (teams[index].graceUntil ?? null),
   );
   // 🔴 순서·활성 팀을 건드리지 않는다 — `upsertTeam`을 쓰지 않는 이유가 이것이다.
   if (changed) await setLocal(STORAGE_KEYS.TEAMS, results);
