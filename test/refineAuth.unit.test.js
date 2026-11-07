@@ -110,3 +110,13 @@ test('🔴 429 monthly-limit은 하루 한도와 다른 안내 — 「내일 다
   assert.match(block[0], /다음 달/);
   assert.doesNotMatch(block[0], /내일/);
 });
+
+test('🔴 2026-11-07 — 배포본은 서버 실패에 목업 교정문을 돌려주지 않는다(개발 빌드에서만)', () => {
+  const devGuard = BACKGROUND.indexOf('import.meta.env?.DEV === true');
+  const mock = BACKGROUND.search(/await mockRefine\(/);
+  assert.ok(devGuard >= 0 && mock > devGuard, '목업이 개발 빌드 조건 밖에 있다 — 네트워크가 끊기면 엉뚱한 예시 문장이 「적용하기」로 들어간다');
+  const block = BACKGROUND.slice(devGuard, mock + 200);
+  assert.match(block, /return;\s*\}/, '개발 빌드 분기가 끝나지 않는다');
+  assert.match(BACKGROUND, /buildAuthFailureResponse\(message\.request, mode, \{\s*reason: 'error'/, '배포본 실패 응답(원문 그대로 + 안내)이 없다');
+  assert.match(BACKGROUND, /error\?\.code === 'text-too-long'/, '너무 긴 글 거절(400)을 연결 실패로 안내한다');
+});

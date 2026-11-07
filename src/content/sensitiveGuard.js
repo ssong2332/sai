@@ -66,14 +66,16 @@ const RULES = [
     type: 'credit-card',
     label: '카드번호',
     // 13~19자리, 공백/하이픈 구분 허용. 🔴 Luhn을 통과할 때만 감지 — 없으면 주문번호가 다 걸린다.
-    pattern: /\b(?:\d[ -]?){12,18}\d\b/g,
-    verify: (match) => luhnValid(match.replace(/[ -]/g, '')),
+    // 2026-11-07 점검 — 점(.) 구분도 받는다(1234.5678.…).
+    pattern: /\b(?:\d[ .-]?){12,18}\d\b/g,
+    verify: (match) => luhnValid(match.replace(/[ .-]/g, '')),
   },
   {
     type: 'korean-rrn',
     label: '주민등록번호',
     // 🔴 생년월일이 유효할 때만 감지 — 형식만 보면 일반 숫자 조합이 걸린다.
-    pattern: /\b(\d{2})(\d{2})(\d{2})-[1-4]\d{6}\b/g,
+    // 🔴 2026-11-07 점검 — 하이픈 없음·공백 낀 형식·외국인등록번호(뒷자리 첫 숫자 5~8)도 잡는다. 예전엔 `-[1-4]`뿐이었다.
+    pattern: /\b(\d{2})(\d{2})(\d{2}) ?-? ?[1-8]\d{6}\b/g,
     verify: (_match, groups) => validBirthDate(groups),
   },
 ];

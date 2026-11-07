@@ -183,3 +183,37 @@ test('fetchHolidays: 정상 응답의 date 필드만 집합으로 뽑는다', as
   assert.equal(ok, true);
   assert.ok(holidays.has('2026-08-17'));
 });
+
+/* ── 2026-11-07 점검: UTC보다 늦은 지역 ────────────────────────────────────
+ * 🔴 다음 날 커서를 현지 시각으로 다시 읽어 하루씩 밀리던 결함 — 예전 테스트가 전부 `Asia/Seoul`이라 못 잡았다.
+ *    기대값은 각 지역 달력으로 손으로 셈(2026-11-06은 금요일, 2026-11-26은 미국 추수감사절).
+ */
+const noHolidays = async () => ({ ok: true, json: async () => [] });
+
+function localLabel(date, timeZone) {
+  const p = getLocalParts(date, timeZone);
+  return `${p.dateKey} ${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
+}
+
+for (const [name, nowIso, timeZone, expected] of [
+  ['뉴욕 금 19:00 → 월 09:00', '2026-11-06T19:00:00-05:00', 'America/New_York', '2026-11-09 09:00'],
+  ['뉴욕 화 02:00 → 같은 날 09:00', '2026-11-10T02:00:00-05:00', 'America/New_York', '2026-11-10 09:00'],
+  ['뉴욕 화 20:00 → 수 09:00', '2026-11-10T20:00:00-05:00', 'America/New_York', '2026-11-11 09:00'],
+  ['뉴욕 금 19:00(서머타임 시작 주말) → 월 09:00 EDT', '2026-03-06T19:00:00-05:00', 'America/New_York', '2026-03-09 09:00'],
+  ['상파울루 수 21:00 → 목 09:00', '2026-11-11T21:00:00-03:00', 'America/Sao_Paulo', '2026-11-12 09:00'],
+  ['호놀룰루 금 18:00 → 월 09:00', '2026-11-06T18:00:00-10:00', 'Pacific/Honolulu', '2026-11-09 09:00'],
+  ['오클랜드 금 18:00 → 월 09:00', '2026-11-06T18:00:00+13:00', 'Pacific/Auckland', '2026-11-09 09:00'],
+]) {
+  test(`UTC보다 늦은/빠른 지역 — ${name}`, async () => {
+    const r = await computeNextSendTime({ now: new Date(nowIso), timeZone, fetchImpl: noHolidays });
+    assert.equal(r.needsSchedule, true);
+    assert.equal(localLabel(r.sendAt, timeZone), expected);
+    assert.ok(r.sendAt.getTime() > new Date(nowIso).getTime(), '🔴 보낼 시각이 지금보다 이르다');
+  });
+}
+
+test('미국 추수감사절(목) 전날 저녁 → 금 09:00 (공휴일 건너뜀)', async () => {
+  const usHolidays = async (url) => ({ ok: true, json: async () => (url.includes('/2026/') ? [{ date: '2026-11-26' }] : []) });
+  const r = await computeNextSendTime({ now: new Date('2026-11-25T19:00:00-05:00'), timeZone: 'America/New_York', countryCode: 'US', fetchImpl: usHolidays });
+  assert.equal(localLabel(r.sendAt, 'America/New_York'), '2026-11-27 09:00');
+});

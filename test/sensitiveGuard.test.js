@@ -150,3 +150,17 @@ test('요약 문구에도 값이 들어가지 않는다', () => {
   assert.ok(!summary.includes('sk-proj'));
   assert.ok(!summary.includes('4111'));
 });
+
+test('🔴 2026-11-07 — 주민번호: 하이픈 없음·공백·외국인등록번호도 감지, 날짜가 틀리면 감지 안 함', () => {
+  // 합성 값(실존 번호 아님).
+  assert.ok(types('번호 9001011234567 입니다').includes('korean-rrn'), '하이픈 없음');
+  assert.ok(types('번호 900101 - 1234567').includes('korean-rrn'), '공백 낀 형식');
+  assert.ok(types('외국인 900101-5234567').includes('korean-rrn'), '외국인등록번호(5)');
+  assert.ok(types('기존 900101-2234567').includes('korean-rrn'), '기존 형식 유지');
+  assert.ok(!types('주문 9913991234567').includes('korean-rrn'), '13월 99일은 생년월일이 아니다');
+  assert.ok(!types('연락처 010-1234-5678').includes('korean-rrn'), '전화번호');
+});
+
+test('🔴 2026-11-07 — 카드번호: 점(.) 구분도 감지(Luhn 통과할 때만)', () => {
+  assert.ok(types('카드 4111.1111.1111.1111').includes('credit-card'));
+});

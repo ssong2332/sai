@@ -270,6 +270,23 @@ test('G5 — 팀: 팀장만 · 좌석 2~10 · 팀원 수 이상 · 그 좌석 �
   assert.equal(resolvePlan(await docOf(db, 'billing', 'u2'), { enforced: true }), 'free');
 });
 
+test('🔴 묶인 토큰 — 다른 상품 결제에 같은 ref를 붙여도 팀이 갱신되지 않는다(2026-11-07 점검)', async () => {
+  const { handle, db } = setup();
+  await seedTeam(db);
+  const { ref } = await startCheckout(handle, { plan: 'team', interval: 'month', teamId: 'team-1', seats: 5 });
+  await send(handle, event('subscription_payment.completed', paid(ref, { productId: 'team5M', merchantUid: 'r1' })));
+  assert.equal((await docOf(db, 'teams', 'team-1')).billing.status, 'active');
+  // 환불로 끝낸 뒤, 싼 Pro 월 상품 결제에 같은 ref를 붙인다.
+  await send(handle, event('subscription_payment.refunded', { merchantUid: 'r1', refund: { refundedAt: new Date(NOW).toISOString() } }, { occurredAt: new Date(NOW + 1000).toISOString() }));
+  assert.equal((await docOf(db, 'teams', 'team-1')).billing.status, 'canceled');
+  const res = await send(handle, event('subscription_payment.completed', paid(ref, { productId: 'proM', merchantUid: 'r2', reason: 'RENEWAL' }), { occurredAt: new Date(NOW + 2000).toISOString() }));
+  assert.equal(res.status, 200);
+  assert.equal((await docOf(db, 'teams', 'team-1')).billing.status, 'canceled', '🔴 Pro 결제로 팀이 다시 active가 됐다');
+  // 같은 상품의 다음 회차는 여전히 반영된다.
+  await send(handle, event('subscription_payment.completed', paid(ref, { productId: 'team5M', merchantUid: 'r3', reason: 'RENEWAL' }), { occurredAt: new Date(NOW + 3000).toISOString() }));
+  assert.equal((await docOf(db, 'teams', 'team-1')).billing.status, 'active');
+});
+
 test('G5 — 이미 결제 중이면 결제 시작 409(Groble 경로도)', async () => {
   const { handle, db } = setup();
   const { ref } = await startCheckout(handle);

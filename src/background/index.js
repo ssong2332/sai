@@ -7,6 +7,7 @@ import { buildFallbackResponse, FALLBACK_REASONS } from '../core/refine/fallback
 // 🔴 2026-10-24 — 관리용 웹사이트 브리지(`docs/WebSplit.md` 「C — 로컬 브리지」). 처리 규칙은 그 파일에 있다.
 import { handleSiteMessage } from './siteBridge.js';
 import { DAILY_LIMIT_TEXT, dailyLimitText, getCachedPlan, refreshPlan } from '../lib/planCache.js';
+import { TEXT_TOO_LONG_NOTICE } from '../core/refine/limits.js';
 import { PLAN_FEATURES, PLAN_UPSELL_NOTE } from '../core/refine/quality.js';
 import { STORAGE_KEYS } from '../lib/storage.js';
 import { runToneReconcile } from '../lib/toneReconcile.js';
@@ -72,14 +73,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
        *    나란히 두고 보지만, 회신 초안은 **그대로 복사해 상대에게 보내는 문장**이다. 준비된
        *    예시 문장이 자기 메시지에 대한 답으로 오인되면 잘못된 내용이 실제로 전송된다.
        */
+      /**
+       * 🔴 2026-11-07 점검 — 서버가 요청을 **거절**(400: 지원하지 않는 언어·너무 긴 글)한 것과 **닿지 못한** 것을
+       *    가른다. 예전엔 둘 다 「AI 서버에 연결하지 못해」라서, 일본어 메시지 회신(서버 400)이 연결 문제로 보였다.
+       */
+      const rejected = error?.status === 400;
+      const failureNotice = rejected
+        ? error?.code === 'text-too-long'
+          ? TEXT_TOO_LONG_NOTICE
+          : '이 요청은 처리할 수 없어요 — 지원하지 않는 언어이거나 형식이에요.'
+        : null;
+
       if (mode === 'reply') {
         sendResponse({
           draft: null,
           placeholderNote: '',
           fallback: true,
           fallbackReason: 'error',
-          fallbackNotice: 'AI 서버에 연결하지 못해 회신 초안을 만들지 못했어요.',
-          backendUnreachable: true,
+          fallbackNotice: failureNotice ?? 'AI 서버에 연결하지 못해 회신 초안을 만들지 못했어요.',
+          backendUnreachable: !rejected,
         });
         return;
       }
@@ -92,15 +104,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           unresolvedCount: 0,
           fallback: true,
           fallbackReason: 'error',
-          fallbackNotice: 'AI 서버에 연결하지 못해 결정 요약을 만들지 못했어요.',
-          backendUnreachable: true,
+          fallbackNotice: failureNotice ?? 'AI 서버에 연결하지 못해 결정 요약을 만들지 못했어요.',
+          backendUnreachable: !rejected,
         });
         return;
       }
-      console.warn('[사이] 목업으로 폴백');
-      const fallback =
-        mode === 'decode' ? await mockDecode(message.request) : await mockRefine(message.request);
-      sendResponse({ ...fallback, backendUnreachable: true });
+
+      /**
+       * 🔴 2026-11-07 점검 — **배포본에서는 목업을 돌려주지 않는다.** 목업 교정문은 사용자 문장과 무관한 해커톤 예시
+       *    ("Hi Miguel, could you review PR #482…")인데 「적용하기」가 눌려서, 네트워크가 끊긴 순간 엉뚱한 문장이 메일에
+       *    들어갈 수 있었다. 배포본은 원문 그대로 + 실패 안내(401·429와 같은 모양)만 올린다. 목업은 개발 빌드에만 남긴다.
+       */
+      if (import.meta.env?.DEV === true) {
+        console.warn('[사이] 목업으로 폴백(개발 빌드)');
+        const fallback =
+          mode === 'decode' ? await mockDecode(message.request) : await mockRefine(message.request);
+        sendResponse({ ...fallback, backendUnreachable: true });
+        return;
+      }
+      sendResponse({
+        ...buildAuthFailureResponse(message.request, mode, {
+          reason: 'error',
+          notice: failureNotice ?? 'AI 서버에 연결하지 못했어요. 원문은 그대로예요 — 잠시 뒤 다시 시도해 주세요.',
+        }),
+        backendUnreachable: !rejected,
+      });
     });
 
   return true; // 비동기 응답을 쓰겠다는 신호 — 빼면 sendResponse가 무시된다.
@@ -269,7 +297,11 @@ async function callBackend(request) {
     });
     if (!response.ok) {
       // 🔴 2026-11-02 — 429는 사유 코드로 하루 한도·이달 멈춤을 가른다. 못 읽으면 예전처럼 하루 한도로 본다.
-      const code = response.status === 429 ? (await response.json().catch(() => null))?.error ?? null : null;
+      //    2026-11-07 — 400도 사유 코드(`text-too-long`)를 읽는다. 400의 `error`는 서버 고정 문구다(본문 없음).
+      const code =
+        response.status === 429 || response.status === 400
+          ? (await response.json().catch(() => null))?.error ?? null
+          : null;
       throw new BackendError(response.status, typeof code === 'string' ? code : null);
     }
     return await response.json();

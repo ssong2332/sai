@@ -24,7 +24,8 @@ export { MemoryCacheStore, computeCacheKey } from '../refine/cache.js';
 export { REPLY_PROMPT_VERSION, REPLY_INTENTS, REPLY_INTENT_LABELS } from './prompt.js';
 export { REPLY_FALLBACK_REASONS } from './fallback.js';
 
-const SUPPORTED_LANGUAGES = ['ko', 'en', 'zh'];
+// 🔴 2026-11-07 점검 — 다듬기·뜻 풀기와 같은 7개 언어. 예전엔 ko·en·zh뿐이라 일본어 메시지 회신이 서버 400(화면엔 「연결하지 못해」)이었다.
+const SUPPORTED_LANGUAGES = ['ko', 'en', 'zh', 'ja', 'de', 'fr', 'es'];
 
 /** 사전 질문은 의도당 2개다 — 여유를 두되 상한은 둔다. */
 const MAX_ANSWERS = 6;

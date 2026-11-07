@@ -64,7 +64,7 @@ import {
 // 🔴 로컬 저장소만 읽는다(네트워크 없음) — 팝업이 뜨는 순간 팀 목록을 기다리게 하지 않는다.
 import { listTeams, getTeam } from '../lib/teamClient.js';
 // 🔴 최소 선택 길이는 문자 종류별이다 — 한자·가나 2자, 그 밖 5자(`detectLanguage.js` 판정표).
-import { minSelectionLength, MIN_SELECTION_LENGTH, MIN_SELECTION_LENGTH_CJK } from '../lib/detectLanguage.js';
+import { detectLanguage, minSelectionLength, MIN_SELECTION_LENGTH, MIN_SELECTION_LENGTH_CJK } from '../lib/detectLanguage.js';
 
 /**
  * 드래그 선택 → 플로팅 버튼 → 교정 팝업 (S05).
@@ -638,8 +638,17 @@ export default function SaiOverlay({ autoButton = true }) {
    *    변경에서 비운다. `undefined` = 고른 적 없음 → 요청에 싣지 않는다.
    */
   const adhocRegisterRef = useRef(undefined);
+  /**
+   * 🔴 2026-11-07 실브라우저 점검 — **회신 초안을 다듬을 때는 원래 메시지의 언어로 옮긴다.** 예전엔 받는 사람 칸
+   *    (예: 영어권 Daniel)의 언어를 따라가서, 일본어 메시지에 대한 회신이 영어로 나왔다. 받는 사람을 직접 바꾸면
+   *    그 사람 언어가 이긴다(`changeRecipient`에서 비운다). 팝업이 내려가면 비운다(민감정보 확인 단계는 유지).
+   */
+  const replyTargetRef = useRef(null);
+  /** 문자(script)만으로 확실한 판정 — `en`(라틴 문자권 전체의 기본값)은 넣지 않는다. */
+  const SCRIPT_CERTAIN_LANGUAGES = new Set(['ko', 'ja', 'zh']);
   useEffect(() => {
     if (stage !== 'refine') adhocRegisterRef.current = undefined;
+    if (stage !== 'refine' && stage !== 'guard') replyTargetRef.current = null;
   }, [stage]);
 
   const runRefine = useCallback(
@@ -656,6 +665,7 @@ export default function SaiOverlay({ autoButton = true }) {
           threadContext: threadContextRef.current,
           // 받는 사람이 있으면 그 사람 기록의 값을 `refineClient`가 읽는다 — 여기서 덮지 않는다.
           ...(adhocRegisterRef.current !== undefined ? { register: adhocRegisterRef.current } : {}),
+          ...(replyTargetRef.current ? { targetLanguage: replyTargetRef.current } : {}),
         });
         setResult(response);
         /**
@@ -1045,6 +1055,11 @@ export default function SaiOverlay({ autoButton = true }) {
   const refineReplyDraft = (text) => {
     const trimmed = String(text ?? '').trim();
     if (trimmed === '') return;
+    // 원래 메시지(뜻 풀기 원문)의 언어 — 아직 `sendTextRef`가 그 원문이다(아래 beginSend가 덮는다).
+    // 🔴 문자로 확실히 가려지는 언어(ko·ja·zh)만 덮는다. `en`은 독·프·스페인어도 포함하는 추정값이라
+    //    (`detectLanguage.js` 판정표 5행) 덮으면 독일어 회신이 영어가 된다 — 그때는 받는 사람 언어를 그대로 쓴다.
+    const original = detectLanguage(sendTextRef.current ?? '');
+    replyTargetRef.current = SCRIPT_CERTAIN_LANGUAGES.has(original) ? original : null;
     modeRef.current = 'compose';
     setReplyAsk(false);
     beginSend(trimmed);
@@ -1177,6 +1192,7 @@ export default function SaiOverlay({ autoButton = true }) {
 
   const changeRecipient = async (id) => {
     adhocRegisterRef.current = undefined;
+    replyTargetRef.current = null; // 사람을 직접 고르면 그 사람 언어로(위 replyTargetRef 주석).
     const next = recipients.find((entry) => entry.id === id) ?? null;
     setRecipient(next);
     await setSelectedRecipientId(id);
