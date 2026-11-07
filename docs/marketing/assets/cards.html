@@ -1,0 +1,187 @@
+<!doctype html>
+<!--
+  인스타그램 카드뉴스 1080×1350 (2026-11-03). 주소 쿼리로 장을 고른다: ?s=a1 … a6(뜻 풀기) · ?s=b1 … b6(다듬기).
+  렌더: docs/marketing/README.md 의 명령. 색·글꼴·로고는 docs/store/promo-tile.html 과 같다.
+  🔴 예시 문장의 결과 글은 실제 사이 응답(빠른 모드, 2026-11-03 실 API — 뒤 4번 장은 스토어 스크린샷 2번 화면)을 줄이지 않고 옮긴 것만 쓴다.
+     지어낸 결과를 넣지 않는다. 국가 단위 단정 금지(Spec 필수 9).
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-Regular.subset.woff2) format('woff2'); font-weight: 400; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-SemiBold.subset.woff2) format('woff2'); font-weight: 600; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-Bold.subset.woff2) format('woff2'); font-weight: 700; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-ExtraBold.subset.woff2) format('woff2'); font-weight: 800; }
+  :root { --ink:#191f28; --sub:#4e5968; --mut:#626d7a; --bg:#f2f4f6; --line:#e5e8eb; --seam:#f04419; --seam-tint:#ffeee8; --seam-deep:#c4320e;
+          --dusk:#3d5afe; --dusk-tint:#ecefff; --dusk-deep:#3049d9; --kept:#0e9f6e; --kept-tint:#e6f7f0; --kept-deep:#0a7a55; --fault:#c81e45; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1350px; overflow: hidden; }
+  body { font-family: P, sans-serif; color: var(--ink); background: #fff; position: relative; word-break: keep-all; }
+  .page { position: absolute; inset: 0; padding: 88px 88px 0; display: none; }
+  .page.on { display: block; }
+  .top { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand svg { width: 64px; height: 33px; }
+  .word { font-weight: 800; font-size: 30px; letter-spacing: 0.02em; }
+  .count { font-size: 26px; font-weight: 700; color: var(--mut); }
+  .seam { height: 8px; width: 120px; background: var(--seam); border-radius: 4px; margin: 64px 0 40px; }
+  h1 { margin: 0; font-weight: 800; font-size: 84px; line-height: 1.18; letter-spacing: -0.03em; }
+  h2 { margin: 0; font-weight: 800; font-size: 58px; line-height: 1.24; letter-spacing: -0.025em; }
+  .lede { margin: 36px 0 0; font-size: 36px; line-height: 1.5; color: var(--sub); }
+  .pill { display: inline-block; margin-top: 48px; padding: 16px 30px; border-radius: 999px; font-size: 30px; font-weight: 700; background: var(--ink); color: #fff; }
+  .quote { margin-top: 0; padding: 40px 44px; border-radius: 28px; background: var(--bg); font-size: 46px; line-height: 1.42; font-weight: 600; }
+  .quote.ko { background: var(--bg); }
+  .label { font-size: 26px; font-weight: 700; letter-spacing: 0.01em; margin-bottom: 12px; display: block; }
+  .box { margin-top: 32px; padding: 36px 44px; border-radius: 28px; font-size: 37px; line-height: 1.5; }
+  .plain { border: 2px solid var(--line); color: var(--sub); }
+  .plain .label { color: var(--mut); }
+  .intent { background: var(--dusk-tint); }
+  .intent .label { color: var(--dusk-deep); }
+  .intent b { font-weight: 700; color: var(--ink); }
+  .refined { background: var(--ink); color: #fff; font-weight: 600; font-size: 42px; }
+  .mid { position: absolute; left: 88px; right: 88px; top: 190px; bottom: 120px; display: flex; flex-direction: column; justify-content: center; }
+  .refined .label { color: #8c9eff; }
+  .back { background: var(--kept-tint); color: var(--ink); }
+  .back .label { color: var(--kept-deep); }
+  .urg { display: inline-block; margin-left: 14px; padding: 6px 16px; border-radius: 999px; font-size: 24px; font-weight: 800; vertical-align: 4px; }
+  .urg.c { background: var(--fault); color: #fff; } .urg.n { background: var(--dusk); color: #fff; } .urg.l { background: #e5e8eb; color: var(--sub); }
+  .foot { position: absolute; left: 88px; right: 88px; bottom: 64px; font-size: 22px; color: var(--mut); }
+  .ui { position: absolute; right: 88px; bottom: 120px; width: 468px; border-radius: 28px; box-shadow: 0 4px 12px rgba(25,31,40,.06), 0 40px 80px -24px rgba(25,31,40,.28); }
+  .steps { margin: 48px 0 0; padding: 0; list-style: none; width: 372px; }
+  .page h2.first { margin-top: 72px; }
+  .steps li { font-size: 31px; line-height: 1.4; margin-bottom: 34px; display: flex; gap: 18px; }
+  .steps b { flex: 0 0 52px; height: 52px; border-radius: 50%; background: var(--seam); color: #fff; font-size: 28px; display: grid; place-items: center; }
+  .facts { margin-top: 52px; display: grid; gap: 22px; }
+  .fact { padding: 28px 36px; border-radius: 24px; background: var(--bg); font-size: 34px; font-weight: 600; display: flex; gap: 20px; align-items: center; }
+  .fact i { font-style: normal; width: 16px; height: 16px; border-radius: 50%; background: var(--seam); flex: 0 0 16px; }
+  .cta { position: absolute; left: 88px; right: 88px; bottom: 150px; padding: 40px 44px; border-radius: 28px; background: var(--ink); color: #fff; }
+  .cta strong { display: block; font-size: 44px; font-weight: 800; }
+  .cta span { display: block; margin-top: 10px; font-size: 30px; color: #c9cdd2; }
+</style>
+</head>
+<body>
+<template id="logo"><svg viewBox="0 0 188 96" aria-hidden="true"><rect x="14" y="20" width="118" height="16" fill="#191f28"/><rect x="56" y="44" width="118" height="16" fill="#191f28"/><rect x="14" y="68" width="160" height="16" fill="#f04419"/></svg></template>
+
+<!-- ── A. 뜻 풀기 ── -->
+<section class="page" id="a1">
+  <div class="seam" style="margin-top:150px"></div>
+  <h1>해외 동료의<br>이 말,<br>진짜 뜻은?</h1>
+  <p class="lede">받은 영어 메시지를 사이에 넣고<br>직역 말고 <b>실제 의도</b>를 물어봤어요.</p>
+  <span class="pill">예시 3가지 →</span>
+</section>
+
+<section class="page" id="a2">
+  <div class="quote">“That's an interesting approach. Let's circle back on this next quarter.”</div>
+  <div class="box plain"><span class="label">직역</span>그것은 흥미로운 접근이네요. 다음 분기에 이 건을 다시 논의해 봅시다.</div>
+  <div class="box intent"><span class="label">사이가 본 실제 의도</span><b>상대방은 이 제안을 당장 진행하지 않겠다는 뜻으로, 다음 분기로 미루자고 완곡하게 말하고 있습니다.</b> 실질적으로는 지금 결정이나 조치를 요구하지 않는 보류 신호입니다.</div>
+  <p class="foot">실제 사이 결과(빠른 모드) · AI 결과는 매번 조금씩 다를 수 있어요</p>
+</section>
+
+<section class="page" id="a3">
+  <div class="quote">“Not a big deal, but it would be great if you could take a look when you get a chance.”</div>
+  <div class="box plain"><span class="label">직역</span>큰 문제는 아니지만, 시간 되실 때 한번 봐주시면 정말 좋겠습니다.</div>
+  <div class="box intent"><span class="label">사이가 본 실제 의도</span>발신자는 특정 자료나 작업을 검토해 달라고 요청하고 있습니다. <b>'큰 문제는 아니다'라는 말은 긴급성을 낮추는 완곡한 표현이지만, 검토 요청 자체는 분명합니다.</b></div>
+  <p class="foot">실제 사이 결과(빠른 모드) · AI 결과는 매번 조금씩 다를 수 있어요</p>
+</section>
+
+<section class="page" id="a4">
+  <div class="quote">“…Could you check whether that still works on your end, and let me know by EOD tomorrow if we need to escalate?”</div>
+  <div class="box intent"><span class="label">사이가 본 실제 의도</span>벤더의 납품 연기로 다음 주 목요일 일정이 생겼으니, 발신자는 수신자 측 일정이 맞는지 확인받고 싶어 합니다. <b>내일 EOD까지 답이 없으면 상위 단계로 올리겠다는 뜻이 담겨 있습니다.</b></div>
+  <div class="box plain"><span class="label">요구 행동</span>① 다음 주 목요일 납품 일정이 귀측에서 가능한지 확인하기<br>② 내일 업무 종료 전까지 에스컬레이션 필요 여부 회신하기</div>
+  <p class="foot">실제 사이 화면(스토어 스크린샷)에서 옮김 · 인물·대화는 지어낸 예시예요</p>
+</section>
+
+<section class="page" id="a5">
+  <h2 class="first">쓰는 법은<br>세 단계</h2>
+  <ul class="steps">
+    <li><b>1</b>받은 메시지를 드래그해서 선택</li>
+    <li><b>2</b>옆에 뜨는 사이 아이콘 누르기</li>
+    <li><b>3</b>직역 · 실제 의도 · 긴급도 · 해야 할 일 확인</li>
+  </ul>
+  <img class="ui" src="ui-decode.png" alt="">
+  <p class="foot">메일 · 슬랙 · 메신저 등 크롬에서 여는 대부분의 사이트에서</p>
+</section>
+
+<section class="page" id="a6">
+  <div class="seam" style="margin-top:110px"></div>
+  <h2>보낼 땐 다듬고,<br>받을 땐 풀어 주는<br>크롬 확장 「사이」</h2>
+  <div class="facts">
+    <div class="fact"><i></i>지금은 팀 기능까지 모두 무료 · 하루 20회</div>
+    <div class="fact"><i></i>메시지 본문은 서버에 저장하지 않아요</div>
+    <div class="fact"><i></i>회사 용어집 · 상대 시간대까지 반영</div>
+  </div>
+  <div class="cta"><strong>프로필 링크에서 설치</strong><span>Chrome 웹 스토어 · SAI — 해외 협업 메시지 다듬기</span></div>
+</section>
+
+<!-- ── B. 다듬기 ── -->
+<section class="page" id="b1">
+  <div class="seam" style="margin-top:150px"></div>
+  <h1>이 한국어,<br>영어로 어떻게<br>보내지?</h1>
+  <p class="lede">사이가 상대 언어로 다듬고,<br><b>상대에게 어떻게 읽히는지</b>까지 보여 줘요.</p>
+  <span class="pill">예시 3가지 →</span>
+</section>
+
+<section class="page" id="b2">
+  <div class="quote ko">이거 확인 좀 빨리 해주세요. 내일까지 안 되면 곤란합니다.</div>
+  <div class="box refined"><span class="label">사이가 다듬은 문장 <span class="urg c">CRITICAL</span></span>Could you please look into this as soon as possible? If it's not resolved by tomorrow, it will cause us real problems.</div>
+  <div class="box back"><span class="label">역번역 — 상대에게 이렇게 읽혀요</span>이것 가능한 한 빨리 확인해 주시겠어요? 내일까지 해결되지 않으면 저희에게 실질적인 문제가 생길 것입니다.</div>
+  <p class="foot">실제 사이 결과(빠른 모드) · 긴급도는 사이가 판정 · AI 결과는 매번 조금씩 다를 수 있어요</p>
+</section>
+
+<section class="page" id="b3">
+  <div class="quote ko">지난번에 말씀드린 건 아직인가요?</div>
+  <div class="box refined"><span class="label">사이가 다듬은 문장 <span class="urg l">LOW</span></span>Just checking in on the item I mentioned last time. Has it been completed yet?</div>
+  <div class="box back"><span class="label">역번역 — 상대에게 이렇게 읽혀요</span>지난번에 말씀드린 건 아직 완료되지 않았는지 확인차 연락드립니다. 혹시 이미 끝났나요?</div>
+  <p class="foot">실제 사이 결과(빠른 모드) · AI 결과는 매번 조금씩 다를 수 있어요</p>
+</section>
+
+<section class="page" id="b4">
+  <div class="quote ko">금요일까지 견적서 보내 주실 수 있나요? 안 되면 다른 업체 알아보겠습니다.</div>
+  <div class="box refined"><span class="label">사이가 다듬은 문장 <span class="urg n">NORMAL</span></span>Could you send the quotation by Friday? If that won't work, we'll need to look for another supplier.</div>
+  <div class="box back"><span class="label">역번역 — 상대에게 이렇게 읽혀요</span>금요일까지 견적서를 보내주실 수 있을까요? 그것이 어렵다면 다른 공급업체를 알아봐야 할 것 같습니다.</div>
+  <p class="foot">실제 사이 결과(빠른 모드) · 기한·조건은 바꾸지 않아요 · AI 결과는 매번 조금씩 다를 수 있어요</p>
+</section>
+
+<section class="page" id="b5">
+  <h2 class="first">무엇을 왜<br>바꿨는지도<br>보여 줘요</h2>
+  <ul class="steps">
+    <li><b>1</b>입력창에 쓴 문장을 선택</li>
+    <li><b>2</b>사이 아이콘 → 다듬은 문장 · 바꾼 이유 · 역번역</li>
+    <li><b>3</b>「적용하기」로 입력창에 바로</li>
+  </ul>
+  <img class="ui" src="ui-refine.png" alt="">
+  <p class="foot">상대가 퇴근 시간이면 현지 근무 시간에 보내도록 알려 줘요</p>
+</section>
+
+<section class="page" id="b6">
+  <div class="seam" style="margin-top:110px"></div>
+  <h2>보내기 전에,<br>한 번 더.<br>크롬 확장 「사이」</h2>
+  <div class="facts">
+    <div class="fact"><i></i>지금은 팀 기능까지 모두 무료 · 하루 20회</div>
+    <div class="fact"><i></i>메시지 본문은 서버에 저장하지 않아요</div>
+    <div class="fact"><i></i>민감정보는 보내기 전에 기기에서 막아요</div>
+  </div>
+  <div class="cta"><strong>프로필 링크에서 설치</strong><span>Chrome 웹 스토어 · SAI — 해외 협업 메시지 다듬기</span></div>
+</section>
+
+<script>
+  // 🔴 해시는 headless --screenshot에서 무시됐다(2026-11-03 실측 — 빈 흰 장) → 쿼리 ?s=a1
+  const id = new URLSearchParams(location.search).get('s') || (location.hash || '#a1').slice(1);
+  const page = document.getElementById(id);
+  page.classList.add('on');
+  // 예시 장: 위 막대·아래 주석을 뺀 내용을 가운데로(빈 아래쪽 없애기)
+  if (page.querySelector('.quote')) {
+    const mid = document.createElement('div');
+    mid.className = 'mid';
+    [...page.children].filter((el) => !el.classList.contains('foot')).forEach((el) => mid.append(el));
+    page.prepend(mid);
+  }
+  const total = 6, n = Number(id.slice(1));
+  const bar = document.createElement('div');
+  bar.className = 'top';
+  bar.innerHTML = `<div class="brand">${document.getElementById('logo').innerHTML}<span class="word">S·AI</span></div><span class="count">${n} / ${total}</span>`;
+  page.prepend(bar); // 🔴 `top`은 window.top과 겹쳐 스크립트 전체가 죽는다(2026-11-03 실측)
+</script>
+</body>
+</html>
