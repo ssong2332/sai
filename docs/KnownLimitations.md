@@ -26,6 +26,8 @@
 | K6 | 예약 | 예약 발송 알림은 `chrome.alarms`라 크롬이 꺼져 있으면 그 시각에 울리지 않는다 | 크롬을 켠 뒤 늦게 알린다(놓친 예약) | 예약은 **알림만** 하고 대신 보내지 않는다 — 사용자가 직접 보낸다 | 서버 발송을 도입할 때(본문 저장 금지 원칙 때문에 지금은 불가) | `src/background/index.js:384` |
 | K7 | 로그인 | 로그인 세션(토큰)은 `chrome.storage.local`에 있다 | 같은 PC의 다른 확장·악성 프로그램이 프로필에 접근하면 읽힐 수 있다(크롬 확장 일반 한계) | 토큰은 짧은 수명 + 갱신, 확장 외부로 내보내지 않는다 | `chrome.storage.session` 전환 시 재시작마다 재로그인이 생겨 보류 | `src/lib/authClient.js:223-260` |
 | K8 | 결제 | 결제 토큰 문서 `billingRefs/{토큰}`에 TTL(자동 삭제)이 없다 | 결제를 시작만 하고 끝내지 않은 토큰 문서가 쌓인다(본문 없음 — uid·상품 메타데이터뿐) | 토큰은 추측 불가 난수, 한 번 묶이면 다른 상품 이벤트를 거절 | Firestore TTL 정책을 `createdAt` 기준으로 켤 때(콘솔 작업 — 사용자 승인 건) | `workers/refine/src/grobleBilling.js:151-165` |
+| K9 | 다듬기 품질 | 빠른 모드 독일어 교정문이 소문자로 시작한다("vielen Dank…") · 역번역이 가끔 다른 언어로 섞인다 | 첫 글자 소문자 4회 중 3회 · 역번역 독일어 1/4 · 실브라우저 1건은 일본어 문장 + 「(Korean)」 표기 섞임 | 독일어로만 나온 역번역은 `backcheck.js` WRONG_SCRIPT가 잡아 자동 재시도. 기본 모드(Sonnet) 3/3 정상 · 빠른 모드 프랑스어 3/3 정상 | 🔴 **수정 여부 사용자 결정 대기(11-07)** — 안: 라틴 문자 언어에서 첫 단어가 전부 소문자면 첫 글자만 대문자(대소문자 섞인 단어는 그대로) | 11-07 e2e 0.1.83 스크린샷 · 직접 호출 실측. 원인 추정: 이름 없는 인사 규칙(`src/core/refine/prompt.js:233`)으로 인사만 지운 흔적(미확인) |
+| K10 | 의존성 | `functions/` 의존성에 npm audit 13건(critical 1 proxy-addr · high 3 busboy·body-parser·grpc-js · moderate 9) | 없음 — Functions는 2026-10-28 삭제(`firebase.json`에 설정 없음, health 404). 이 의존성은 CI에서 `test/teams.unit.test.js`가 `functions/teams.js`를 부를 때만 설치된다(`.github/workflows/build.yml:42`) | 운영 경로(확장·Worker·site·dashboard) npm audit 0건(11-07) | Functions를 다시 배포하거나 `functions/`를 정리할 때(삭제는 사용자 승인 건) | 11-07 `npm audit --omit=dev` 출력 |
 
 ## 의도된 동작 (결함 아님)
 | 항목 | 동작 | 이유 | 근거 |
@@ -40,4 +42,4 @@
 ## 이력
 | 날짜 | 변경 |
 |---|---|
-| 2026-11-07 | 최초 작성 (K1~K8, 전수 점검) |
+| 2026-11-07 | 최초 작성 (K1~K8, 전수 점검) · K9(빠른 모드 독일어)·K10(functions 의존성) 추가 |
