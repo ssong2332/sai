@@ -15,6 +15,7 @@ import { computeCacheKey, MemoryCacheStore } from './cache.js';
 import { buildFallbackResponse, FALLBACK_REASONS } from './fallback.js';
 import { isRefinedInTargetScript, isRefinedComplete, isCurrencyConsistent, isFormalAddress, checkBackTranslation } from './backcheck.js';
 import { checkNumbersPreserved } from './numberCheck.js';
+import { capitalizeSentenceStart } from './sentenceStart.js';
 import {
   countMissingGlossary,
   glossaryHitCount,
@@ -391,6 +392,8 @@ export async function refine(request, deps = {}) {
    * 🔴 개수뿐이다. 맥락 본문은 응답에도 싣지 않는다.
    */
   result.threadContextCount = contextCount;
+  // 🔴 2026-11-07 K9 — 라틴 문자권 교정문이 소문자로 시작하면 첫 글자만 대문자로(`sentenceStart.js` 판정표).
+  result.refined = capitalizeSentenceStart(result.refined, input.targetLanguage, input.text);
   // 🔴 「적용됨」은 모델 신고가 아니라 등록된 말로 판정한다(`glossaryVerify.js` 판정표).
   result = reconcileAppliedGlossary(result, input.glossary, input.text);
 

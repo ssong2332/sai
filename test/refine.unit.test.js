@@ -465,14 +465,14 @@ test('gemini 안전필터 차단은 invalid 폴백으로 분류된다 — 빈 �
 
 test('provider가 다르면 캐시 키가 갈린다 — 응답이 섞이지 않는다', async () => {
   const cache = new MemoryCacheStore();
-  const openaiFetch = stubFetch(goodRaw({ refined: 'from openai' }));
-  const geminiFetch = stubGeminiFetch(goodRaw({ refined: 'from gemini' }));
+  const openaiFetch = stubFetch(goodRaw({ refined: 'From openai' }));
+  const geminiFetch = stubGeminiFetch(goodRaw({ refined: 'From gemini' }));
 
   const a = await refine(BASE_REQUEST, { apiKey: 'k', provider: 'openai', cache, fetchImpl: openaiFetch });
   const b = await refine(BASE_REQUEST, { apiKey: 'k', provider: 'gemini', cache, fetchImpl: geminiFetch });
 
-  assert.equal(a.refined, 'from openai');
-  assert.equal(b.refined, 'from gemini');
+  assert.equal(a.refined, 'From openai');
+  assert.equal(b.refined, 'From gemini');
   assert.equal(b.cached, false);
 });
 
