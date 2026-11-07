@@ -78,7 +78,8 @@ export const REFINE_CASES = [
     id: 'P-04',
     field: 'refined',
     request: { ...KO_EN, text: '서버 응답이 평소 200ms에서 3초로 늘었습니다. 원인 확인이 필요합니다.', referenceDate: REFERENCE_DATE },
-    mustInclude: ['200ms', ['3 seconds', '3s', '3 sec']],
+    // 2026-11-07 — 「200 ms」(SI 띄어쓰기)도 같은 값이다. 실측 3회 중 1회가 이 표기라 거짓 실패였다.
+    mustInclude: [['200ms', '200 ms'], ['3 seconds', '3s', '3 sec']],
   },
   {
     id: 'P-05',
@@ -123,7 +124,9 @@ export const REFINE_CASES = [
     id: 'D-01',
     field: 'refined',
     request: { ...KO_EN, text: '8/4까지 초안 부탁드립니다.', referenceDate: REFERENCE_DATE },
-    mustInclude: [['aug 4, 2026', 'august 4, 2026']],
+    // 2026-11-07 — 검증 핵심은 「8/4」의 월·일 모호함을 없애는 것이다. 기준일(8/12)보다 앞선 날짜라 연도를 단정하지
+    //    않은 「Aug 4」도 맞다(실측 3/3이 이 표기). 「8/4」·「04/08」 금지는 그대로.
+    mustInclude: [['aug 4, 2026', 'august 4, 2026', 'aug 4', 'august 4']],
     mustNotInclude: ['8/4', '04/08'],
   },
   {
