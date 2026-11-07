@@ -644,6 +644,8 @@ export default function SaiOverlay({ autoButton = true }) {
    *    그 사람 언어가 이긴다(`changeRecipient`에서 비운다). 팝업이 내려가면 비운다(민감정보 확인 단계는 유지).
    */
   const replyTargetRef = useRef(null);
+  /** 문자(script)만으로 확실한 판정 — `en`(라틴 문자권 전체의 기본값)은 넣지 않는다. */
+  const SCRIPT_CERTAIN_LANGUAGES = new Set(['ko', 'ja', 'zh']);
   useEffect(() => {
     if (stage !== 'refine') adhocRegisterRef.current = undefined;
     if (stage !== 'refine' && stage !== 'guard') replyTargetRef.current = null;
@@ -1054,7 +1056,10 @@ export default function SaiOverlay({ autoButton = true }) {
     const trimmed = String(text ?? '').trim();
     if (trimmed === '') return;
     // 원래 메시지(뜻 풀기 원문)의 언어 — 아직 `sendTextRef`가 그 원문이다(아래 beginSend가 덮는다).
-    replyTargetRef.current = detectLanguage(sendTextRef.current ?? '');
+    // 🔴 문자로 확실히 가려지는 언어(ko·ja·zh)만 덮는다. `en`은 독·프·스페인어도 포함하는 추정값이라
+    //    (`detectLanguage.js` 판정표 5행) 덮으면 독일어 회신이 영어가 된다 — 그때는 받는 사람 언어를 그대로 쓴다.
+    const original = detectLanguage(sendTextRef.current ?? '');
+    replyTargetRef.current = SCRIPT_CERTAIN_LANGUAGES.has(original) ? original : null;
     modeRef.current = 'compose';
     setReplyAsk(false);
     beginSend(trimmed);

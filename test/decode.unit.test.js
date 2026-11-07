@@ -330,3 +330,13 @@ test('🔴 코드가 긴급도를 올리는 경로는 없다 — 관문은 격�
   // 되돌림은 항상 surface 쪽으로 간다 — 모델이 낮춘 것을 코드가 지어내 올리는 일은 없다.
   assert.equal(result.surfaceUrgency, 'CRITICAL');
 });
+
+test('🔴 2026-11-07 — `en` 판정은 단정하지 않는다(독·프·스페인어도 en으로 오므로) · 직역은 반드시 해석 언어로', async () => {
+  const { buildDecodePayload } = await import('../src/core/decode/prompt.js');
+  const en = buildDecodePayload({ text: 'Bitte schicken Sie die Rechnung.', sourceLanguage: 'en', targetLanguage: 'ko' }).instruction;
+  assert.match(en, /label is only a guess/, 'en이면 실제 언어를 스스로 판별하라고 알려야 한다');
+  assert.ok(!/The original is in English/.test(en), 'en을 단정하면 독일어 원문이 직역 칸에 그대로 돌아온다(실측 3/3)');
+  assert.match(en, /"literalTranslation" MUST be written in Korean/);
+  const ja = buildDecodePayload({ text: 'よろしくお願いします', sourceLanguage: 'ja', targetLanguage: 'ko' }).instruction;
+  assert.match(ja, /The original is in Japanese\./, '문자로 확실한 언어는 그대로 알린다');
+});

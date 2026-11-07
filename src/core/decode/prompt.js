@@ -42,7 +42,7 @@
  *    버전을 올리지 않으면 **옛 응답이 새 프롬프트의 결과인 척** 캐시에서 되살아난다
  *    (`refine/cache.js`의 키 공식 주석과 같은 이유).
  */
-export const DECODE_PROMPT_VERSION = 'decode-v5';
+export const DECODE_PROMPT_VERSION = 'decode-v6';
 
 /**
  * 🔴 회신 의도 목록의 **단일 출처는 `reply/prompt.js`**다. 여기에 다시 적으면 한쪽만 늘어나
@@ -169,6 +169,23 @@ const DECODE_RULE =
   'explicitly rather than translating only the surface wording.';
 
 /**
+ * 원문 언어 안내 한 줄 (2026-11-07 점검 — decode-v6).
+ * 🔴 확장의 `detectLanguage`는 라틴 문자권(독·프·스페인어)을 전부 `en`으로 보낸다(그 파일 판정표 5행 — 설계).
+ *    「원문은 영어」라고 단정해 알려 주면 모델이 독일어 원문을 그대로 직역 칸에 돌려줬다(실측 독 3/3·스 2/3·프 1/3).
+ *    `en`일 때는 단정하지 않고 실제 언어를 스스로 판별하게 한다. 다른 언어는 문자로 확실하므로 그대로 둔다.
+ */
+function sourceLanguageLine(sourceLanguage) {
+  if (sourceLanguage === 'en') {
+    return (
+      'The original was labeled English, but the label is only a guess for Latin-script text — it may ' +
+      'actually be German, French, Spanish or another language. Identify the real language yourself and ' +
+      'translate from it. '
+    );
+  }
+  return `The original is in ${languageLabel(sourceLanguage)}. `;
+}
+
+/**
  * @param {object} input
  * @param {string} input.text 상대가 보낸 원문(외국어).
  * @param {string} input.sourceLanguage 원문 언어.
@@ -180,9 +197,12 @@ export function buildDecodePayload({ text, sourceLanguage, targetLanguage, threa
     DECODE_RULE,
     // 맥락이 없으면 문단을 싣지 않는다 — 빈 필드를 설명하는 규칙은 토큰만 쓴다.
     ...(threadContext.length > 0 ? [threadContextRule(threadContext)] : []),
-    `The original is in ${languageLabel(sourceLanguage)}; produce every output field in ` +
+    sourceLanguageLine(sourceLanguage) +
+      `Produce every output field in ` +
       `${languageLabel(targetLanguage)}, except "intentEvidence"'s quoted phrase which should stay ` +
-      'in the original language, and "recommendedReply" which is one of the fixed keys.',
+      'in the original language, and "recommendedReply" which is one of the fixed keys. ' +
+      `"literalTranslation" MUST be written in ${languageLabel(targetLanguage)} — never copy the original ` +
+      'text into it unchanged, and never translate into a third language.',
     RESPONSE_FORMAT_RULE,
   ].join(' ');
 
