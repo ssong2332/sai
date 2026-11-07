@@ -40,7 +40,7 @@ export default defineManifest({
    *    L28 안전망·경고 상자가 들어갔는데 숫자가 그대로라 「다시 로드」가 됐는지 화면으로 알 수 없었다.
    *    `package.json`과 같은 값이어야 한다(`test/version.unit.test.js`).
    */
-  version: '0.1.82',
+  version: '0.1.83',
   /**
    * 🔴 **동작을 먼저, 은유는 빼고.** 예전 문구("사람과 사람, 언어와 언어 사이를 매끄럽게 잇는")는
    *    첫 줄이 은유라 무엇을 하는 도구인지 읽는 데 시간이 걸렸다.
@@ -101,6 +101,9 @@ export default defineManifest({
     {
       resources: ['fonts/*.woff2'],
       matches: ['<all_urls>'],
+      // 🔴 2026-11-07 점검 — 고정 주소면 웹페이지가 `chrome-extension://<ID>/fonts/…`를 불러 보는 것만으로
+      //    사이 설치 여부를 알아낸다(핑거프린팅). 세션마다 바뀌는 주소로만 열어 준다. `getURL`은 그대로 쓴다.
+      use_dynamic_url: true,
     },
   ],
   /**

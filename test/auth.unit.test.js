@@ -203,3 +203,29 @@ test('🔴 L26 진짜 실패는 여전히 경고로 남는다', async () => {
   assert.equal(caught?.reason, AUTH_ERRORS.CANCELLED);
   assert.equal(warned.length, 1);
 });
+
+// ── 2026-11-07 점검 — 로그인 nonce 확인 ───────────────────────────────
+// 🔴 우리가 만든 nonce와 다른 id_token(다른 로그인 흐름에서 가져온 토큰 재사용)은 받지 않는다.
+import { idTokenNonceMatches } from '../src/lib/authClient.js';
+
+function fakeIdToken(payload) {
+  const enc = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+  return `${enc({ alg: 'RS256' })}.${enc(payload)}.sig`;
+}
+
+test('🔴 id_token의 nonce가 우리가 보낸 값과 같을 때만 통과한다', () => {
+  assert.equal(idTokenNonceMatches(fakeIdToken({ nonce: 'abc123', sub: 'u1' }), 'abc123'), true);
+  assert.equal(idTokenNonceMatches(fakeIdToken({ nonce: 'other', sub: 'u1' }), 'abc123'), false);
+  assert.equal(idTokenNonceMatches(fakeIdToken({ sub: 'u1' }), 'abc123'), false);
+});
+
+test('🔴 nonce 확인 — 깨진 토큰·빈 값은 전부 거절(예외 없이 false)', () => {
+  assert.equal(idTokenNonceMatches('not-a-jwt', 'abc'), false);
+  assert.equal(idTokenNonceMatches('a.!!!.c', 'abc'), false);
+  assert.equal(idTokenNonceMatches(null, 'abc'), false);
+  assert.equal(idTokenNonceMatches(fakeIdToken({ nonce: '' }), ''), false);
+});
+
+test('nonce 확인 — 한글 등 비ASCII가 든 payload도 해독한다', () => {
+  assert.equal(idTokenNonceMatches(fakeIdToken({ nonce: 'n-1', name: '박사이' }), 'n-1'), true);
+});

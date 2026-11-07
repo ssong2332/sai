@@ -230,24 +230,40 @@ export async function applyGrobleEvent(db, event, groble, idempotencyKey = null)
   const obj = event?.data?.object ?? {};
   const occurredAt = String(event?.occurredAt ?? '');
 
+  /**
+   * 🔴 2026-11-07 점검 — 중복 표시를 **먼저 차지한다**(없을 때만 만들기). 예전엔 「있나 확인 → 처리 → 표시」라서
+   *    같은 웹훅이 동시에 두 번 오면 둘 다 확인을 통과해 두 번 처리될 틈이 있었다.
+   *    처리 결과가 예전에 표시를 남기지 않던 경우(토큰 못 찾음·상품 다름·ignored·오류)는 표시를 다시 지운다 — 재시도 동작은 예전과 같다.
+   */
   const markId = idempotencyKey ? await idempotencyDocId(idempotencyKey) : null;
-  if (markId) {
-    const mark = await db.collection('billingEvents').doc(markId).get();
-    if (mark.exists) return 'duplicate';
+  const markRef = markId ? db.collection('billingEvents').doc(markId) : null;
+  if (markRef && !(await markRef.create({ at: new Date().toISOString() }))) return 'duplicate';
+  let outcome;
+  try {
+    outcome = await processGrobleEvent(db, type, obj, occurredAt, groble);
+  } catch (error) {
+    if (markRef) await markRef.delete().catch(() => {});
+    throw error;
   }
+  if (markRef && !outcome.keepMark) await markRef.delete().catch(() => {});
+  return outcome.result;
+}
 
+/** 표시 차지 뒤의 실제 처리. `keepMark` = 예전 코드가 표시를 남기던 경우(상태를 반영했고 `ignored`가 아님). */
+async function processGrobleEvent(db, type, obj, occurredAt, groble) {
+  const done = (result, keepMark = false) => ({ result, keepMark });
   // 토큰 찾기 — 환불에는 `sellerReference`가 없어 회차 기록(`billingRounds/{merchantUid}`)으로 찾는다.
   let ref = str(obj.sellerReference);
   const merchantUid = str(obj.merchantUid);
   if (type === 'subscription_payment.refunded') {
-    if (!merchantUid || merchantUid.length > 128 || merchantUid.includes('/')) return 'unknown-ref';
+    if (!merchantUid || merchantUid.length > 128 || merchantUid.includes('/')) return done('unknown-ref');
     const round = await db.collection('billingRounds').doc(merchantUid).get();
     ref = round.exists ? str(round.get('ref')) : null;
   }
-  if (!ref || !REF_PATTERN.test(ref)) return 'unknown-ref';
+  if (!ref || !REF_PATTERN.test(ref)) return done('unknown-ref');
   const tokenRef = db.collection('billingRefs').doc(ref);
   const tokenSnap = await tokenRef.get();
-  if (!tokenSnap.exists) return 'unknown-ref';
+  if (!tokenSnap.exists) return done('unknown-ref');
   const token = tokenSnap.data() ?? {};
 
   let product = token.boundAt ? groble.products.get(String(token.productId ?? '')) ?? null : null;
@@ -255,19 +271,19 @@ export async function applyGrobleEvent(db, event, groble, idempotencyKey = null)
   //    팀 상품을 한 번 결제해 묶은 `ref`를 싼 Pro 결제 링크에 붙이면 Pro 결제마다 팀이 active로 갱신됐다.
   //    상품 id가 없는 이벤트(환불·해지 일부)는 회차 기록·토큰으로만 찾으므로 그대로 둔다.
   const eventProductId = str(obj?.content?.id);
-  if (token.boundAt && eventProductId && eventProductId !== String(token.productId ?? '')) return 'wrong-product';
+  if (token.boundAt && eventProductId && eventProductId !== String(token.productId ?? '')) return done('wrong-product');
   if (!token.boundAt) {
     // 묶이지 않은 토큰은 첫 결제 완료로만 묶인다. 그 밖의 이벤트(실패·해지·환불)는 묶인 토큰에만 온다.
-    if (type !== 'subscription_payment.completed') return 'unknown-ref';
+    if (type !== 'subscription_payment.completed') return done('unknown-ref');
     const checked = checkProduct(groble, token, obj);
-    if (checked.error) return checked.error;
+    if (checked.error) return done(checked.error);
     const paidAt = isoMs(obj?.payment?.purchasedAt) || isoMs(occurredAt);
     // 🔴 판정은 결제 시각 — 웹훅 도착 시각이 아니다(Groble 재시도가 최대 약 44시간 늦을 수 있다).
-    if (!Number.isFinite(paidAt) || paidAt > isoMs(token.createdAt) + REF_TTL_MS) return 'expired-ref';
+    if (!Number.isFinite(paidAt) || paidAt > isoMs(token.createdAt) + REF_TTL_MS) return done('expired-ref');
     product = checked.product;
     await tokenRef.set({ boundAt: new Date().toISOString() }, { merge: true });
   }
-  if (!product) return 'wrong-product';
+  if (!product) return done('wrong-product');
 
   if (type === 'subscription_payment.completed' && merchantUid && merchantUid.length <= 128 && !merchantUid.includes('/')) {
     await db.collection('billingRounds').doc(merchantUid).set({ ref });
@@ -278,8 +294,7 @@ export async function applyGrobleEvent(db, event, groble, idempotencyKey = null)
   const result = token.teamId
     ? await applyTeam(db, token, product, next, common, occurredAt)
     : await applyPersonal(db, token.uid, next, common, occurredAt);
-  if (markId && result !== 'ignored') await db.collection('billingEvents').doc(markId).set({ at: new Date().toISOString() });
-  return result;
+  return done(result, result !== 'ignored');
 }
 
 async function applyPersonal(db, uid, next, common, occurredAt) {

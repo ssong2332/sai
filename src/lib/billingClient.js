@@ -7,7 +7,7 @@
  * 🔴 `FEATURES.billing`이 꺼져 있으면 화면에 진입점이 없다(`src/config.js`).
  */
 
-import { BILLING_CHECKOUT_ENDPOINT, BILLING_ME_ENDPOINT } from '../config.js';
+import { BILLING_CHECKOUT_ENDPOINT, BILLING_ME_ENDPOINT, PRODUCTION_SITE_URL } from '../config.js';
 import { getIdToken } from './authClient.js';
 import { PLAN_LIMITS } from '../core/refine/quality.js';
 
@@ -103,7 +103,28 @@ export async function startCheckout(interval, { plan = 'pro', teamId, seats, fet
   if (response.status === 400 && payload?.error === 'bad seats') throw new BillingClientError(BILLING_ERRORS.BAD_SEATS);
   if (response.status === 409 && payload?.error === 'already-subscribed') throw new BillingClientError(BILLING_ERRORS.ALREADY_SUBSCRIBED);
   if (!response.ok || typeof payload?.checkoutUrl !== 'string') throw new BillingClientError(BILLING_ERRORS.UNKNOWN);
+  if (!isAllowedCheckoutUrl(payload.checkoutUrl)) throw new BillingClientError(BILLING_ERRORS.UNKNOWN);
   return payload.checkoutUrl;
+}
+
+/**
+ * 결제창으로 열어도 되는 주소인가 (2026-11-07 점검 — 예전엔 서버가 준 값을 그대로 새 탭으로 열었다).
+ * | 주소 | 판정 |
+ * |---|---|
+ * | `https://groble.im/…` · `https://www.groble.im/…` | 연다 (그로블 결제창) |
+ * | 운영 사이트(`PRODUCTION_SITE_URL`)의 `/checkout` | 연다 (Paddle 경로 — 지금은 꺼져 있음) |
+ * | 그 밖·https 아님·형식 오류 | 열지 않는다 — 「결제를 시작하지 못했어요」 |
+ */
+export function isAllowedCheckoutUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:') return false;
+  if (url.hostname === 'groble.im' || url.hostname === 'www.groble.im') return true;
+  return url.origin === new URL(PRODUCTION_SITE_URL).origin && url.pathname === '/checkout';
 }
 
 /**
