@@ -119,3 +119,28 @@ test('설정 「지금 플랜」 — 결제한 요금제는 그 이름·한도(P
   assert.deepEqual([planSummary('free').name, planSummary('free').daily], ['무료', '20회 · 빠른 모드만']);
   for (const plan of ['beta', null, undefined, 'x']) assert.equal(planSummary(plan), null, String(plan));
 });
+
+// ── 2026-11-07 점검 — 결제 URL 허용 목록 ─────────────────────────────
+// 🔴 서버 응답이 오염돼도 확장이 엉뚱한 사이트를 결제 창으로 열지 않는다.
+import { isAllowedCheckoutUrl } from '../src/lib/billingClient.js';
+
+test('🔴 결제 URL — 그로블(https)과 우리 사이트 /checkout만 연다', () => {
+  assert.equal(isAllowedCheckoutUrl('https://groble.im/payment/abc?ref=t1'), true);
+  assert.equal(isAllowedCheckoutUrl('https://www.groble.im/payment/abc'), true);
+  assert.equal(isAllowedCheckoutUrl('https://sai-global-msg-2026.web.app/checkout?x=1'), true);
+});
+
+test('🔴 결제 URL — http·다른 호스트·비슷한 이름·다른 경로·깨진 값은 거절', () => {
+  for (const bad of [
+    'http://groble.im/payment/abc',
+    'https://groble.im.evil.example/payment',
+    'https://evilgroble.im/payment',
+    'https://sai-global-msg-2026.web.app/settings',
+    'javascript:alert(1)',
+    'not a url',
+    '',
+    null,
+  ]) {
+    assert.equal(isAllowedCheckoutUrl(bad), false, bad);
+  }
+});

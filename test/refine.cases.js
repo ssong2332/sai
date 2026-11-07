@@ -182,6 +182,11 @@ export const REFINE_CASES = [
     // 한국어 직급을 영어로 옮기며 위계를 지어내는 것("Manager Kim")이 금지 대상이다.
     id: 'N-02',
     field: 'appliedGlossary',
+    // 🔴 2026-11-07 점검 — 앱은 사람 항목(`entryType:'person'`)을 만들지 않는다(`src/lib/glossary.js` 머리말: term만).
+    //    실사용에서 나올 수 없는 시드라 실 API 회귀의 통과·실패가 품질을 말해 주지 않는다. 삭제 금지 원칙대로 제외만 한다.
+    //    거짓 신고·3인칭 전달 방어는 `test/safetyNet.unit.test.js`가 계속 잠근다.
+    skip: true,
+    skipReason: '앱이 사람 용어집 항목을 만들지 않음 — 실사용 불가 시드(2026-11-07)',
     request: { ...KO_EN, text: '김 대리님이 확인해 주셔야 합니다.', glossary: GLOSSARY_SEED, referenceDate: REFERENCE_DATE },
     mustInclude: ['Sujin Kim'],
     mustNotInclude: ['manager kim', 'assistant manager kim'],

@@ -100,6 +100,10 @@ export function createFakeFirestore({ projectId = 'sai-global-msg-2026', now = (
     if (path === `${root}:commit`) {
       const fail = commitFailures.shift();
       if (fail) return json(fail, { error: { status: fail === 409 ? 'ABORTED' : 'INTERNAL' } });
+      // `currentDocument.exists:false`(없을 때만 만들기) — 이미 있으면 409 ALREADY_EXISTS(2026-11-07 에뮬레이터 실측과 같은 모양).
+      if (body.writes.some((w) => w.currentDocument?.exists === false && docs.has(w.update?.name))) {
+        return json(409, { error: { status: 'ALREADY_EXISTS' } });
+      }
       const writeResults = body.writes.map(applyWrite);
       return json(200, { writeResults, commitTime: now().toISOString() });
     }

@@ -216,6 +216,20 @@ class DocumentReference {
   async set(data, options = {}) {
     await this._db._commit([this._db._setWrite(this, data, options)]);
   }
+  /**
+   * 없을 때만 만든다(2026-11-07 — 그로블 중복 웹훅 표시를 「확인 후 표시」에서 「한 번에 차지」로).
+   * @returns {Promise<boolean>} 만들었으면 true, 이미 있으면 false(Firestore 409 `ALREADY_EXISTS` — 에뮬레이터 실측).
+   *   🔴 같은 409라도 `ABORTED`(경합)는 여기서 오지 않는다 — 트랜잭션이 아니다. 그 밖 오류는 그대로 던진다.
+   */
+  async create(data) {
+    try {
+      await this._db._commit([{ ...this._db._setWrite(this, data, {}), currentDocument: { exists: false } }]);
+      return true;
+    } catch (error) {
+      if (error instanceof FirestoreRestError && error.status === 409 && error.grpc === 'ALREADY_EXISTS') return false;
+      throw error;
+    }
+  }
   async delete() {
     await this._db._commit([{ delete: this.name }]);
   }

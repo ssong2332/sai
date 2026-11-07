@@ -51,7 +51,12 @@ service cloud.firestore {
       allow create, update: if isOwner(userId)
         && onlyFields(['sourceText', 'targetText', 'keepSource', 'entryType', 'updatedAt'])
         && request.resource.data.sourceText is string
-        && request.resource.data.sourceText.size() <= 200;
+        && request.resource.data.sourceText.size() <= 200
+        // 🔴 2026-11-07 점검 — 번역어도 팀 용어집과 같은 200자 상한. 예전엔 상한이 없어 본문이 이 칸에 들어갈 수 있었다.
+        //    원문 유지 항목은 `targetText: null`(`src/lib/glossary.js`)이라 null은 받는다.
+        && (!('targetText' in request.resource.data)
+            || request.resource.data.targetText == null
+            || (request.resource.data.targetText is string && request.resource.data.targetText.size() <= 200));
     }
 
     // 🔴 마찰 카운트 (Spec §3 F-10/F-26) — 조직 단위 **집계 수치만**.

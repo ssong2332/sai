@@ -10,7 +10,7 @@ import { MemoryCacheStore } from '../../../src/core/refine/index.js';
 import { createHandler } from '../src/handler.js';
 import { createMemoryUsageStore } from '../src/usageStore.js';
 import { resolvePlan } from '../src/billing.js';
-import { REF_TTL_MS, parseGrobleProducts, verifyGrobleSignature } from '../src/grobleBilling.js';
+import { REF_TTL_MS, applyGrobleEvent, parseGrobleProducts, readGrobleConfig, verifyGrobleSignature } from '../src/grobleBilling.js';
 import { RestFirestore } from '../src/google/firestoreRest.js';
 import { createFakeFirestore } from './fakeFirestore.js';
 import { TEST_ENV, captureLogger, fakeAnthropicFetch, makeKeys, signIdToken } from './helpers.js';
@@ -324,4 +324,26 @@ test('G7 — 상품 표: 틀린 줄·겹치는 줄은 버리고, Groble 설정�
   const { handle } = setup();
   const res = await handle(checkout({ plan: 'pro', interval: 'month' }), TEST_ENV);
   assert.equal(res.status, 503, 'Groble도 Paddle도 설정이 없으면 503');
+});
+
+test('🔴 2026-11-07 — 같은 웹훅(같은 키)이 동시에 두 번 와도 한 번만 처리한다(느린 저장소로 경합을 강제)', async () => {
+  // 저장소 응답마다 지연을 넣어 두 처리가 「표시 확인」 단계에서 겹치게 만든다 — 지연이 없으면 경합 창이 안 열린다.
+  const fake = createFakeFirestore();
+  const slowFetch = async (...args) => { await new Promise((r) => setTimeout(r, 5)); return fake.fetch(...args); };
+  const db = new RestFirestore({ projectId: 'sai-global-msg-2026', token: async () => 't', fetchImpl: slowFetch });
+  const groble = readGrobleConfig(ENV);
+  const ref = 'sr_' + 'a'.repeat(32);
+  await db.collection('billingRefs').doc(ref).set({ uid: UID, teamId: null, plan: 'pro', interval: 'month', productId: 'proM', createdAt: new Date(NOW).toISOString(), boundAt: null });
+  const ev = event('subscription_payment.completed', paid(ref, { merchantUid: 'dup-round' }));
+  const results = await Promise.all([applyGrobleEvent(db, ev, groble, 'same-key'), applyGrobleEvent(db, ev, groble, 'same-key')]);
+  assert.deepEqual(results.sort(), ['duplicate', 'saved'], '🔴 두 번 처리됐다');
+});
+
+test('2026-11-07 — 처리하지 못한 이벤트(토큰 없음)는 표시를 남기지 않는다 — 같은 키 재시도가 다시 처리된다', async () => {
+  const { handle, logger } = setup();
+  const ev = event('subscription_payment.completed', paid('sr_' + 'x'.repeat(32)));
+  await send(handle, ev, { key: 'retry-key' });
+  await send(handle, ev, { key: 'retry-key' });
+  const lines = logger.lines.filter((l) => l.includes('subscription_payment.completed →'));
+  assert.equal(lines.filter((l) => l.endsWith('→ unknown-ref')).length, 2, '재시도가 duplicate로 막혔다');
 });

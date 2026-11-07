@@ -136,3 +136,15 @@ test('randomInt — 범위 안, 잘못된 max는 거절', () => {
   }
   assert.throws(() => randomInt(0), RangeError);
 });
+
+test('🔴 2026-11-07 — 팀 ID·uid에 `/`가 있거나 128자를 넘으면 400(문서 경로가 갈라지지 않게)', async () => {
+  const { call } = setup();
+  const { teamId } = (await call(ownerToken, { action: 'create', name: '경로 팀' })).body;
+  for (const bad of [`${teamId}/members/x`, 'a/b', 'x'.repeat(129)]) {
+    const r = await call(ownerToken, { action: 'members', teamId: bad });
+    assert.deepEqual([r.status, r.body.error], [400, 'bad-request'], bad.slice(0, 30));
+  }
+  const badUid = await call(ownerToken, { action: 'permission', teamId, uid: 'member-uid/../x', canViewDashboard: true });
+  assert.deepEqual([badUid.status, badUid.body.error], [400, 'bad-request']);
+  assert.equal((await call(ownerToken, { action: 'members', teamId })).status, 200, '정상 id는 그대로');
+});

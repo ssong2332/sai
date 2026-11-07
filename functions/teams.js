@@ -249,6 +249,15 @@ export function teamShouldLock({ billing = null, createdAtMs = NaN, enforced = f
 }
 
 /**
+ * 문서 id로 쓸 값 검사 (2026-11-07 점검). 🔴 `/`가 들어가면 REST 경로가 갈라져 다른 문서·하위 컬렉션을 가리킬 수 있다
+ *    (`workers/refine/src/google/firestoreRest.js` 경로 분해). 악용 경로는 찾지 못했지만 결제 시작(`grobleCheckout`)처럼
+ *    입구에서 거절한다. 빈 값은 각 핸들러의 기존 검사(`no-team`·`bad-request`)가 그대로 맡는다.
+ */
+function assertSafeDocId(value) {
+  if (value.includes('/') || value.length > 128) throw new TeamError(400, 'bad-request');
+}
+
+/**
  * 유예가 끝나는 시각(ms) — 기존 팀장에게 「12월 5일부터 잠겨요」를 미리 알리려고(2026-11-06). 순수 함수.
  * 🔴 미결제 · 출시 뒤(`enforced`) · 출시 전에 만든 팀 · 아직 유예 안일 때만 숫자, 그 밖엔 `null`(알릴 것 없음).
  *    판정은 `judgeTeamJoin` 5번 줄과 같은 조건이다 — 둘이 어긋나면 「잠긴다」고 했는데 안 잠기거나 그 반대가 된다.
@@ -362,6 +371,7 @@ export async function joinTeam(req, deps) {
 export async function listMembers(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   if (teamId === '') throw new TeamError(400, 'no-team');
 
   const db = deps.db();
@@ -405,7 +415,9 @@ export async function listMembers(req, deps) {
 export async function setMemberPermission(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   const targetUid = String(req.body?.uid ?? '').trim();
+  assertSafeDocId(targetUid);
   const canView = req.body?.canViewDashboard === true;
   if (teamId === '' || targetUid === '') throw new TeamError(400, 'bad-request');
   if (targetUid === uid) throw new TeamError(400, 'cannot-change-self');
@@ -439,6 +451,7 @@ const teamDefaultQuality = (team) => {
 export async function setDefaultQuality(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   if (teamId === '') throw new TeamError(400, 'no-team');
   const quality = req.body?.quality ?? null;
   if (quality !== null && !QUALITY_IDS.includes(quality)) throw new TeamError(400, 'bad-request');
@@ -467,6 +480,7 @@ function graceUntilOf(team, deps) {
 export async function whoAmI(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   if (teamId === '') throw new TeamError(400, 'no-team');
 
   const db = deps.db();
@@ -528,6 +542,7 @@ export async function whoAmI(req, deps) {
 export async function recordFriction(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   if (teamId === '') throw new TeamError(400, 'no-team');
 
   const db = deps.db();
@@ -577,7 +592,9 @@ export async function recordFriction(req, deps) {
 export async function removeMember(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   const targetUid = String(req.body?.uid ?? '').trim();
+  assertSafeDocId(targetUid);
   if (teamId === '' || targetUid === '') throw new TeamError(400, 'bad-request');
   if (targetUid === uid) throw new TeamError(400, 'cannot-change-self');
 
@@ -603,7 +620,9 @@ export async function removeMember(req, deps) {
 export async function transferOwnership(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   const targetUid = String(req.body?.uid ?? '').trim();
+  assertSafeDocId(targetUid);
   if (teamId === '' || targetUid === '') throw new TeamError(400, 'bad-request');
   if (targetUid === uid) throw new TeamError(400, 'cannot-change-self');
 
@@ -642,6 +661,7 @@ export async function transferOwnership(req, deps) {
 export async function regenerateInvite(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   if (teamId === '') throw new TeamError(400, 'no-team');
 
   const db = deps.db();
@@ -671,6 +691,7 @@ export async function regenerateInvite(req, deps) {
 export async function renameTeam(req, deps) {
   const uid = await requireUid(req, deps);
   const teamId = String(req.body?.teamId ?? '').trim();
+  assertSafeDocId(teamId);
   if (teamId === '') throw new TeamError(400, 'no-team');
   const name = cleanTeamName(req.body?.name);
 

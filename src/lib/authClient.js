@@ -92,6 +92,26 @@ function makeNonce() {
   return globalThis.crypto?.randomUUID?.() ?? `n${Date.now()}${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * id_token의 `nonce`가 우리가 보낸 값과 같은가 (2026-11-07 점검 — 예전엔 보내기만 하고 대조하지 않았다).
+ * 🔴 서명 검증은 하지 않는다 — 토큰은 바로 Firebase(`signInWithIdp`)가 구글 키로 검증한다. 여기서는
+ *    「이 응답이 내가 시작한 로그인의 것인가」만 본다. 형식이 깨졌으면 다른 것으로 보고 거절한다.
+ */
+export function idTokenNonceMatches(idToken, expectedNonce) {
+  if (typeof idToken !== 'string' || !expectedNonce) return false;
+  const part = idToken.split('.')[1];
+  if (!part) return false;
+  try {
+    const base64 = part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '=');
+    const json = decodeURIComponent(
+      Array.from(atob(base64), (ch) => `%${ch.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''),
+    );
+    return JSON.parse(json)?.nonce === expectedNonce;
+  } catch {
+    return false;
+  }
+}
+
 /** 리디렉션으로 돌아온 URL의 **프래그먼트**에서 id_token을 꺼낸다(암시적 흐름은 `#`에 실린다). */
 export function extractIdToken(callbackUrl) {
   if (typeof callbackUrl !== 'string') return null;
@@ -129,7 +149,8 @@ function launchAuthFlow({ identityImpl, interactive = true }) {
   url.searchParams.set('response_type', 'id_token');
   url.searchParams.set('redirect_uri', redirectUri(identity));
   url.searchParams.set('scope', 'openid email profile');
-  url.searchParams.set('nonce', makeNonce());
+  const nonce = makeNonce();
+  url.searchParams.set('nonce', nonce);
   // 🔴 계정을 매번 고르게 한다 — 계정이 여러 개인 사용자가 엉뚱한 계정으로 묶이는 사고를 막는다.
   url.searchParams.set('prompt', 'select_account');
 
@@ -142,7 +163,7 @@ function launchAuthFlow({ identityImpl, interactive = true }) {
         reject(new AuthError(AUTH_ERRORS.CANCELLED, raw));
         return;
       }
-      resolve(callbackUrl);
+      resolve({ callbackUrl, nonce });
     });
   });
 }
@@ -171,9 +192,11 @@ async function postJson(url, body, fetchImpl) {
 export async function signIn({ fetchImpl = globalThis.fetch, identityImpl = undefined } = {}) {
   if (!isAuthConfigured()) throw new AuthError(AUTH_ERRORS.NOT_CONFIGURED);
 
-  const callbackUrl = await launchAuthFlow({ identityImpl });
+  const { callbackUrl, nonce } = await launchAuthFlow({ identityImpl });
   const googleIdToken = extractIdToken(callbackUrl);
   if (!googleIdToken) throw new AuthError(AUTH_ERRORS.NO_ID_TOKEN, redirectUri(identityImpl));
+  // 🔴 내가 시작한 로그인의 응답인지 — 다르면 Firebase로 넘기지 않는다(문구는 「토큰 없음」과 같은 안내).
+  if (!idTokenNonceMatches(googleIdToken, nonce)) throw new AuthError(AUTH_ERRORS.NO_ID_TOKEN, 'nonce mismatch');
 
   const { ok, body } = await postJson(
     `${SIGN_IN_WITH_IDP}?key=${FIREBASE_API_KEY}`,
