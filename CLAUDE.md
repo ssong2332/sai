@@ -72,7 +72,7 @@
 
 > 🔴 **`.env`는 git 워크트리마다 따로 있다** (untracked 파일은 공유되지 않는다). 워크트리에서
 > 작업하면 그 워크트리 루트에 `.env`가 있어야 `npm run proxy`·vite가 값을 읽는다.
-| `/v1/refine` 실 API 20건 | `npm run test:refine:live` (키 필요, 없으면 exit 2) | 미실행 |
+| `/v1/refine` 실 API 20건 | `npm run test:refine:live` (키 필요, 없으면 exit 2 · 빠른 모드 Haiku 5.5, 약 $0.016) → 19/20·폴백 0 (U-01 「if possible」은 빠른 모드 흔들림 — 판정 기준은 그대로 둔다) | 2026-11-07 |
 | `/v1/refine` 실 API 20건 — Claude(시험) | `ANTHROPIC_API_KEY=... node scripts/refine-live.js --provider anthropic` → 21/21 통과·폴백 0 (응답 2.6~10.0초) | 2026-10-23 |
 
 > 🔴 **2026-10-23 — 기본 provider는 Claude(anthropic)이고 예비는 groq뿐이다** (사용자 결정, Spec §0).
