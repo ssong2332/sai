@@ -61,6 +61,7 @@ import { createNoopUsageStore } from './usageStore.js';
 import { budgetLevel, extraCallsMicros } from './qualityAllowance.js';
 import { handleTeam } from './teamRoute.js';
 import { featuresFor, resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
+import { MAX_TEXT_CHARS, MAX_DECISIONS_CHARS, MAX_GLOSSARY_ENTRIES } from '../../../src/core/refine/limits.js';
 import { googleClientsFromEnv } from './google/clients.js';
 import { PLAN_LIMITS, handleBilling, readBillingConfig, resolvePlan } from './billing.js';
 
@@ -71,12 +72,30 @@ import { PLAN_LIMITS, handleBilling, readBillingConfig, resolvePlan } from './bi
  * | `glossary` 중 `scope:'personal'` | 앞에서 `personalGlossary`개만 · 팀 항목은 그대로 | 그대로 |
  * | `profile.learned` | 빈 배열(1순위 설정 `situation`·`collabStyle`은 남긴다) | 그대로 |
  */
+/**
+ * 요청 길이 상한(2026-11-07 점검). 확장 화면도 같은 값을 쓴다(`src/core/refine/limits.js`).
+ * | mode | `text` 상한 |
+ * |---|---|
+ * | refine · decode · reply | `MAX_TEXT_CHARS` |
+ * | decisions(대화 전체 요약) | `MAX_DECISIONS_CHARS` |
+ * `glossary`는 항목 `MAX_GLOSSARY_ENTRIES`개까지. 넘으면 사유 코드만 돌려준다.
+ * @returns {null|'text-too-long'|'glossary-too-long'}
+ */
+export function requestTooLong(body, modeName) {
+  const limit = modeName === 'decisions' ? MAX_DECISIONS_CHARS : MAX_TEXT_CHARS;
+  if (typeof body?.text === 'string' && body.text.length > limit) return 'text-too-long';
+  if (Array.isArray(body?.glossary) && body.glossary.length > MAX_GLOSSARY_ENTRIES) return 'glossary-too-long';
+  return null;
+}
+
 export function applyPlanFeatures(body, features) {
   if (!body || typeof body !== 'object') return body;
   if (features.personalGlossary != null && Array.isArray(body.glossary)) {
     let kept = 0;
     body.glossary = body.glossary.filter((entry) => {
-      if (entry?.scope !== 'personal') return true;
+      // 🔴 2026-11-07 점검 — 예전엔 `scope === 'personal'`만 세서, `scope`를 빼거나 다른 값을 넣으면 무료 5개 제한을
+      //    그냥 넘었다. 팀 항목(`'team'`)만 빼고 전부 개인으로 센다.
+      if (entry?.scope === 'team') return true;
       kept += 1;
       return kept <= features.personalGlossary;
     });
@@ -321,6 +340,15 @@ export function createHandler(deps = {}) {
     // ⑤ mode — 위 `MODES` 표. 모르는 값은 refine(2026-10-24부터 501 없음).
     const modeName = resolveMode(body.mode);
     const mode = MODES[modeName];
+
+    // 🔴 2026-11-07 점검 — 본문·용어집 길이 상한. 비용은 건당 고정 추정값으로 세므로, 아주 긴 글이 하루 한도만큼
+    //    들어오면 실제 비용이 추정보다 훨씬 커져 이달 멈춤($95)보다 먼저 콘솔 한도에 닿을 수 있었다.
+    //    한도·LLM 호출 **전에** 거절한다(사용량을 세지 않는다). 본문 값은 로그에 남기지 않는다.
+    const tooLong = requestTooLong(body, modeName);
+    if (tooLong) {
+      logger.warn(`[${modeName}] 요청 거절: ${tooLong}`);
+      return json(400, { error: tooLong });
+    }
 
     // 🔴 2026-10-30 품질 모드 — 다듬기(refine)만. 확장은 이름만 보내고 모델·사고·effort는 `quality.js` 표가 정한다.
     //    모르는 값·없음은 기본값(빠른). 2026-10-31부터 아래 ⑥이 상위 모드를 빠른으로 낮출 수 있다(`qualityAllowance.js`).

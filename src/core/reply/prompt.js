@@ -199,7 +199,7 @@ const INTENT_RULES = {
     'than a clear one.',
 };
 
-const LANGUAGE_LABELS = { ko: 'Korean', en: 'English', zh: 'Chinese' };
+const LANGUAGE_LABELS = { ko: 'Korean', en: 'English', zh: 'Chinese', ja: 'Japanese', de: 'German', fr: 'French', es: 'Spanish' };
 function languageLabel(code) {
   return LANGUAGE_LABELS[code] ?? code;
 }

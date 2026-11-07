@@ -31,7 +31,9 @@ function mount() {
   host.style.cssText = 'all:initial;position:static';
   document.documentElement.appendChild(host);
 
-  const shadow = host.attachShadow({ mode: 'open' });
+  // 🔴 2026-11-07 점검 — `closed`. `open`이면 호스트 페이지 스크립트가 `#sai-root.shadowRoot`로 교정문·역번역·
+  //    뜻 풀기 결과·저장 문구를 읽고, 버튼에 합성 클릭을 보낼 수 있었다(점검 중 실제로 읽힘). 참조는 이 함수 안에만 둔다.
+  const shadow = host.attachShadow({ mode: 'closed' });
 
   const style = document.createElement('style');
   style.textContent = `${tokensCss}\n${motionCss}\n${contentCss}`;

@@ -201,8 +201,8 @@ test('🔴 화이트리스트 밖 의도는 거절한다 — 고르지 않은 �
 test('원문·언어가 빠지면 거절한다', async () => {
   for (const bad of [
     { intent: 'accept', sourceLanguage: 'en', targetLanguage: 'ko' },
-    { text: SOURCE, intent: 'accept', sourceLanguage: 'fr', targetLanguage: 'ko' },
-    { text: SOURCE, intent: 'accept', sourceLanguage: 'en', targetLanguage: 'fr' },
+    { text: SOURCE, intent: 'accept', sourceLanguage: 'ru', targetLanguage: 'ko' },
+    { text: SOURCE, intent: 'accept', sourceLanguage: 'en', targetLanguage: 'ru' },
   ]) {
     await assert.rejects(() => reply(bad, {}), ReplyRequestError);
   }
@@ -623,4 +623,12 @@ test('🔴 v9 — 모든 방향에 원문에 없는 평가·감정 부사(벌써
     const { instruction } = buildReplyPayload({ ...V9_INPUT, intent });
     assert.ok(instruction.includes('벌써'), intent);
   }
+});
+
+test('🔴 2026-11-07 — 회신도 다듬기·뜻 풀기와 같은 7개 언어를 받는다(일본어 회신이 400이던 결함)', () => {
+  for (const lang of ['ko', 'en', 'zh', 'ja', 'de', 'fr', 'es']) {
+    const payload = buildReplyPayload({ text: SOURCE, intent: 'accept', sourceLanguage: lang, targetLanguage: 'ko' });
+    assert.ok(!payload.instruction.includes(`written in ${lang}.`), `${lang} 언어 이름이 코드 그대로 들어갔다`);
+  }
+  assert.match(buildReplyPayload({ text: SOURCE, intent: 'accept', sourceLanguage: 'ja', targetLanguage: 'ko' }).instruction, /written in Japanese/);
 });

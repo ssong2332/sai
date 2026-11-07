@@ -72,6 +72,20 @@ export function getLocalParts(date, timeZone) {
  *    ②그 순간이 실제로 타임존에서 몇 시로 읽히는지 확인해 ③그 차이만큼 되돌린다. DST 전환이
  *    "그 시각 근방 1시간 안"에서 일어나는 예외적 순간이 아니면 정확하다.
  */
+/** UTC 자정에 담아 둔 달력 날짜를 그대로 읽는다(타임존 변환 없음). */
+function calendarParts(date) {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + 1;
+  const day = date.getUTCDate();
+  return {
+    year,
+    month,
+    day,
+    weekday: date.getUTCDay(),
+    dateKey: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  };
+}
+
 function zonedWallTimeToUtc(year, month, day, hour, minute, timeZone) {
   const guessUtcMs = Date.UTC(year, month - 1, day, hour, minute);
   const mappedBack = getLocalParts(new Date(guessUtcMs), timeZone);
@@ -162,7 +176,10 @@ export async function computeNextSendTime({
 
   // 공휴일·주말이 연속되는 극단적 케이스에서도 멈추도록 상한을 둔다(비정상 데이터 방어).
   for (let guard = 0; guard < 30; guard += 1) {
-    const parts = getLocalParts(cursor, timeZone);
+    // 🔴 2026-11-07 점검 — `cursor`는 「현지 달력 날짜」를 UTC 자정에 담아 둔 값이다. 예전엔 이것을
+    //    `getLocalParts(cursor, timeZone)`로 **현지 시각으로 다시 읽어서**, UTC보다 늦은 지역(뉴욕·LA·상파울루)에서는
+    //    전날 저녁으로 읽혀 하루씩 밀렸다(금 19:00 → 「금 09:00」). 달력 값은 UTC 필드 그대로 읽는다.
+    const parts = calendarParts(cursor);
     if (!isWeekend(parts.weekday) && !holidays.has(parts.dateKey)) {
       const sendAt = zonedWallTimeToUtc(parts.year, parts.month, parts.day, workStartHour, 0, timeZone);
       return { needsSchedule: true, reason, sendAt, localParts: getLocalParts(sendAt, timeZone), holidayLookupFailed };

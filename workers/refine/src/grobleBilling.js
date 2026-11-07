@@ -251,6 +251,11 @@ export async function applyGrobleEvent(db, event, groble, idempotencyKey = null)
   const token = tokenSnap.data() ?? {};
 
   let product = token.boundAt ? groble.products.get(String(token.productId ?? '')) ?? null : null;
+  // 🔴 2026-11-07 점검 — 묶인 토큰도 이벤트에 실린 상품이 토큰 상품과 같아야 한다. 예전엔 첫 결제만 대조해서,
+  //    팀 상품을 한 번 결제해 묶은 `ref`를 싼 Pro 결제 링크에 붙이면 Pro 결제마다 팀이 active로 갱신됐다.
+  //    상품 id가 없는 이벤트(환불·해지 일부)는 회차 기록·토큰으로만 찾으므로 그대로 둔다.
+  const eventProductId = str(obj?.content?.id);
+  if (token.boundAt && eventProductId && eventProductId !== String(token.productId ?? '')) return 'wrong-product';
   if (!token.boundAt) {
     // 묶이지 않은 토큰은 첫 결제 완료로만 묶인다. 그 밖의 이벤트(실패·해지·환불)는 묶인 토큰에만 온다.
     if (type !== 'subscription_payment.completed') return 'unknown-ref';
