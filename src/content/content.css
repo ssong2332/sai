@@ -2355,7 +2355,9 @@
   border-color var(--dur-quick) var(--ease-out), transform var(--dur-press) var(--spring);
 }
 
-.sai-reply-intent:hover:not(:disabled) {
+/* 🔴 2026-11-10 — 선택(on)된 칩은 제외한다. 예전엔 이 규칙이 선택 칩 글자까지 `--ink`로 바꿔, 누른 직후 마우스가
+   그 위에 있으면 잉크 배경에 잉크 글자 — 이름이 통째로 사라졌다(라이트·다크 모두, 실측 rgb(25,31,40) on rgb(25,31,40)). */
+.sai-reply-intent:hover:not(:disabled):not(.sai-reply-intent-on) {
   color: var(--ink);
   border-color: var(--border-strong);
 }
@@ -2392,6 +2394,11 @@
   background: var(--ink);
   border-style: solid;
   border-color: var(--ink);
+  color: var(--on-ink);
+}
+
+/* 선택한 칩은 초안을 만드는 동안(disabled)에도 잉크 위 흰 글자 그대로 — 회색(`--mut`)이면 잉크 배경에 묻힌다. */
+.sai-reply-intent-on:disabled {
   color: var(--on-ink);
 }
 
