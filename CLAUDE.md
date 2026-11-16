@@ -5,6 +5,7 @@
 - API 키·비밀번호·토큰을 소스·문서·커밋 메시지에 쓰지 않는다. 비밀값은 `.env`에만, 커밋은 `.env.example`(플레이스홀더)만.
 - 근거 없는 성공 보고 금지. jsdom/단위 테스트 green만으로 "동작한다" 판정 금지 — **확장 기능은 실브라우저 unpacked 로드 확인이 있어야 done** (`docs/reference/Lessons.md` #1).
 - 요청받지 않은 수정·리팩토링·삭제 금지. 막히면 조용한 우회 대신 보고 후 승인.
+- **운영 배포는 사전 사용자 승인 없이 실행 금지** (2026-11-16 사용자 결정) — Firestore 규칙(`firebase deploy --only firestore:rules`) · Hosting(`firebase deploy --only hosting`) · Cloudflare Worker(`npx wrangler deploy`). 배포 전에 대상과 변경 내용을 보고하고 승인을 받는다.
 - 개인 숫자 점수 표기 금지(Spec 필수 9 G1/G2) · 국가 단위 단정 서술 금지(3순위 참고까지만).
 
 ## 문서 위계
@@ -33,7 +34,7 @@
 | 단위 테스트 | `npm test` | 2026-08-12 |
 | 로컬 refine 프록시 | `npm run proxy` | 2026-08-13 |
 | 프록시 상태 확인 | `curl http://127.0.0.1:8787/health` | 2026-08-13 |
-| Firestore 규칙 배포 | `firebase deploy --only firestore:rules` | 2026-08-13 |
+| Firestore 규칙 배포 (🔴 운영 배포 — 사전 사용자 승인 건) | `firebase deploy --only firestore:rules` | 2026-08-13 |
 | 🔴 폐기(2026-10-28 Functions 삭제) — refineV1 인증 확인 (무인증이 막히는지) | `curl -s -o /dev/null -w "%{http_code}" -X POST .../refineV1 -H "Content-Type: application/json" -d "{}"` → **401** | 2026-08-17 |
 | 🔴 폐기(2026-10-28 Functions 삭제) — 코어 → functions 동기화 | `node scripts/sync-core.mjs` | 2026-08-13 |
 | 🔴 폐기(2026-10-28 Functions 삭제, `firebase.json`에 설정 없음 #102) — Functions 배포 | `firebase deploy --only functions` (동시 다건 실패 시 `firebase deploy --only functions:<이름>`으로 개별 재시도) | 2026-08-13 |
@@ -43,7 +44,7 @@
 | Functions 의존성 설치 (worktree에 `functions/node_modules`가 없을 때) | `functions/` 안에서 `npm ci` — 🔴 `npm --prefix functions install`은 쓰지 않는다: `functions/package.json`에 `"sai": "file:.."` 의존성을 몰래 추가한다(2026-10-23 실측) | 2026-10-23 |
 | 대시보드 설치 | `dashboard/` 안에서 `npm ci` — 🔴 `npm --prefix dashboard install`은 쓰지 않는다: `dashboard/package.json`에 `"sai": "file:.."`를 몰래 넣는다(2026-10-25 실측) | 2026-10-25 |
 | 대시보드 빌드 | `npm --prefix dashboard run build` | 2026-08-13 |
-| 대시보드 배포 | `firebase deploy --only hosting` | 2026-08-13 |
+| 대시보드 배포 (🔴 운영 배포 — 사전 사용자 승인 건) | `firebase deploy --only hosting` | 2026-08-13 |
 | 대시보드 배포 확인 | `curl https://sai-global-msg-2026.web.app/` | 2026-08-13 |
 | 호스팅 조립(소개 사이트 `/` + 대시보드 `/dashboard/` + `/privacy.html`·`/terms.html` → `hosting-dist/`) | `node scripts/build-hosting.mjs` (hosting predeploy가 자동으로 부른다. 처리방침 원본은 `dashboard/public/` — 사이트 사본을 여기서 다시 쓴다) | 2026-10-25 |
 | 호스팅 로컬 확인(배포 아님) | `npx firebase serve --only hosting --port 5053` → `http://localhost:5053` (🔴 `127.0.0.1`로는 안 붙는다 — localhost로) | 2026-10-25 |
