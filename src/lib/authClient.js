@@ -180,7 +180,7 @@ async function postJson(url, body, fetchImpl) {
     throw new AuthError(AUTH_ERRORS.NETWORK);
   }
   const parsed = await response.json().catch(() => null);
-  return { ok: response.ok, body: parsed };
+  return { ok: response.ok, status: response.status, body: parsed };
 }
 
 /**
@@ -246,12 +246,15 @@ export async function getIdToken({ fetchImpl = globalThis.fetch } = {}) {
   if (!stored?.refreshToken) return null;
   if (stored.idToken && Date.now() < stored.expiresAt - EXPIRY_MARGIN_MS) return stored.idToken;
 
-  const { ok, body } = await postJson(
+  const { ok, status, body } = await postJson(
     `${REFRESH_URL}?key=${FIREBASE_API_KEY}`,
     { grant_type: 'refresh_token', refresh_token: stored.refreshToken },
     fetchImpl,
   );
 
+  // 🔴 2026-11-17 점검 — 토큰 서버의 **일시 장애**(5xx·429)는 세션을 지우지 않는다. 예전엔 구글이 잠깐 503만 내도
+  //    전원이 로그아웃됐다. 토큰이 정말 무효일 때(400·401·403)만 아래에서 지운다.
+  if (!ok && (status === 429 || status >= 500)) throw new AuthError(AUTH_ERRORS.NETWORK);
   if (!ok || !body?.id_token) {
     await removeLocal(STORAGE_KEYS.AUTH);
     throw new AuthError(AUTH_ERRORS.REFRESH_FAILED, body?.error?.message ?? 'no id_token');

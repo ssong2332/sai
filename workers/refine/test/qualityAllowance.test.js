@@ -118,7 +118,7 @@ test('B4 비용은 받은 요청마다 그 모드 추정치만큼 쌓이고, 달
   assert.equal(seoulMonthKey(new Date('2026-10-31T15:30:00Z')), '2026-11', '🔴 달 경계는 서울 기준');
 });
 
-test('B4·B5 Firestore — 한 트랜잭션에 하루 문서(premium)와 달 문서(micros)만, 본문·모델명 없음', async () => {
+test('B4·B5 Firestore — 하루 문서(premium, 트랜잭션)와 달 문서(micros, increment — 2026-11-17)만, 본문·모델명 없음', async () => {
   const fake = createFakeFirestore();
   const db = new RestFirestore({ projectId: 'sai-global-msg-2026', token: async () => 't', fetchImpl: fake.fetch });
   const now = () => new Date('2026-10-31T03:00:00Z');

@@ -144,6 +144,19 @@ test('🔴 갱신에 실패하면 세션을 지운다 — 죽은 토큰으로 "�
   assert.equal(await getSession(), null, '실패했는데 세션이 남아 있다');
 });
 
+test('🔴 2026-11-17 — 토큰 서버 일시 장애(5xx·429)는 세션을 지우지 않는다 · 네트워크 오류로 던진다', async () => {
+  for (const status of [503, 500, 429]) {
+    await setLocal(STORAGE_KEYS.AUTH, { uid: 'u1', email: 'a@b.com', idToken: 'stale', refreshToken: 'r1', expiresAt: Date.now() - 1000 });
+    const impl = fakeFetch(() => ({ status, body: { error: { message: 'UNAVAILABLE' } } }));
+    await assert.rejects(() => getIdToken({ fetchImpl: impl }), (e) => e.reason === AUTH_ERRORS.NETWORK, String(status));
+    assert.equal((await getSession())?.uid, 'u1', `${status}에 세션이 지워졌다`);
+  }
+  // 장애가 풀리면 같은 세션으로 다시 갱신된다.
+  const ok = fakeFetch(() => ({ body: { id_token: 'fresh', refresh_token: 'r2', expires_in: '3600' } }));
+  assert.equal(await getIdToken({ fetchImpl: ok }), 'fresh');
+  await signOut();
+});
+
 test('로그인한 적이 없으면 토큰 요청이 null이다 — 예외를 던지지 않는다', async () => {
   await signOut();
   assert.equal(await getIdToken(), null);
