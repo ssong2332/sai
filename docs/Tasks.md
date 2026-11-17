@@ -1467,3 +1467,25 @@ Gemini는 갈렸다(`Could you please …?`) — 즉 추상을 해석하는 정�
 
 「내 언어」는 **내가 쓰는 메시지의 원문 언어**(교정 요청의 `sourceLanguage`)이며 **화면 언어가 아니다.**
 화면에 이 구분을 적어 두는 안(ⓐ)은 2026-08-20에 검토했으나 **채택하지 않았다**(기록만 하기로 결정).
+
+## 🅒 예약 — 2026-11-17 감사 남은 항목 (7~18) · 기록만
+
+> 2026-11-17 전체 감사 18건 중 1~6은 PR #202(0.1.85)로 고쳤다(규칙 배포 완료 · Worker·스토어 미배포).
+> 아래 12건은 사용자 결정 「나머지는 일단 기록만 하고 나중에 수정하자」(2026-11-17)로 **보류**. 착수 전 해당 줄을 다시 확인한다.
+
+| # | 문제 | 겪는 일 (구체 사례) | 위치 | 작은 수정 | 크기 |
+|---|---|---|---|---|---|
+| 7 | 카드번호 앞에 다른 숫자가 있으면 못 잡음 · 13자리 주문번호를 주민번호로 오인 | `전화 010-1234-5678 4111 1111 1111 1111` → 감지 없음(2026-11-17 직접 실행) · `주문번호 2301151234567` → 주민번호로 막힘 | `src/content/sensitiveGuard.js:69-75` | 체크섬 실패 시 안쪽 13~19자리 구간 재검사 · 주민번호 구분자에 `–` `－` 추가 · 테스트 추가 | 작음 |
+| 8 | 크롬이 꺼진 사이 지난 예약은 알림이 영영 안 옴 | 09:00 예약 → 노트북 덮음 → 09:30 켜면 알람을 지우고 다시 걸지 않음. 확장 업데이트 때도 같다 | `src/background/index.js:378` `syncReservationAlarms` | 지났고 아직 안 알린(`notifiedAt` 없음) 예약은 바로 알림 | 작음 |
+| 9 | 그로블 구독 판정이 만료일을 안 봄 | 해지 웹훅을 하나라도 놓치면 그 사용자는 영구 Pro | `workers/refine/src/billing.js:68-77` `resolvePlan` | groble 문서는 `periodEnd`+여유일·`graceEnd`가 지났으면 free | 작음 · Worker 배포 |
+| 10 | Firestore 규칙을 실제로 돌려 보는 테스트가 없음(문자열 일치뿐) | 규칙에 구멍이 다시 생겨도 테스트 통과 | `test/refineAuth.unit.test.js:32,99` | 2026-11-17 에뮬레이터 16건(`local-e2e-harness` 메모)을 테스트로 | 중간 |
+| 11 | 「인증 후 모델 호출」 순서 테스트가 삭제된 `functions/index.js`를 검사 | Worker에서 순서가 깨져도 통과 | `test/refineAuth.unit.test.js:28-56` | 대상을 `workers/refine/src/handler.js`로. 그 뒤 `functions/index.js`(493줄)·`functions/health.js`(35줄) 삭제 가능 — `functions/teams.js` 등은 Worker가 쓴다, 지우지 않는다 | 작음 |
+| 12 | 예약 알람 처리(`syncReservationAlarms`·`onAlarm`)에 테스트 없음 | 8번 같은 회귀를 못 잡음 | `src/background/index.js` | 8번과 함께 | 작음 |
+| 13 | 소개 사이트에 스크립트 CSP 없음(`frame-ancestors`만) | 사이트 XSS가 생기면 확장 브리지(용어집 수정·팀 생성·결제 시작)를 사용자 대신 부름. 지금 발견된 XSS는 없음 — 심층 방어 | `firebase.json:13-20` | `script-src 'self'; object-src 'none'; base-uri 'self'` | 작음 · 호스팅 배포 |
+| 14 | 두 탭에서 동시에 예약 저장 시 하나가 사라질 수 있음(추정, 미재현) | 읽고·바꾸고·통째로 쓰기 — 나중 쓴 쪽만 남음. 저장 문구·용어집도 같은 모양 | `src/lib/reservations.js` | 쓰기를 background 한 곳으로 모으거나 항목별 키 | 중간 |
+| 15 | `safeEqual`·`hexOf`가 두 파일에 똑같이 있음 | 한쪽만 고칠 위험 | `billing.js:125-135` · `grobleBilling.js:90-99` | 하나만 남기고 import | 작음 |
+| 16 | 언어 코드가 틀린 요청도 하루 횟수 1회를 깎은 뒤 400 | 본인 한도만 깎임 | `workers/refine/src/handler.js` admit 앞 | 언어·빈 text 검사를 admit 앞으로 | 작음 |
+| 17 | 미결제 팀 잠금에서 한 팀 쓰기가 실패하면 나머지 팀이 안 잠기고 건수 로그도 없음 | 유예 끝난 팀 일부가 계속 열림 | `billing.js:321-340` `lockOverdueTeams` | 팀별 try/catch + 실패 건수 로그 | 작음 |
+| 18 | 예약 저장소 키를 문자열 `'sai.reservations'`로 직접 씀 | 한쪽만 바뀌면 예약 알림이 조용히 멈춤 | `src/background/index.js:357` | `STORAGE_KEYS.RESERVATIONS` 사용 | 한 줄 |
+
+그 밖에 보고만 하고 표에 넣지 않은 작은 것: 그로블 같은 시각 이벤트 순서(환불이 덮일 수 있음, 추정) · 복사 대체 경로가 페이지 DOM을 거침 · 리프레시 토큰을 `storage.local`에 둠(제품 결정 필요) · 화면 기본값 3곳 중복.
