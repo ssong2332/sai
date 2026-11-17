@@ -1,0 +1,130 @@
+<!doctype html>
+<!--
+  홍보 영상 ④ 「뜻 풀기 위젯」 9:16 · 12초 (2026-11-03).
+  참고: awesome-opus5-5-videos 「Widget Animation Motion Design」(@Khlaseek_dsgner) — 카드가 30%에서 100%로 커지며 나타나고,
+  카드가 자리 잡으면 항목이 차례로 미끄러져 들어온다. 선은 경로처럼 그려지고, 뒤 광채가 함께 밝아지며, 빛 띠 두 개가 시차를 두고 지나간다.
+  🔴 카드 글은 실제 사이 뜻 풀기 화면(스토어 스크린샷 2번 — 무대 페이지의 지어낸 대화)에서 옮겼다. 지어낸 결과 금지.
+  박자 100bpm. 큐: widget.cue.json
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-Regular.subset.woff2) format('woff2'); font-weight: 400; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-SemiBold.subset.woff2) format('woff2'); font-weight: 600; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-Bold.subset.woff2) format('woff2'); font-weight: 700; }
+  @font-face { font-family: P; src: url(../../../public/fonts/Pretendard-ExtraBold.subset.woff2) format('woff2'); font-weight: 800; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #0b0d12; }
+  body { font-family: P, sans-serif; word-break: keep-all; color: #191f28; }
+  #cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+  .abs { position: absolute; }
+  #glow { left: -60px; top: 380px; width: 1200px; height: 1400px; border-radius: 50%; filter: blur(110px);
+          background: radial-gradient(circle at 35% 40%, #f04419 0%, transparent 60%), radial-gradient(circle at 70% 65%, #3d5afe 0%, transparent 60%); }
+  #card { left: 80px; top: 480px; width: 920px; border-radius: 48px; background: #fff; padding: 52px 56px 56px; overflow: hidden; transform-origin: 50% 40%; }
+  .row { will-change: transform, opacity; }
+  .lbl { font-size: 28px; font-weight: 700; color: #626d7a; margin-bottom: 12px; }
+  .intent { background: #ecefff; border-radius: 32px; padding: 34px 38px; }
+  .intent .lbl { color: #3049d9; }
+  .intent p { font-size: 40px; font-weight: 700; line-height: 1.45; }
+  .quote { font-size: 32px; line-height: 1.45; color: #4e5968; font-weight: 600; }
+  .bar { height: 22px; border-radius: 11px; background: #e5e8eb; position: relative; overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 11px; }
+  .act { display: flex; gap: 18px; align-items: flex-start; font-size: 33px; line-height: 1.4; font-weight: 600; margin-top: 18px; }
+  .act b { flex: 0 0 48px; height: 48px; border-radius: 50%; background: #f2f4f6; display: grid; place-items: center; font-size: 26px; }
+  .sweep { position: absolute; top: -200px; width: 140px; height: 2400px; background: linear-gradient(90deg, transparent, rgba(61,90,254,.16), rgba(240,68,25,.12), transparent); transform: rotate(18deg); pointer-events: none; mix-blend-mode: multiply; } /* 🔴 흰 빛은 흰 카드 위에서 안 보였다(2026-11-03 프레임 확인) — 브랜드색 띠로 */
+  .head { position: absolute; left: 0; right: 0; text-align: center; overflow: hidden; height: 150px; }
+  .head span { display: block; font-size: 100px; font-weight: 800; letter-spacing: -0.04em; color: #fff; }
+</style>
+</head>
+<body>
+<div id="cam">
+  <div class="head" style="top:250px"><span id="h">받은 메시지, 속뜻까지.</span></div>
+  <div class="abs" id="glow"></div>
+  <div class="abs" id="card">
+    <div class="row" id="r0" style="display:flex;align-items:center;gap:14px;margin-bottom:34px">
+      <svg viewBox="0 0 188 96" width="58" height="30"><rect x="14" y="20" width="118" height="16" fill="#191f28"/><rect x="56" y="44" width="118" height="16" fill="#191f28"/><rect x="14" y="68" width="160" height="16" fill="#f04419"/></svg>
+      <span style="font-size:32px;font-weight:800">S·AI</span>
+      <span style="font-size:26px;font-weight:700;color:#3049d9;background:#ecefff;padding:6px 16px;border-radius:999px">뜻 풀기</span>
+    </div>
+    <div class="row" id="r1"><div class="lbl">받은 메시지</div><p class="quote">“…let me know by EOD tomorrow if we need to escalate?”</p></div>
+    <div class="row intent" id="r2" style="margin-top:34px">
+      <div class="lbl">실제 의도 — 완곡 표현 감지</div>
+      <p>벤더의 납품 연기로 다음 주 목요일 일정이 생겼으니, 발신자는 수신자 측 일정이 맞는지 확인받고 싶어 합니다. 내일 EOD까지 답이 없으면 상위 단계로 올리겠다는 뜻이 담겨 있습니다.</p>
+      <svg width="760" height="24" style="display:block;margin-top:12px"><path id="line" d="M4 14 C 120 2, 240 22, 380 12 S 640 4, 756 14" fill="none" stroke="#3d5afe" stroke-width="6" stroke-linecap="round"/></svg>
+    </div>
+    <div class="row" id="r3" style="margin-top:36px">
+      <div class="lbl" style="display:flex;justify-content:space-between"><span>체감 긴급도</span><span style="font-weight:600">표면과 실제가 같아요</span></div>
+      <div style="display:flex;align-items:center;gap:20px;margin-top:8px"><span style="font-size:28px;font-weight:700;width:70px">표면</span><div class="bar" style="flex:1"><i id="b1" style="background:#8b95a1"></i></div><span style="font-size:28px;font-weight:800;color:#3049d9;width:70px;text-align:right">Low</span></div>
+      <div style="display:flex;align-items:center;gap:20px;margin-top:16px"><span style="font-size:28px;font-weight:700;width:70px">실제</span><div class="bar" style="flex:1"><i id="b2" style="background:#3d5afe"></i></div><span style="font-size:28px;font-weight:800;color:#3049d9;width:70px;text-align:right">Low</span></div>
+    </div>
+    <div class="row" id="r4" style="margin-top:36px"><div class="lbl">요구 행동</div>
+      <div class="act" id="a1"><b>1</b><span>다음 주 목요일 납품 일정이 귀측에서 가능한지 확인하기</span></div>
+      <div class="act" id="a2"><b>2</b><span>내일 업무 종료 전까지 에스컬레이션 필요 여부 회신하기</span></div>
+    </div>
+    <div class="sweep" id="sw1"></div><div class="sweep" id="sw2" style="width:70px"></div>
+  </div>
+  <!-- 끝 장 -->
+  <div class="abs" id="end" style="left:0;top:0;width:1080px;height:1920px">
+    <div class="abs" id="e1" style="top:700px;height:44px;background:#fff"></div>
+    <div class="abs" id="e2" style="top:766px;height:44px;background:#fff"></div>
+    <div class="abs" id="e3" style="top:832px;height:44px;background:#f04419"></div>
+    <div class="head" style="top:950px;height:230px"><span id="t1" style="font-size:200px">사이</span></div>
+    <div class="head" style="top:1200px;height:80px"><span id="t2" style="font-size:54px;font-weight:700">크롬 확장 · 지금 무료</span></div>
+  </div>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  const prog = (t, a, d) => clamp((t - a) / d);
+  const out3 = (p) => 1 - Math.pow(1 - clamp(p), 3);
+  const inOut = (p) => { p = clamp(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+  const spring = (t, zeta, settle) => { if (t <= 0) return 0; const w = 4 / (zeta * settle), wd = w * Math.sqrt(1 - zeta * zeta); return 1 - Math.exp(-zeta * w * t) * (Math.cos(wd * t) + (zeta / Math.sqrt(1 - zeta * zeta)) * Math.sin(wd * t)); };
+  const LEN = $('line').getTotalLength();
+  $('line').style.strokeDasharray = LEN;
+  const slideIn = (el, t, at) => { const p = out3(prog(t, at, 0.4)); el.style.opacity = p; el.style.transform = `translateY(${(1 - p) * 50}px)`; };
+  const rise = (el, t, at) => { el.style.transform = `translateY(${(1 - out3(prog(t, at, 0.4))) * 110}%)`; };
+
+  window.render = (t) => {
+    // 제목 — 6.0초에 바뀐다
+    const second = t >= 6.0;
+    $('h').textContent = second ? '직역 말고, 실제 의도.' : '받은 메시지, 속뜻까지.';
+    const hOut = t >= 5.8 && t < 6.0 ? out3(prog(t, 5.8, 0.2)) : 0;
+    $('h').style.transform = `translateY(${(1 - out3(prog(t, second ? 6.0 : 0.2, 0.4))) * 110 - hOut * 110}%)`;
+    $('h').parentElement.style.display = t < 8.4 ? 'block' : 'none';
+    // 카드 — 30% → 100%, 보이지 않다가 보인다(스프링)
+    const cs = spring(t - 0.6, 0.75, 0.6);
+    const shrink = inOut(prog(t, 8.4, 0.6));
+    const scale = (0.3 + 0.7 * cs) * (1 - 0.7 * shrink);
+    $('card').style.transform = `translateY(${-shrink * 300}px) scale(${scale})`;
+    $('card').style.opacity = clamp((t - 0.6) / 0.3) * (1 - shrink);
+    $('card').style.display = t < 9.1 ? 'block' : 'none';
+    // 항목이 차례로
+    [['r0', 1.3], ['r1', 1.6], ['r2', 2.0], ['r3', 3.2], ['a1', 4.1], ['a2', 4.4]].forEach(([id, at]) => slideIn($(id), t, at));
+    $('r4').style.opacity = t >= 4.0 ? 1 : 0;
+    $('line').style.strokeDashoffset = LEN * (1 - inOut(prog(t, 2.6, 0.7)));
+    $('b1').style.width = `${33 * out3(prog(t, 3.5, 0.5))}%`;
+    $('b2').style.width = `${33 * out3(prog(t, 3.7, 0.5))}%`;
+    // 뒤 광채 — 항목이 들어오는 동안 밝아진다
+    $('glow').style.opacity = 0.95 * inOut(prog(t, 1.3, 3.2)) * (1 - shrink);
+    $('glow').style.transform = `scale(${0.8 + 0.25 * inOut(prog(t, 1.3, 4))})`;
+    // 빛 띠 두 개 — 시차를 두고 지나간다
+    $('sw1').style.left = `${-300 + 1600 * inOut(prog(t, 5.0, 0.8))}px`;
+    $('sw2').style.left = `${-300 + 1600 * inOut(prog(t, 5.2, 0.8))}px`;
+    // 카메라 — 천천히 다가가며 살짝 뜬다
+    const cz = 1 + 0.05 * inOut(prog(t, 5.2, 3.0));
+    $('cam').style.transform = `scale(${cz}) translateY(${Math.sin(t * 1.2) * 6}px)`;
+    // 끝 장
+    $('end').style.display = t >= 8.9 ? 'block' : 'none';
+    const unit = 3.2, left = 540 - (188 * unit) / 2;
+    [['e1', 14, 118, 8.95], ['e2', 56, 118, 9.1], ['e3', 14, 160, 9.25]].forEach(([id, x, w, at]) => {
+      const p = out3(prog(t, at, 0.32));
+      Object.assign($(id).style, { left: `${left + x * unit}px`, width: `${w * unit * p}px` });
+    });
+    [['t1', 9.5], ['t2', 9.75]].forEach(([id, at]) => rise($(id), t, at));
+  };
+  const q = new URLSearchParams(location.search).get('t');
+  window.render(q === null ? 0 : Number(q));
+</script>
+</body>
+</html>
