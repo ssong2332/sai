@@ -24,12 +24,41 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly(allowed);
     }
 
+    // 🔴 2026-11-17 점검 — 칸 이름만 정하면 그 칸에 본문(최대 1MB)을 넣을 수 있었다(Zero Retention 위반 경로).
+    //    허용한 칸마다 형식·길이를 확인한다. 없는 칸·null은 통과(클라이언트는 칸을 지울 때 updateMask로 뺀다).
+    function optString(field, max) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] == null
+        || (request.resource.data[field] is string && request.resource.data[field].size() <= max);
+    }
+    function optBool(field) {
+      return !(field in request.resource.data) || request.resource.data[field] is bool;
+    }
+    function optNumber(field) {
+      return !(field in request.resource.data) || request.resource.data[field] is number;
+    }
+    // 시각 — 서버 시각(timestamp) 또는 ISO 문자열(팀 용어집 클라이언트가 문자열로 보낸다).
+    function optTime(field) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] is timestamp
+        || (request.resource.data[field] is string && request.resource.data[field].size() <= 40);
+    }
+
     // 개인 프로필 — 자기신고 성향값과 온보딩 결과. 본문 없음.
     match /users/{userId} {
       allow read, delete: if isOwner(userId);
       allow create, update: if isOwner(userId)
         && onlyFields(['language', 'partnerRegions', 'tone', 'honorificLevel',
-                       'directness', 'emojiPreference', 'updatedAt']);
+                       'directness', 'emojiPreference', 'updatedAt'])
+        && optString('language', 16) && optString('tone', 32) && optString('honorificLevel', 32)
+        && optString('directness', 32) && optString('emojiPreference', 32) && optTime('updatedAt')
+        // 확장은 지역 하나만 배열로 보낸다(`syncClient.js` onboardingToFields) — 규칙은 원소를 다 돌 수 없어 1개로 묶는다.
+        && (!('partnerRegions' in request.resource.data)
+            || (request.resource.data.partnerRegions is list
+                && request.resource.data.partnerRegions.size() <= 1
+                && (request.resource.data.partnerRegions.size() == 0
+                    || (request.resource.data.partnerRegions[0] is string
+                        && request.resource.data.partnerRegions[0].size() <= 32))));
     }
 
     // 🔴 Diff 학습 — **수치만** 적재한다 (Spec 필수 2 / audit 6).
@@ -42,7 +71,8 @@ service cloud.firestore {
         && request.resource.data.kind is string
         && request.resource.data.kind.size() <= 64
         && request.resource.data.count is int
-        && request.resource.data.count >= 0;
+        && request.resource.data.count >= 0
+        && optNumber('distance') && optTime('updatedAt');
     }
 
     // 용어집 (Spec 필수 7). 용어는 본문이 아니라 사용자가 등록한 짧은 대응쌍이다.
@@ -50,6 +80,7 @@ service cloud.firestore {
       allow read, delete: if isOwner(userId);
       allow create, update: if isOwner(userId)
         && onlyFields(['sourceText', 'targetText', 'keepSource', 'entryType', 'updatedAt'])
+        && optBool('keepSource') && optString('entryType', 32) && optTime('updatedAt')
         && request.resource.data.sourceText is string
         && request.resource.data.sourceText.size() <= 200
         // 🔴 2026-11-07 점검 — 번역어도 팀 용어집과 같은 200자 상한. 예전엔 상한이 없어 본문이 이 칸에 들어갈 수 있었다.
@@ -140,10 +171,13 @@ service cloud.firestore {
         allow read, delete: if isMember();
         allow create, update: if isMember()
           && onlyFields(['sourceText', 'targetText', 'keepSource', 'updatedAt', 'updatedBy'])
+          && optBool('keepSource') && optTime('updatedAt') && optString('updatedBy', 128)
           && request.resource.data.sourceText is string
           && request.resource.data.sourceText.size() <= 200
+          // 🔴 2026-11-17 — 개인 용어집과 같이 null(원문 유지)도 받는다. 예전엔 null에 `.size()`를 불러 거절됐다.
           && (!('targetText' in request.resource.data)
-              || request.resource.data.targetText.size() <= 200);
+              || request.resource.data.targetText == null
+              || (request.resource.data.targetText is string && request.resource.data.targetText.size() <= 200));
       }
     }
 

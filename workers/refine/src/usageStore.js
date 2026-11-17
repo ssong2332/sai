@@ -1,6 +1,7 @@
 import { consumeDailyQuota, DAILY_REFINE_LIMIT, quotaExpireAt, seoulDateKey } from '../../../functions/refineQuota.js';
 import { recordDailyUser, recordRequest } from '../../../functions/betaMetrics.js';
 import { googleClientsFromEnv } from './google/clients.js';
+import { FieldValue } from './google/firestoreRest.js';
 import { costMicros, decideQuality, MONTHLY_HARD_STOP_MICROS, seoulMonthKey } from './qualityAllowance.js';
 
 /**
@@ -63,6 +64,7 @@ export function createMemoryUsageStore({
   const replies = new Map(); // `${날짜}:${uid}` → 회신 초안 횟수(무료 한도가 있을 때만 센다)
   const budget = new Map(); // 달 → 추정 비용(백만분의 1달러)
   const billing = new Map(); // uid → billing 문서(테스트가 setBilling으로 넣는다)
+  const teamMembers = new Set(); // `${teamId}:${uid}` (테스트가 addTeamMember로 넣는다)
   const requests = [];
   const dailyUsers = new Set();
   return {
@@ -103,6 +105,12 @@ export function createMemoryUsageStore({
     setBilling(uid, doc) {
       billing.set(uid, doc);
     },
+    async isTeamMember(uid, teamId) {
+      return teamMembers.has(`${teamId}:${uid}`);
+    },
+    addTeamMember(uid, teamId) {
+      teamMembers.add(`${teamId}:${uid}`);
+    },
     monthMicros: () => budget.get(month()) ?? startMicros,
     async getMonthMicros() {
       return budget.get(month()) ?? startMicros;
@@ -136,6 +144,11 @@ export function createFirestoreUsageStore({ db, limit = DAILY_REFINE_LIMIT, now 
       const snap = await db.collection('billing').doc(uid).get();
       return snap.exists ? snap.data() ?? null : null;
     },
+    // 2026-11-17 — 무료 사용자의 팀 용어 확인용(`handler.js`). 팀원 문서가 있고 팀이 잠기지 않았을 때만 true. 읽기 2회(한 번에).
+    isTeamMember: async (uid, teamId) => {
+      const [member, team] = await db.getAll(db.doc(`teams/${teamId}/members/${uid}`), db.doc(`teams/${teamId}`));
+      return member.exists && team.exists && team.data()?.locked !== true;
+    },
     recordDailyUser: (uid) => recordDailyUser(db, uid, now()),
     recordRequest: (input) => recordRequest(db, input, now()),
     addBudget: (micros) => addBudgetFirestore(db, micros, now()),
@@ -157,9 +170,13 @@ async function admitFirestore(db, { uid, quality, limit, limits = null, replyLim
   const monthKey = seoulMonthKey(now);
   const quotaRef = db.collection('refineQuota').doc(`${uid}_${dateKey}`);
   const budgetRef = db.collection('budgetMonthly').doc(monthKey);
-  return db.runTransaction(async (tx) => {
+  // 🔴 2026-11-17 점검 — 이달 예산 문서는 모든 사용자가 같이 쓰는 문서 1개다. 예전엔 이 문서를 트랜잭션 안에서 읽고 써서
+  //    동시 요청이 늘면 경합(409)으로 admit이 실패했고, handler는 실패를 「통과」로 처리해 한도·멈춤선이 꺼졌다.
+  //    지금: 예산은 트랜잭션 **밖**에서 읽고(조금 늦은 값이어도 멈춤선 판정엔 충분), 더하기는 `increment`로 따로 한다.
+  //    트랜잭션은 사용자별 문서 하나만 잡는다.
+  const budgetSnap = await budgetRef.get();
+  const decidedResult = await db.runTransaction(async (tx) => {
     const quotaSnap = await tx.get(quotaRef);
-    const budgetSnap = await tx.get(budgetRef);
     const q = quotaSnap.exists ? quotaSnap.data() ?? {} : {};
     const used = Number(q.count ?? 0);
     if (used >= limit) return { ok: false, used, limit };
@@ -178,9 +195,17 @@ async function admitFirestore(db, { uid, quality, limit, limits = null, replyLim
       quotaDoc.premium = { [decided.quality]: (premiumUsed[decided.quality] ?? 0) + 1 };
     }
     tx.set(quotaRef, quotaDoc, { merge: true });
-    tx.set(budgetRef, { monthKey, micros: monthMicros + costMicros(decided.quality), updatedAt: now }, { merge: true });
     return { ok: true, used: used + 1, limit, ...decided };
   });
+  if (decidedResult.ok) {
+    // 횟수는 이미 셌다 — 비용 더하기가 실패해도 요청은 막지 않고, handler가 `budgetNotCounted`를 로그에 남긴다.
+    try {
+      await budgetRef.set({ monthKey, micros: FieldValue.increment(costMicros(decidedResult.quality)), updatedAt: now }, { merge: true });
+    } catch {
+      return { ...decidedResult, budgetNotCounted: true };
+    }
+  }
+  return decidedResult;
 }
 
 /**
@@ -190,12 +215,8 @@ async function admitFirestore(db, { uid, quality, limit, limits = null, replyLim
 async function addBudgetFirestore(db, micros, now) {
   if (!(micros > 0)) return;
   const monthKey = seoulMonthKey(now);
-  const ref = db.collection('budgetMonthly').doc(monthKey);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const current = snap.exists ? Number(snap.data()?.micros ?? 0) : 0;
-    tx.set(ref, { monthKey, micros: current + micros, updatedAt: now }, { merge: true });
-  });
+  // 2026-11-17 — 트랜잭션 대신 `increment`(전 사용자 공용 문서라 경합을 만들지 않는다, `admitFirestore`와 같은 이유).
+  await db.collection('budgetMonthly').doc(monthKey).set({ monthKey, micros: FieldValue.increment(micros), updatedAt: now }, { merge: true });
 }
 
 const NOOP = createNoopUsageStore();

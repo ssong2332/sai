@@ -21,6 +21,7 @@ import {
 import { buildCasualToneBlock } from '../core/meme/index.js';
 import { getLocal, STORAGE_KEYS, THREAD_CONTEXT_DEFAULT } from '../lib/storage.js';
 import { effectiveQuality } from '../core/refine/quality.js';
+import { fitGlossary } from '../core/refine/limits.js';
 import { getOnboarding, languagePairFrom } from '../lib/onboarding.js';
 import { detectLanguage } from '../lib/detectLanguage.js';
 import { hasAppliedTeamGlossary } from '../lib/friction.js';
@@ -104,12 +105,20 @@ export async function requestRefine(request) {
   const teamEntries =
     teamId === PERSONAL_TEAM_ID ? [] : await listTeamGlossary({ teamId });
 
-  const glossary =
-    request.glossary ??
-    [
-      ...toRefinePayloadGlossary(await listPersonalGlossary(), targetLanguage).slice(0, planFeatures.personalGlossary ?? undefined),
-      ...toRefinePayloadTeamGlossary(teamEntries, targetLanguage),
-    ];
+  /**
+   * 🔴 2026-11-17 점검 — 서버는 항목 `MAX_GLOSSARY_ENTRIES`개를 넘으면 요청 전체를 거절한다(`glossary-too-long`).
+   *    예전엔 팀 용어를 개수 제한 없이 실어, 팀원 누가 301번째 용어를 넣으면 **팀 전원의 다듬기**가 실패했다.
+   *    개인 용어를 먼저 두고(우선순위가 높다) 남은 자리만큼만 팀 용어를 싣는다. 서버가 빼는 긴 용어는 미리 뺀다.
+   */
+  const { personal: personalPayload, team: teamPayload } = fitGlossary(
+    toRefinePayloadGlossary(await listPersonalGlossary(), targetLanguage),
+    toRefinePayloadTeamGlossary(teamEntries, targetLanguage),
+    planFeatures.personalGlossary,
+  );
+  const glossary = request.glossary ?? [...personalPayload, ...teamPayload];
+  // 서버가 무료 사용자의 팀 용어를 팀원 확인 후에만 받는다(Worker `isTeamMember`) — 실은 팀 용어의 팀 id를 함께 보낸다.
+  const glossaryTeamId =
+    request.glossary || teamPayload.length === 0 ? null : teamId ?? (await getTeam().catch(() => null))?.teamId ?? null;
   /**
    * 문체 수위 — **하나의 눈금, 세 칸** (2026-08-18). `'casual' | 'formal' | null(기본)`.
    *
@@ -149,6 +158,7 @@ export async function requestRefine(request) {
     quality,
     ...request,
     glossary,
+    teamId: glossaryTeamId,
     profile,
     recipient,
     casualTone,

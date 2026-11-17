@@ -61,7 +61,13 @@ import { createNoopUsageStore } from './usageStore.js';
 import { budgetLevel, extraCallsMicros } from './qualityAllowance.js';
 import { handleTeam } from './teamRoute.js';
 import { featuresFor, resolveQuality, qualityStepDeps } from '../../../src/core/refine/quality.js';
-import { MAX_TEXT_CHARS, MAX_DECISIONS_CHARS, MAX_GLOSSARY_ENTRIES } from '../../../src/core/refine/limits.js';
+import {
+  MAX_TEXT_CHARS,
+  MAX_DECISIONS_CHARS,
+  MAX_GLOSSARY_ENTRIES,
+  MAX_GLOSSARY_TERM_CHARS,
+  MAX_REQUEST_EXTRA_CHARS,
+} from '../../../src/core/refine/limits.js';
 import { googleClientsFromEnv } from './google/clients.js';
 import { PLAN_LIMITS, handleBilling, readBillingConfig, resolvePlan } from './billing.js';
 
@@ -79,23 +85,39 @@ import { PLAN_LIMITS, handleBilling, readBillingConfig, resolvePlan } from './bi
  * | refine · decode · reply | `MAX_TEXT_CHARS` |
  * | decisions(대화 전체 요약) | `MAX_DECISIONS_CHARS` |
  * `glossary`는 항목 `MAX_GLOSSARY_ENTRIES`개까지. 넘으면 사유 코드만 돌려준다.
- * @returns {null|'text-too-long'|'glossary-too-long'}
+ * 요청 전체(JSON)는 본문 상한 + `MAX_REQUEST_EXTRA_CHARS`자까지. 긴 용어 하나는 거절 대신 `dropLongGlossaryTerms`가 뺀다.
+ * @returns {null|'text-too-long'|'glossary-too-long'|'request-too-large'}
  */
 export function requestTooLong(body, modeName) {
   const limit = modeName === 'decisions' ? MAX_DECISIONS_CHARS : MAX_TEXT_CHARS;
   if (typeof body?.text === 'string' && body.text.length > limit) return 'text-too-long';
   if (Array.isArray(body?.glossary) && body.glossary.length > MAX_GLOSSARY_ENTRIES) return 'glossary-too-long';
+  // 🔴 2026-11-17 점검 — 프로필·수신자 등 따로 상한이 없는 칸까지 — 요청 전체 크기(본문 상한 + 여유).
+  if (JSON.stringify(body).length > limit + MAX_REQUEST_EXTRA_CHARS) return 'request-too-large';
   return null;
 }
 
-export function applyPlanFeatures(body, features) {
+/**
+ * 🔴 2026-11-17 점검 — 용어 하나에 긴 글을 넣으면 요청 한 건이 수만 토큰이 됐다(비용은 건당 고정 추정으로 센다).
+ * 원문·번역어가 `MAX_GLOSSARY_TERM_CHARS`자를 넘는 항목은 **뺀다**(거절하지 않는다 — 확장의 개인 용어집은 길이 상한이 없어서
+ * 옛 항목 하나 때문에 모든 다듬기가 막히면 안 된다).
+ */
+export function dropLongGlossaryTerms(body) {
+  if (!Array.isArray(body?.glossary)) return body;
+  const tooLong = (v) => typeof v === 'string' && v.length > MAX_GLOSSARY_TERM_CHARS;
+  body.glossary = body.glossary.filter((e) => !tooLong(e?.sourceText) && !tooLong(e?.targetText));
+  return body;
+}
+
+export function applyPlanFeatures(body, features, { teamVerified = false } = {}) {
   if (!body || typeof body !== 'object') return body;
   if (features.personalGlossary != null && Array.isArray(body.glossary)) {
     let kept = 0;
     body.glossary = body.glossary.filter((entry) => {
       // 🔴 2026-11-07 점검 — 예전엔 `scope === 'personal'`만 세서, `scope`를 빼거나 다른 값을 넣으면 무료 5개 제한을
       //    그냥 넘었다. 팀 항목(`'team'`)만 빼고 전부 개인으로 센다.
-      if (entry?.scope === 'team') return true;
+      // 🔴 2026-11-17 — 팀 항목도 서버가 팀원임을 확인했을 때만(`teamVerified`) 뺀다. 아니면 개인과 같이 센다.
+      if (entry?.scope === 'team' && teamVerified) return true;
       kept += 1;
       return kept <= features.personalGlossary;
     });
@@ -349,6 +371,7 @@ export function createHandler(deps = {}) {
       logger.warn(`[${modeName}] 요청 거절: ${tooLong}`);
       return json(400, { error: tooLong });
     }
+    dropLongGlossaryTerms(body);
 
     // 🔴 2026-10-30 품질 모드 — 다듬기(refine)만. 확장은 이름만 보내고 모델·사고·effort는 `quality.js` 표가 정한다.
     //    모르는 값·없음은 기본값(빠른). 2026-10-31부터 아래 ⑥이 상위 모드를 빠른으로 낮출 수 있다(`qualityAllowance.js`).
@@ -359,11 +382,14 @@ export function createHandler(deps = {}) {
 
     // ⑥ 일일 상한 + 품질 모드 허용량 — 기존과 같이 **카운터 장애로 교정을 멈추지 않는다**(저장소를 못 만들어도 noop으로 통과).
     const store = resolveStore(storeFor, env, logger);
+    // 구독 문서를 실제로 읽었는가 — 못 읽었으면 유료 사용자도 free로 보이므로 아래 「확인 실패 시 거절」을 하지 않는다.
+    let planKnown = false;
     try {
       // 2026-10-31 요금제별 한도 — 구독 문서가 없거나 못 읽으면 `beta`/`free`(`BILLING_ENFORCED`) 판정표 그대로.
       try {
         const billingDoc = store.getBilling ? await store.getBilling(uid) : null;
         plan = resolvePlan(billingDoc, readBillingConfig(env));
+        planKnown = true;
       } catch (error) {
         plan = resolvePlan(null, readBillingConfig(env));
         logger.error(`[billing] 구독 확인 실패 — ${plan}로 처리: ${error?.code ?? error?.name ?? 'unknown'}`);
@@ -392,8 +418,15 @@ export function createHandler(deps = {}) {
         // 🔴 사유 코드만 — uid·본문 없음.
         logger.log(`[refine] 품질 모드 낮춤 → ${quality} reason=${downgrade}`);
       }
+      if (quota.budgetNotCounted) logger.error('[refine] 이달 비용 더하기 실패 — 횟수만 셈');
       if (quota.used === 1) await safeMetric(logger, () => store.recordDailyUser(uid));
     } catch (error) {
+      // 🔴 2026-11-17 점검 — 구독을 읽어 **무료로 확인된** 사용자는 셀 수 없으면 거절한다(한도 없이 열리는 것 방지).
+      //    구독조차 못 읽은 장애(유료 사용자도 free로 보인다)와 유료·beta는 예전처럼 통과시킨다.
+      if (planKnown && plan === 'free') {
+        logger.error(`[refine] 상한 확인 실패 — 무료라 거절: ${error?.code ?? error?.name ?? 'unknown'}`);
+        return json(503, { error: 'quota-unavailable' });
+      }
       logger.error(`[refine] 상한 확인 실패 — 통과시킴: ${error?.code ?? error?.name ?? 'unknown'}`);
       // 🔴 셀 수 없을 때 비싼 모드를 열어 두지 않는다 — 다듬기는 빠른 모드로(안전한 쪽, 2026-10-31).
       if (quality && quality !== 'fast') {
@@ -405,7 +438,20 @@ export function createHandler(deps = {}) {
     // ⑥-2 무료 요금제 정리(2026-11-05 「무료 2단계」) — 확장이 이미 거르지만 옛 확장·조작 요청도 같은 결과가 되게 서버가 한 번 더.
     //    개인 용어는 앞에서 N개만(`PLAN_FEATURES.personalGlossary`), 학습 기록(`profile.learned`)은 버린다. 팀 용어는 건드리지 않는다
     //    (팀 잠금은 팀 쪽이 판정 — 유예 중인 팀의 무료 팀원도 팀 용어를 쓴다).
-    applyPlanFeatures(body, featuresFor(plan));
+    // 🔴 2026-11-17 점검 — 「팀 용어」 표시는 요청이 붙인 값일 뿐이다. 무료 요금제면 `teamId`의 팀원(잠기지 않은 팀)인지
+    //    확인된 경우에만 팀 항목을 개인 상한 밖으로 둔다. 확인 못 하면 팀 항목도 개인으로 센다(조작한 요청의 5개 제한 우회 차단).
+    const features = featuresFor(plan);
+    let teamVerified = false;
+    if (features.personalGlossary != null && Array.isArray(body.glossary) && body.glossary.some((e) => e?.scope === 'team')) {
+      const teamId = typeof body.teamId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(body.teamId) ? body.teamId : null;
+      if (teamId && store.isTeamMember) {
+        teamVerified = await store.isTeamMember(uid, teamId).catch((error) => {
+          logger.error(`[refine] 팀원 확인 실패 — 팀 용어를 개인으로 셈: ${error?.code ?? error?.name ?? 'unknown'}`);
+          return false;
+        });
+      }
+    }
+    applyPlanFeatures(body, features, { teamVerified });
 
     // ⑦ provider — 위 판정표. 명시 요청은 대체하지 않는다.
     const selected = resolveProvider(body.provider, config.keys);
